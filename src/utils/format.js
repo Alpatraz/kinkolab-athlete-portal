@@ -15,3 +15,7 @@ export function totalRaised(athlete) {
 export function progressOf(athlete) {
   return Math.round((totalRaised(athlete) / Number(athlete.goal || 1)) * 100);
 }
+
+export function campaignTitle(campaigns, id) {
+  return campaigns.find((campaign) => campaign.id === id)?.title || "Campagne inconnue";
+}
