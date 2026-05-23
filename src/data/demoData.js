@@ -4,23 +4,144 @@ export const campaignsSeed = [
     title: "Championnats du monde 2026",
     subtitle: "Campagne internationale",
     location: "Espagne",
-    date: "Octobre 2026"
-  }
+    date: "Octobre 2026",
+    status: "Campagne active",
+    description:
+      "Campagne dédiée aux athlètes qualifiés pour les Championnats du monde 2026. Elle regroupe les pages athlètes, la collection Shopify et les objectifs de financement.",
+    shopifyCollectionUrl: "https://kinkolab.com/collections/championnats-du-monde-2026",
+  },
+  {
+    id: "wako-italy-2026",
+    title: "WAKO Italie 2026",
+    subtitle: "Campagne compétition",
+    location: "Italie",
+    date: "2026",
+    status: "Ouvert aux inscriptions",
+    description:
+      "Campagne pour aider les athlètes sélectionnés à financer déplacement, inscription, équipement et préparation.",
+    shopifyCollectionUrl: "https://kinkolab.com/collections/wako-italie-2026",
+  },
+  {
+    id: "season-2026",
+    title: "Saison compétitive 2026",
+    subtitle: "Fonds saisonnier",
+    location: "Québec / Canada",
+    date: "Saison 2026",
+    status: "Campagne continue",
+    description:
+      "Campagne flexible pour soutenir les athlètes sur plusieurs compétitions de la saison.",
+    shopifyCollectionUrl: "https://kinkolab.com/collections/saison-competitive-2026",
+  },
 ];
 
 export const athletesSeed = [
   {
     id: "noah-martin",
     name: "Noah Martin",
-    dojo: "Sunfuki Terrebonne",
+    campaignId: "world-2026",
     program: "Championnats du monde 2026",
-    avatar: "🥋",
+    province: "Québec",
+    discipline: "Karaté combat",
+    dojo: "Sunfuki Terrebonne",
+    belt: "Noire",
+    status: "accepté",
     goal: 2500,
     raisedShop: 840,
     raisedOffline: 300,
-    featured: true
-  }
+    views: 1284,
+    daysLeft: 12,
+    featured: true,
+    recentlyAdded: false,
+    avatar: "🥋",
+    category: "Fin bientôt",
+    shopifyUrl: "https://kinkolab.com/collections/supporter-noah-martin",
+    sponsorUrl: "https://kinkolab.com/products/commandite-noah-martin",
+    bio:
+      "Noah représente fièrement son dojo et prépare sa participation aux Championnats du monde 2026. Sa page permet de suivre son parcours et de le soutenir concrètement.",
+    sponsors: ["Restaurant local", "Clinique sportive ABC"],
+    steps: [
+      { label: "Qualification", status: "completed", note: "Place confirmée dans l’équipe" },
+      { label: "Enregistrement", status: "completed", note: "Dossier athlète créé" },
+      { label: "Billets d’avion", status: "in_progress", note: "Recherche et réservation à venir" },
+      { label: "Hôtel", status: "pending", note: "Budget à confirmer" },
+      { label: "Équipement", status: "in_progress", note: "Produits supporters et équipement officiel" },
+      { label: "Départ", status: "pending", note: "Préparation finale" },
+    ],
+  },
+  {
+    id: "emma-roy",
+    name: "Emma Roy",
+    campaignId: "wako-italy-2026",
+    program: "WAKO Italie 2026",
+    province: "Québec",
+    discipline: "Point fighting",
+    dojo: "Sunfuki Laval",
+    belt: "Brune",
+    status: "accepté",
+    goal: 2000,
+    raisedShop: 520,
+    raisedOffline: 150,
+    views: 742,
+    daysLeft: 46,
+    featured: true,
+    recentlyAdded: true,
+    avatar: "🏆",
+    category: "Récemment ajouté",
+    shopifyUrl: "https://kinkolab.com/collections/supporter-emma-roy",
+    sponsorUrl: "https://kinkolab.com/products/commandite-emma-roy",
+    bio:
+      "Emma finance sa saison compétitive avec une campagne personnalisée reliée aux produits supporters KinkoLab.",
+    sponsors: ["Famille & amis"],
+    steps: [
+      { label: "Qualification", status: "completed", note: "Sélection confirmée" },
+      { label: "Enregistrement", status: "in_progress", note: "Documents en cours" },
+      { label: "Billets d’avion", status: "pending", note: "À planifier" },
+      { label: "Hôtel", status: "pending", note: "À réserver" },
+      { label: "Équipement", status: "in_progress", note: "Campagne ouverte" },
+      { label: "Départ", status: "pending", note: "À venir" },
+    ],
+  },
+  {
+    id: "liam-gagnon",
+    name: "Liam Gagnon",
+    campaignId: "season-2026",
+    program: "Saison compétitive 2026",
+    province: "Québec",
+    discipline: "Kata",
+    dojo: "Sunfuki Mascouche",
+    belt: "Bleue",
+    status: "accepté",
+    goal: 1500,
+    raisedShop: 310,
+    raisedOffline: 90,
+    views: 1540,
+    daysLeft: 30,
+    featured: false,
+    recentlyAdded: false,
+    avatar: "🔥",
+    category: "Les plus vus",
+    shopifyUrl: "https://kinkolab.com/collections/supporter-liam-gagnon",
+    sponsorUrl: "https://kinkolab.com/products/commandite-liam-gagnon",
+    bio:
+      "Liam prépare plusieurs compétitions cette saison. Sa campagne finance une partie des frais grâce à la boutique et aux actions locales.",
+    sponsors: ["Famille Gagnon"],
+    steps: [
+      { label: "Qualification", status: "completed", note: "Objectif de saison confirmé" },
+      { label: "Enregistrement", status: "completed", note: "Profil public créé" },
+      { label: "Transport", status: "pending", note: "Selon calendrier" },
+      { label: "Hôtel", status: "pending", note: "Selon compétitions" },
+      { label: "Équipement", status: "in_progress", note: "Produits disponibles" },
+      { label: "Compétitions", status: "pending", note: "Calendrier à suivre" },
+    ],
+  },
 ];
 
-export const wallSeed = [];
-export const updatesSeed = [];
+export const updatesSeed = [
+  { id: 1, athleteId: "noah-martin", type: "Nouvelle", title: "Qualification confirmée", content: "Noah a confirmé sa place dans l’équipe pour la compétition internationale." },
+  { id: 2, athleteId: "emma-roy", type: "Activité", title: "Campagne ouverte", content: "La page de financement d’Emma est maintenant disponible." },
+];
+
+export const wallSeed = [
+  { id: 1, athleteId: "noah-martin", name: "Famille Tremblay", message: "Bravo Noah, toute l’équipe est derrière toi !", status: "approuvé" },
+  { id: 2, athleteId: "emma-roy", name: "Coach Marc", message: "Continue ton excellent travail Emma !", status: "approuvé" },
+];
