@@ -4,10 +4,8 @@ import {
   CalendarDays,
   CheckCircle2,
   Copy,
-  Facebook,
   Gift,
   HeartHandshake,
-  Instagram,
   Mail,
   Megaphone,
   MessageCircle,
@@ -191,7 +189,6 @@ export default function AthletePublicPage({
           <ArrowLeft size={17} /> Retour aux athlètes
         </button>
 
-        {/* 1. HERO ATHLÈTE */}
         <section className="overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950">
           <div className="grid gap-8 p-6 md:p-10 lg:grid-cols-[0.95fr_1.1fr] lg:items-center">
             <div className="relative">
@@ -266,7 +263,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 2. OBJECTIF FINANCIER */}
         <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[2rem] bg-zinc-950 p-6">
             <SectionTitle icon={Sparkles} title="Objectif financier" />
@@ -276,10 +272,12 @@ export default function AthletePublicPage({
                 <p className="text-xs uppercase text-zinc-500">Objectif total</p>
                 <p className="mt-1 text-3xl font-black">{money(athlete.goal)}</p>
               </div>
+
               <div className="rounded-2xl bg-black p-4">
                 <p className="text-xs uppercase text-zinc-500">Déjà amassé</p>
                 <p className="mt-1 text-3xl font-black">{money(raised)}</p>
               </div>
+
               <div className="rounded-2xl bg-black p-4">
                 <p className="text-xs uppercase text-zinc-500">Reste à financer</p>
                 <p className="mt-1 text-3xl font-black" style={{ color: gold }}>{money(remaining)}</p>
@@ -292,9 +290,20 @@ export default function AthletePublicPage({
             </div>
 
             <div className="mt-6 grid gap-3 text-sm text-zinc-300">
-              <div className="flex justify-between rounded-2xl bg-black p-4"><span>Ventes boutique</span><b>{money(athlete.raisedShop)}</b></div>
-              <div className="flex justify-between rounded-2xl bg-black p-4"><span>Dons / activités</span><b>{money(athlete.raisedOffline)}</b></div>
-              <div className="flex justify-between rounded-2xl bg-black p-4"><span>Commandites</span><b>{money(sponsorship)}</b></div>
+              <div className="flex justify-between rounded-2xl bg-black p-4">
+                <span>Ventes boutique</span>
+                <b>{money(athlete.raisedShop)}</b>
+              </div>
+
+              <div className="flex justify-between rounded-2xl bg-black p-4">
+                <span>Dons / activités</span>
+                <b>{money(athlete.raisedOffline)}</b>
+              </div>
+
+              <div className="flex justify-between rounded-2xl bg-black p-4">
+                <span>Commandites</span>
+                <b>{money(sponsorship)}</b>
+              </div>
             </div>
 
             <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
@@ -304,7 +313,6 @@ export default function AthletePublicPage({
             </div>
           </div>
 
-          {/* 3. COMMENT SOUTENIR */}
           <div className="rounded-[2rem] bg-zinc-950 p-6">
             <SectionTitle icon={Gift} title={`Comment soutenir ${athlete.name.split(" ")[0]} ?`}>
               Plusieurs façons simples permettent d’aider concrètement l’athlète.
@@ -323,7 +331,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 4. À QUOI SERVIRA LE FINANCEMENT */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={Target} title="À quoi servira le financement ?">
             Le détail ci-dessous permet de comprendre concrètement ce que le soutien finance.
@@ -346,7 +353,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 5. BOUTONS SHOPIFY */}
         <section className="mt-8 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6">
           <SectionTitle icon={Store} title="Soutenir via la boutique KinkoLab">
             Lors de l’achat, sélectionnez {athlete.name} comme athlète supporté.
@@ -356,16 +362,17 @@ export default function AthletePublicPage({
             <a href={athlete.shopifyUrl} className="rounded-2xl px-5 py-4 font-black text-black" style={{ background: gold }}>
               Acheter un t-shirt ou hoodie et soutenir {athlete.name.split(" ")[0]}
             </a>
+
             <a href={athlete.sponsorUrl} className="rounded-2xl border border-zinc-700 px-5 py-4 font-black text-white hover:bg-zinc-900">
               Faire un don / commandite pour {athlete.name.split(" ")[0]}
             </a>
+
             <button onClick={copyShareLink} className="rounded-2xl border border-zinc-700 px-5 py-4 font-black text-white hover:bg-zinc-900">
               {copied ? "Lien copié" : "Partager la page"}
             </button>
           </div>
         </section>
 
-        {/* 6. ÉTAPES */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={CalendarDays} title="Étapes de préparation">
             Chaque étape donne une vision claire du parcours de préparation.
@@ -378,7 +385,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 7. ACTUALITÉ */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={Megaphone} title={`Dernières nouvelles de ${athlete.name.split(" ")[0]}`} />
 
@@ -389,8 +395,10 @@ export default function AthletePublicPage({
                   <p className="text-xs font-bold uppercase" style={{ color: gold }}>{item.type}</p>
                   {item.date && <p className="text-xs text-zinc-500">{item.date}</p>}
                 </div>
+
                 <h3 className="mt-2 text-xl font-black">{item.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-400">{item.content}</p>
+
                 {item.mediaUrl && (
                   <div className="mt-4 overflow-hidden rounded-2xl">
                     <img src={item.mediaUrl} alt={item.title} className="w-full object-cover" />
@@ -398,11 +406,11 @@ export default function AthletePublicPage({
                 )}
               </article>
             ))}
+
             {approvedUpdates.length === 0 && <p className="text-zinc-500">Aucune nouvelle publiée pour le moment.</p>}
           </div>
         </section>
 
-        {/* 8. ÉVÉNEMENTS */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={Users} title="Événements de financement">
             Activités locales, stages, ventes et initiatives autour de l’athlète.
@@ -410,6 +418,7 @@ export default function AthletePublicPage({
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             {fundingEvents.length === 0 && <p className="text-zinc-500">Aucun événement publié pour le moment.</p>}
+
             {fundingEvents.map((event) => (
               <div key={`${event.date}-${event.title}`} className="rounded-2xl bg-black p-5">
                 <p className="text-xs font-bold uppercase" style={{ color: gold }}>{event.date}</p>
@@ -421,16 +430,16 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 9. COMMANDITAIRES */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={HeartHandshake} title={`Partenaires de ${athlete.name.split(" ")[0]}`} />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {sponsors.map((sponsor) => <SponsorCard key={`${sponsor.level}-${sponsor.name}`} sponsor={sponsor} />)}
+            {sponsors.map((sponsor) => (
+              <SponsorCard key={`${sponsor.level}-${sponsor.name}`} sponsor={sponsor} />
+            ))}
           </div>
         </section>
 
-        {/* 10. MUR D'ENCOURAGEMENT */}
         <section className="mt-8 grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl bg-zinc-950 p-6">
             <SectionTitle icon={MessageCircle} title="Mur d’encouragement">
@@ -480,7 +489,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 11. TRANSPARENCE */}
         <section className="mt-8 rounded-[2rem] border border-amber-500/20 bg-amber-500/10 p-6">
           <SectionTitle icon={ShieldCheck} title="Transparence">
             Comment les fonds sont attribués ?
@@ -499,7 +507,6 @@ export default function AthletePublicPage({
           </div>
         </section>
 
-        {/* 12. PARTAGE */}
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={Share2} title="Partager cette page">
             Aidez {athlete.name.split(" ")[0]} en partageant cette page avec votre famille, vos amis et votre réseau.
@@ -509,15 +516,19 @@ export default function AthletePublicPage({
             <button onClick={copyShareLink} className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-black text-black" style={{ background: gold }}>
               <Copy size={18} /> {copied ? "Lien copié" : "Copier le lien"}
             </button>
+
             <button className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-3 font-black text-white hover:bg-zinc-900">
-              <Facebook size={18} /> Facebook
+              <Share2 size={18} /> Facebook
             </button>
+
             <button className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-3 font-black text-white hover:bg-zinc-900">
-              <Instagram size={18} /> Instagram
+              <Share2 size={18} /> Instagram
             </button>
+
             <button className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-3 font-black text-white hover:bg-zinc-900">
               <Send size={18} /> Messenger
             </button>
+
             <button className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-3 font-black text-white hover:bg-zinc-900">
               <Mail size={18} /> Courriel
             </button>
