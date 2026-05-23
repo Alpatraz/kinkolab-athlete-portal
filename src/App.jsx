@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { collection, onSnapshot } from "firebase/firestore";
 
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
@@ -10,6 +11,8 @@ import AthletePublicPage from "./pages/AthletePublicPage";
 import SignupView from "./pages/SignupView";
 import LoginView from "./pages/LoginView";
 import AdminView from "./pages/AdminView";
+
+import { db } from "./firebase";
 
 import {
   athletesSeed,
@@ -93,9 +96,25 @@ export default function App() {
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState(null);
-  const [athletes] = useState(athletesSeed);
+  const [athletes, setAthletes] = useState(athletesSeed);
   const [campaigns] = useState(campaignsSeed);
   const [wallMessages, setWallMessages] = useState(wallSeed);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "athletes"), (snapshot) => {
+      const firebaseAthletes = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const seedIds = new Set(athletesSeed.map((athlete) => athlete.id));
+      const newAthletes = firebaseAthletes.filter((athlete) => !seedIds.has(athlete.id));
+
+      setAthletes([...athletesSeed, ...newAthletes]);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const goHome = () => navigate("/");
   const openAthletes = () => navigate("/athletes");
