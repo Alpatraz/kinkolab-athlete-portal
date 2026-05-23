@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, HeartHandshake, ShieldCheck, Users } from "lucide-react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-
 import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
 
-function FormInput({ label, value, onChange, type = "text" }) {
+function FormInput({ label, value, onChange, type = "text", required = true }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
+      <span className="mb-2 block text-sm font-bold text-zinc-700">
+        {label} {required && <span className="text-red-600">*</span>}
+      </span>
       <input
+        required={required}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -20,11 +22,14 @@ function FormInput({ label, value, onChange, type = "text" }) {
   );
 }
 
-function FormTextarea({ label, value, onChange }) {
+function FormTextarea({ label, value, onChange, required = true }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
+      <span className="mb-2 block text-sm font-bold text-zinc-700">
+        {label} {required && <span className="text-red-600">*</span>}
+      </span>
       <textarea
+        required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="min-h-32 w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950"
@@ -33,11 +38,14 @@ function FormTextarea({ label, value, onChange }) {
   );
 }
 
-function FormSelect({ label, value, onChange, options }) {
+function FormSelect({ label, value, onChange, options, required = true }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
+      <span className="mb-2 block text-sm font-bold text-zinc-700">
+        {label} {required && <span className="text-red-600">*</span>}
+      </span>
       <select
+        required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950"
@@ -45,11 +53,7 @@ function FormSelect({ label, value, onChange, options }) {
         {options.map((option) => {
           const valueToUse = typeof option === "string" ? option : option.value;
           const labelToUse = typeof option === "string" ? option : option.label;
-          return (
-            <option key={valueToUse} value={valueToUse}>
-              {labelToUse}
-            </option>
-          );
+          return <option key={valueToUse} value={valueToUse}>{labelToUse}</option>;
         })}
       </select>
     </label>
@@ -60,8 +64,6 @@ export default function SignupView({ goBack }) {
   const [type, setType] = useState("individuel");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -83,64 +85,32 @@ export default function SignupView({ goBack }) {
     campaignReason: "",
     motivation: "",
     athleteSocials: "",
-    familyName: ""
+    familyName: "",
   });
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const selectedCampaignTitle = campaignTitle(campaignsSeed, form.campaignId);
 
-  async function submitApplication() {
-    setErrorMessage("");
-
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
-      setErrorMessage("Merci de remplir au minimum le prénom, le nom et le courriel.");
-      return;
-    }
-
+  async function submitApplication(event) {
+    event.preventDefault();
     setSubmitting(true);
 
     try {
       await addDoc(collection(db, "applications"), {
         type,
         status: "en_attente",
-
-        firstName: form.firstName,
-        lastName: form.lastName,
+        ...form,
         athleteName: `${form.firstName} ${form.lastName}`.trim(),
-        birthDate: form.birthDate,
-        photo: form.photo,
-
-        email: form.email,
-        phone: form.phone,
-
-        parentName: form.parentName,
-        parentEmail: form.parentEmail,
-        parentPhone: form.parentPhone,
-
-        province: form.province,
-        city: form.city,
-        dojo: form.dojo,
-        coach: form.coach,
-        discipline: form.discipline,
-        belt: form.belt,
-
-        campaignId: form.campaignId,
         campaignTitle: selectedCampaignTitle,
         desiredGoal: Number(form.desiredGoal || 0),
-
-        campaignReason: form.campaignReason,
-        motivation: form.motivation,
-        athleteSocials: form.athleteSocials,
-        familyName: form.familyName,
-
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
 
       setSubmitted(true);
     } catch (error) {
       console.error("Erreur Firestore:", error);
-      setErrorMessage("Erreur lors de l’envoi de la demande. Vérifie la configuration Firebase.");
+      alert("Erreur lors de l’envoi de la demande.");
     } finally {
       setSubmitting(false);
     }
@@ -153,21 +123,10 @@ export default function SignupView({ goBack }) {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl text-black" style={{ background: gold }}>
             <CheckCircle2 size={34} />
           </div>
-
           <h1 className="mt-5 text-4xl font-black text-zinc-950">Demande envoyée</h1>
-          <p className="mt-3 text-zinc-600">La demande est maintenant enregistrée dans Firestore et apparaîtra dans l’admin global.</p>
-
-          <div className="mt-6 grid gap-3 rounded-3xl bg-zinc-100 p-5 text-left text-sm text-zinc-700 md:grid-cols-2">
-            <p><b>Athlète :</b> {form.firstName} {form.lastName}</p>
-            <p><b>Campagne :</b> {selectedCampaignTitle}</p>
-            <p><b>Discipline :</b> {form.discipline}</p>
-            <p><b>Dojo :</b> {form.dojo || "À confirmer"}</p>
-            <p><b>Objectif demandé :</b> {form.desiredGoal || "À confirmer"} $</p>
-            <p><b>Ville / province :</b> {form.city || "À confirmer"}, {form.province}</p>
-          </div>
-
+          <p className="mt-3 text-zinc-600">La demande apparaîtra maintenant dans l’admin global.</p>
           <button onClick={goBack} className="mt-6 rounded-2xl bg-black px-6 py-4 font-black text-white">
-            Retour à l’accueil
+            Retour
           </button>
         </div>
       </main>
@@ -181,15 +140,11 @@ export default function SignupView({ goBack }) {
           <ArrowLeft size={17} /> Retour
         </button>
 
-        <div className="overflow-hidden rounded-[2rem] bg-white shadow-xl">
+        <form onSubmit={submitApplication} className="overflow-hidden rounded-[2rem] bg-white shadow-xl">
           <div className="bg-black p-6 text-white md:p-8">
-            <p className="text-sm font-bold uppercase tracking-[0.25em]" style={{ color: gold }}>
-              Formulaire d’inscription
-            </p>
+            <p className="text-sm font-bold uppercase tracking-[0.25em]" style={{ color: gold }}>Formulaire d’inscription</p>
             <h1 className="mt-2 text-4xl font-black">Demander une page athlète</h1>
-            <p className="mt-3 max-w-3xl text-zinc-300">
-              Ce formulaire collecte les informations nécessaires pour créer une page athlète claire, crédible et reliée à une campagne KinkoLab.
-            </p>
+            <p className="mt-3 max-w-3xl text-zinc-300">Tous les champs sont obligatoires pour créer une page complète et crédible.</p>
           </div>
 
           <div className="p-6 md:p-8">
@@ -211,8 +166,12 @@ export default function SignupView({ goBack }) {
               <FormInput label="Prénom de l’athlète" value={form.firstName} onChange={(value) => update("firstName", value)} />
               <FormInput label="Nom de l’athlète" value={form.lastName} onChange={(value) => update("lastName", value)} />
               <FormInput label="Date de naissance" type="date" value={form.birthDate} onChange={(value) => update("birthDate", value)} />
-              <FormInput label="Courriel" type="email" value={form.email} onChange={(value) => update("email", value)} />
-              <FormInput label="Téléphone" value={form.phone} onChange={(value) => update("phone", value)} />
+              <FormInput label="Lien photo obligatoire" type="url" value={form.photo} onChange={(value) => update("photo", value)} />
+              <FormInput label="Courriel de l’athlète" type="email" value={form.email} onChange={(value) => update("email", value)} />
+              <FormInput label="Téléphone de l’athlète" value={form.phone} onChange={(value) => update("phone", value)} />
+              <FormInput label="Nom du parent / responsable" value={form.parentName} onChange={(value) => update("parentName", value)} />
+              <FormInput label="Courriel du parent" type="email" value={form.parentEmail} onChange={(value) => update("parentEmail", value)} />
+              <FormInput label="Téléphone du parent" value={form.parentPhone} onChange={(value) => update("parentPhone", value)} />
               <FormInput label="Ville" value={form.city} onChange={(value) => update("city", value)} />
               <FormInput label="Dojo" value={form.dojo} onChange={(value) => update("dojo", value)} />
               <FormInput label="Coach" value={form.coach} onChange={(value) => update("coach", value)} />
@@ -221,7 +180,7 @@ export default function SignupView({ goBack }) {
               <FormInput label="Ceinture" value={form.belt} onChange={(value) => update("belt", value)} />
               <FormSelect label="Campagne souhaitée" value={form.campaignId} onChange={(value) => update("campaignId", value)} options={campaignsSeed.map((campaign) => ({ value: campaign.id, label: campaign.title }))} />
               <FormInput label="Objectif financier souhaité" type="number" value={form.desiredGoal} onChange={(value) => update("desiredGoal", value)} />
-              <FormInput label="Lien photo / média" value={form.photo} onChange={(value) => update("photo", value)} />
+              <FormInput label="Liens réseaux sociaux" value={form.athleteSocials} onChange={(value) => update("athleteSocials", value)} />
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -229,33 +188,22 @@ export default function SignupView({ goBack }) {
               <FormTextarea label="Motivation / histoire de l’athlète" value={form.motivation} onChange={(value) => update("motivation", value)} />
             </div>
 
+            <FormInput label="Nom de famille / groupe familial" value={form.familyName} onChange={(value) => update("familyName", value)} />
+
             <div className="mt-8 rounded-3xl bg-zinc-100 p-5">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-1" style={{ color: gold }} />
-                <div>
-                  <h3 className="font-black text-zinc-950">Validation avant publication</h3>
-                  <p className="mt-1 text-sm leading-6 text-zinc-600">
-                    La demande sera reçue dans l’admin global. Après validation, le profil public pourra être créé et relié à Shopify.
-                  </p>
-                </div>
+                <p className="text-sm leading-6 text-zinc-600">
+                  Après soumission, la demande sera validée par l’admin avant publication.
+                </p>
               </div>
             </div>
 
-            {errorMessage && (
-              <div className="mt-5 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            <button
-              onClick={submitApplication}
-              disabled={submitting}
-              className="mt-8 w-full rounded-2xl bg-black px-6 py-4 font-black text-white hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {submitting ? "Envoi en cours..." : "Envoyer la demande"}
+            <button disabled={submitting} type="submit" className="mt-8 w-full rounded-2xl bg-black px-6 py-4 font-black text-white hover:bg-zinc-800 disabled:opacity-60">
+              {submitting ? "Envoi..." : "Envoyer la demande"}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </main>
   );
