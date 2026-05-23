@@ -4,12 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "TON_API_KEY",
-  authDomain: "TON_PROJECT.firebaseapp.com",
-  projectId: "TON_PROJECT_ID",
-  storageBucket: "TON_PROJECT.appspot.com",
-  messagingSenderId: "TON_MESSAGING_SENDER_ID",
-  appId: "TON_APP_ID"
+  apiKey: "AIzaSyARfuGx846NgfmeMZ4FjpxzJMLsv3T--e0",
+  authDomain: "kinkolab-athletes.firebaseapp.com",
+  projectId: "kinkolab-athletes",
+  storageBucket: "kinkolab-athletes.firebasestorage.app",
+  messagingSenderId: "692057353319",
+  appId: "1:692057353319:web:823f9d18ee08238f9a38c2",
+  measurementId: "G-TDQ63XMTH4"
 };
 
 const app = initializeApp(firebaseConfig);
