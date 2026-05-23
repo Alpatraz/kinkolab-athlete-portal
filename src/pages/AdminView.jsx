@@ -1,9 +1,38 @@
+import { useEffect, useState } from "react";
 import { ArrowLeft, Camera, DollarSign, Megaphone, MessageCircle, PencilLine, Users } from "lucide-react";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+
 import { campaignTitle, gold, money, progressOf, totalRaised } from "../utils/format";
 import StatCard from "../components/StatCard";
+import { db } from "../firebase";
 
 export default function AdminView({ athletes, campaigns, wallMessages, setWallMessages, goBack, onOpenAthlete }) {
   const pendingMessages = wallMessages.filter((message) => message.status === "en_attente");
+  const [applications, setApplications] = useState([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "applications"), orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setApplications(data);
+        setApplicationsLoading(false);
+      },
+      (error) => {
+        console.error("Erreur lecture applications:", error);
+        setApplicationsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   function approveMessage(id) {
     setWallMessages(wallMessages.map((message) => message.id === id ? { ...message, status: "approuvé" } : message));
@@ -23,14 +52,83 @@ export default function AdminView({ athletes, campaigns, wallMessages, setWallMe
         <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-10">
           <p className="text-sm font-bold uppercase tracking-[0.3em]" style={{ color: gold }}>Admin privé</p>
           <h1 className="mt-4 text-4xl font-black text-zinc-950 md:text-6xl">Gestion Programme Athlètes</h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">Espace de test : validation des messages, suivi des athlètes et des campagnes.</p>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">Validation des demandes, messages, suivi des athlètes et campagnes.</p>
         </section>
 
         <section className="mt-8 grid gap-4 md:grid-cols-4">
           <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils actifs" />
           <StatCard light icon={Megaphone} label="Campagnes" value={campaigns.length} sub="Campagnes ouvertes" />
           <StatCard light icon={MessageCircle} label="Messages à valider" value={pendingMessages.length} sub="Mur d’encouragement" />
-          <StatCard light icon={DollarSign} label="Fonds suivis" value={money(athletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0))} sub="Total démo" />
+          <StatCard light icon={DollarSign} label="Demandes reçues" value={applications.length} sub="Firestore" />
+        </section>
+
+        <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+          <div className="flex items-center gap-3">
+            <PencilLine style={{ color: gold }} />
+            <h2 className="text-2xl font-black text-zinc-950">Demandes d’inscription reçues</h2>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {applicationsLoading && <p className="text-zinc-500">Chargement des demandes...</p>}
+
+            {!applicationsLoading && applications.length === 0 && (
+              <p className="text-zinc-500">Aucune demande reçue pour le moment.</p>
+            )}
+
+            {applications.map((application) => (
+              <div key={application.id} className="rounded-2xl border border-zinc-200 p-5">
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <div>
+                    <p className="text-xs font-bold uppercase text-zinc-500">
+                      {application.type === "famille" ? "Demande famille / parent" : "Inscription individuelle"}
+                    </p>
+
+                    <h3 className="mt-1 text-xl font-black text-zinc-950">
+                      {application.athleteName || `${application.firstName || ""} ${application.lastName || ""}`}
+                    </h3>
+
+                    <p className="mt-1 text-sm text-zinc-600">
+                      {application.city || "Ville à confirmer"}, {application.province || "Province à confirmer"}
+                    </p>
+
+                    <p className="mt-1 text-sm text-zinc-600">
+                      Dojo : <b>{application.dojo || "À confirmer"}</b>
+                    </p>
+
+                    <p className="mt-1 text-sm text-zinc-600">
+                      Campagne : <b>{application.campaignTitle || campaignTitle(campaigns, application.campaignId)}</b>
+                    </p>
+
+                    <p className="mt-1 text-sm text-zinc-600">
+                      Objectif demandé : <b>{money(Number(application.desiredGoal || 0))}</b>
+                    </p>
+
+                    <p className="mt-3 text-sm text-zinc-500">
+                      Contact : {application.email || "courriel absent"} {application.phone ? `· ${application.phone}` : ""}
+                    </p>
+                  </div>
+
+                  <span className="rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-black uppercase text-amber-700">
+                    {application.status || "en_attente"}
+                  </span>
+                </div>
+
+                {application.motivation && (
+                  <div className="mt-4 rounded-2xl bg-zinc-100 p-4">
+                    <p className="text-xs font-bold uppercase text-zinc-500">Motivation</p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-700">{application.motivation}</p>
+                  </div>
+                )}
+
+                {application.campaignReason && (
+                  <div className="mt-3 rounded-2xl bg-zinc-100 p-4">
+                    <p className="text-xs font-bold uppercase text-zinc-500">Pourquoi cette campagne ?</p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-700">{application.campaignReason}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
