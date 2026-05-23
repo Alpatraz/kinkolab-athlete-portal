@@ -1,13 +1,21 @@
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, HeartHandshake, ShieldCheck, Users } from "lucide-react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+
 import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
+import { db } from "../firebase";
 
 function FormInput({ label, value, onChange, type = "text" }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950" />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950"
+      />
     </label>
   );
 }
@@ -16,7 +24,11 @@ function FormTextarea({ label, value, onChange }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} className="min-h-32 w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950" />
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-32 w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950"
+      />
     </label>
   );
 }
@@ -25,11 +37,19 @@ function FormSelect({ label, value, onChange, options }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none focus:border-zinc-950"
+      >
         {options.map((option) => {
           const valueToUse = typeof option === "string" ? option : option.value;
           const labelToUse = typeof option === "string" ? option : option.label;
-          return <option key={valueToUse} value={valueToUse}>{labelToUse}</option>;
+          return (
+            <option key={valueToUse} value={valueToUse}>
+              {labelToUse}
+            </option>
+          );
         })}
       </select>
     </label>
@@ -39,6 +59,9 @@ function FormSelect({ label, value, onChange, options }) {
 export default function SignupView({ goBack }) {
   const [type, setType] = useState("individuel");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -60,11 +83,68 @@ export default function SignupView({ goBack }) {
     campaignReason: "",
     motivation: "",
     athleteSocials: "",
-    familyName: "",
+    familyName: ""
   });
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const selectedCampaignTitle = campaignTitle(campaignsSeed, form.campaignId);
+
+  async function submitApplication() {
+    setErrorMessage("");
+
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
+      setErrorMessage("Merci de remplir au minimum le prénom, le nom et le courriel.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await addDoc(collection(db, "applications"), {
+        type,
+        status: "en_attente",
+
+        firstName: form.firstName,
+        lastName: form.lastName,
+        athleteName: `${form.firstName} ${form.lastName}`.trim(),
+        birthDate: form.birthDate,
+        photo: form.photo,
+
+        email: form.email,
+        phone: form.phone,
+
+        parentName: form.parentName,
+        parentEmail: form.parentEmail,
+        parentPhone: form.parentPhone,
+
+        province: form.province,
+        city: form.city,
+        dojo: form.dojo,
+        coach: form.coach,
+        discipline: form.discipline,
+        belt: form.belt,
+
+        campaignId: form.campaignId,
+        campaignTitle: selectedCampaignTitle,
+        desiredGoal: Number(form.desiredGoal || 0),
+
+        campaignReason: form.campaignReason,
+        motivation: form.motivation,
+        athleteSocials: form.athleteSocials,
+        familyName: form.familyName,
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Erreur Firestore:", error);
+      setErrorMessage("Erreur lors de l’envoi de la demande. Vérifie la configuration Firebase.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (submitted) {
     return (
@@ -75,7 +155,7 @@ export default function SignupView({ goBack }) {
           </div>
 
           <h1 className="mt-5 text-4xl font-black text-zinc-950">Demande envoyée</h1>
-          <p className="mt-3 text-zinc-600">Dans la vraie version, cette demande apparaîtra dans l’admin global.</p>
+          <p className="mt-3 text-zinc-600">La demande est maintenant enregistrée dans Firestore et apparaîtra dans l’admin global.</p>
 
           <div className="mt-6 grid gap-3 rounded-3xl bg-zinc-100 p-5 text-left text-sm text-zinc-700 md:grid-cols-2">
             <p><b>Athlète :</b> {form.firstName} {form.lastName}</p>
@@ -155,14 +235,24 @@ export default function SignupView({ goBack }) {
                 <div>
                   <h3 className="font-black text-zinc-950">Validation avant publication</h3>
                   <p className="mt-1 text-sm leading-6 text-zinc-600">
-                    La demande est préparée pour un flux réaliste : réception admin, validation, création du profil public, puis liaison avec Shopify.
+                    La demande sera reçue dans l’admin global. Après validation, le profil public pourra être créé et relié à Shopify.
                   </p>
                 </div>
               </div>
             </div>
 
-            <button onClick={() => setSubmitted(true)} className="mt-8 w-full rounded-2xl bg-black px-6 py-4 font-black text-white hover:bg-zinc-800">
-              Envoyer la demande
+            {errorMessage && (
+              <div className="mt-5 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">
+                {errorMessage}
+              </div>
+            )}
+
+            <button
+              onClick={submitApplication}
+              disabled={submitting}
+              className="mt-8 w-full rounded-2xl bg-black px-6 py-4 font-black text-white hover:bg-zinc-800 disabled:opacity-60"
+            >
+              {submitting ? "Envoi en cours..." : "Envoyer la demande"}
             </button>
           </div>
         </div>
