@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 import { gold } from "../utils/format";
@@ -10,11 +14,13 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   async function login(event) {
     event.preventDefault();
     setLoading(true);
+    setInfoMessage("");
     setErrorMessage("");
 
     try {
@@ -36,6 +42,8 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
         email: firebaseUser.email,
         name: userData.name || firebaseUser.email,
         role: userData.role || "athlete",
+        athleteId: userData.athleteId || null,
+        familyId: userData.familyId || null,
       };
 
       setCurrentUser(connectedUser);
@@ -48,10 +56,32 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
     } catch (error) {
       console.error("Erreur connexion:", error);
       setErrorMessage(
-        "Connexion impossible. Vérifie le courriel, le mot de passe et le rôle associé au compte."
+        "Connexion impossible. Vérifie le courriel, le mot de passe ou le profil associé."
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resetPassword() {
+    setInfoMessage("");
+    setErrorMessage("");
+
+    if (!email.trim()) {
+      setErrorMessage("Entre ton courriel avant de demander une réinitialisation.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setInfoMessage(
+        "Courriel de réinitialisation envoyé. Vérifie aussi les indésirables."
+      );
+    } catch (error) {
+      console.error("Erreur réinitialisation:", error);
+      setErrorMessage(
+        "Impossible d’envoyer le courriel de réinitialisation. Vérifie le courriel."
+      );
     }
   }
 
@@ -100,6 +130,12 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
             />
           </label>
 
+          {infoMessage && (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-300">
+              {infoMessage}
+            </div>
+          )}
+
           {errorMessage && (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-300">
               {errorMessage}
@@ -113,6 +149,14 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
             style={{ background: gold }}
           >
             {loading ? "Connexion..." : "Se connecter"}
+          </button>
+
+          <button
+            type="button"
+            onClick={resetPassword}
+            className="text-sm font-bold text-zinc-300 underline hover:text-white"
+          >
+            Mot de passe oublié ?
           </button>
         </form>
       </div>
