@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
@@ -12,7 +13,7 @@ import SignupView from "./pages/SignupView";
 import LoginView from "./pages/LoginView";
 import AdminView from "./pages/AdminView";
 
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 import {
   athletesSeed,
@@ -31,7 +32,10 @@ function AthleteRoute({ athletes, updates, wallMessages, setWallMessages, onOpen
       <main className="min-h-screen bg-black p-8 text-white">
         <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
           <h1 className="text-3xl font-black">Athlète introuvable</h1>
-          <button onClick={() => navigate("/athletes")} className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black">
+          <button
+            onClick={() => navigate("/athletes")}
+            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
+          >
             Retour aux athlètes
           </button>
         </div>
@@ -61,7 +65,10 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
       <main className="min-h-screen bg-black p-8 text-white">
         <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
           <h1 className="text-3xl font-black">Campagne introuvable</h1>
-          <button onClick={() => navigate("/campaigns")} className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black">
+          <button
+            onClick={() => navigate("/campaigns")}
+            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
+          >
             Retour aux campagnes
           </button>
         </div>
@@ -80,7 +87,17 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
   );
 }
 
-function ProtectedAdminRoute({ currentUser, children }) {
+function ProtectedAdminRoute({ currentUser, authLoading, children }) {
+  if (authLoading) {
+    return (
+      <main className="min-h-screen bg-black p-8 text-white">
+        <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
+          <h1 className="text-3xl font-black">Chargement...</h1>
+        </div>
+      </main>
+    );
+  }
+
   if (!currentUser || currentUser.role !== "admin") {
     return <Navigate to="/login" replace />;
   }
@@ -92,15 +109,52 @@ export default function App() {
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [athletes, setAthletes] = useState(athletesSeed);
   const [campaigns] = useState(campaignsSeed);
   const [wallMessages, setWallMessages] = useState(wallSeed);
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        const userData = userSnap.exists() ? userSnap.data() : {};
+
+        setCurrentUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: userData.name || firebaseUser.email,
+          role: userData.role || "athlete",
+        });
+      } catch (error) {
+        console.error("Erreur récupération rôle utilisateur:", error);
+        setCurrentUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.email,
+          role: "athlete",
+        });
+      } finally {
+        setAuthLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "athletes"), (snapshot) => {
-      const firebaseAthletes = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const firebaseAthletes = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
       }));
 
       const seedIds = new Set(athletesSeed.map((athlete) => athlete.id));
@@ -121,11 +175,22 @@ export default function App() {
   const openAthlete = (id) => navigate(`/athlete/${id}`);
   const openCampaign = (id) => navigate(`/campaign/${id}`);
 
+  async function handleSetCurrentUser(value) {
+    if (value === null) {
+      await signOut(auth);
+      setCurrentUser(null);
+      navigate("/");
+      return;
+    }
+
+    setCurrentUser(value);
+  }
+
   return (
     <div className="min-h-screen bg-black">
       <Header
         currentUser={currentUser}
-        setCurrentUser={setCurrentUser}
+        setCurrentUser={handleSetCurrentUser}
         goHome={goHome}
         openLogin={openLogin}
         openSignup={openSignup}
@@ -214,7 +279,7 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedAdminRoute currentUser={currentUser}>
+            <ProtectedAdminRoute currentUser={currentUser} authLoading={authLoading}>
               <AdminView
                 athletes={athletes}
                 campaigns={campaigns}
