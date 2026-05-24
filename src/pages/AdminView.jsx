@@ -17,107 +17,12 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from "firebase/firestore";
 
 import { campaignTitle, gold, money, progressOf } from "../utils/format";
 import StatCard from "../components/StatCard";
 import { db } from "../firebase";
-
-function slugify(value) {
-  return value
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function buildAthleteFromApplication(application, campaigns) {
-  const athleteName =
-    application.athleteName ||
-    `${application.firstName || ""} ${application.lastName || ""}`.trim();
-
-  const athleteId = slugify(athleteName || `athlete-${application.id}`);
-
-  const campaignName =
-    application.campaignTitle ||
-    campaignTitle(campaigns, application.campaignId);
-
-  return {
-    id: athleteId,
-    name: athleteName,
-    firstName: application.firstName || "",
-    lastName: application.lastName || "",
-    email: application.email || "",
-    phone: application.phone || "",
-    parentName: application.parentName || "",
-    parentEmail: application.parentEmail || "",
-    parentPhone: application.parentPhone || "",
-    status: "accepté",
-    avatar: "🥋",
-    photoUrl: application.photo || "",
-    countryFlag: "🇨🇦",
-    province: application.province || "Québec",
-    city: application.city || "",
-    dojo: application.dojo || "À confirmer",
-    coach: application.coach || "",
-    discipline: application.discipline || "Arts martiaux",
-    belt: application.belt || "À confirmer",
-    athleteSocials: application.athleteSocials || "",
-    familyName: application.familyName || "",
-    campaignId: application.campaignId || "",
-    program: campaignName,
-    campaignBadge: campaignName,
-    athleteLabel: "Athlète Kinko",
-    goal: Number(application.desiredGoal || 0),
-    raisedShop: 0,
-    raisedOffline: 0,
-    raisedSponsorship: 0,
-    shopifyUrl: "https://kinkolab.com",
-    sponsorUrl: "https://kinkolab.com",
-    fundingPurpose:
-      application.campaignReason ||
-      "financer sa préparation et sa participation",
-    bio:
-      application.motivation ||
-      `${athleteName} rejoint le Programme Athlètes KinkoLab.`,
-    profitNote: `100 % des profits des ventes associées à ${athleteName} sont remis à ${athleteName}.`,
-    supportSteps: [
-      "Acheter un produit supporter",
-      "Faire un don",
-      "Partager la page",
-      "Encourager l’athlète",
-    ],
-    needs: [
-      { label: "Transport", amount: 0 },
-      { label: "Hébergement", amount: 0 },
-      { label: "Inscription", amount: 0 },
-      { label: "Équipement", amount: 0 },
-    ],
-    steps: [
-      {
-        label: "Candidature acceptée",
-        status: "completed",
-        note: "Le profil athlète a été créé.",
-        date: new Date().toISOString().slice(0, 10),
-      },
-      {
-        label: "Campagne ouverte",
-        status: "in_progress",
-        note: "Le profil public est maintenant accessible.",
-      },
-    ],
-    sponsors: [],
-    fundingEvents: [],
-    sourceApplicationId: application.id,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-}
 
 export default function AdminView({
   athletes,
@@ -127,13 +32,12 @@ export default function AdminView({
   goBack,
   onOpenAthlete,
 }) {
-  const pendingMessages = wallMessages.filter(
-    (message) => message.status === "en_attente"
-  );
+  const pendingMessages = wallMessages.filter((message) => message.status === "en_attente");
 
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [acceptedAccess, setAcceptedAccess] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, "applications"), orderBy("createdAt", "desc"));
@@ -179,23 +83,39 @@ export default function AdminView({
 
   async function acceptApplication(application) {
     setActionLoadingId(application.id);
+    setAcceptedAccess(null);
 
     try {
-      const athlete = buildAthleteFromApplication(application, campaigns);
-
-      await setDoc(doc(db, "athletes", athlete.id), athlete);
-
-      await updateDoc(doc(db, "applications", application.id), {
-        status: "accepté",
-        athleteId: athlete.id,
-        acceptedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const response = await fetch("/.netlify/functions/accept-athlete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          applicationId: application.id,
+        }),
       });
 
-      onOpenAthlete(athlete.id);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de l’acceptation.");
+      }
+
+      setAcceptedAccess({
+        athleteId: data.athleteId,
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+      });
+
+      if (data.athleteId) {
+        setTimeout(() => {
+          onOpenAthlete(data.athleteId);
+        }, 1200);
+      }
     } catch (error) {
       console.error("Erreur acceptation:", error);
-      alert("Erreur lors de l’acceptation.");
+      alert(error.message || "Erreur lors de l’acceptation.");
     } finally {
       setActionLoadingId("");
     }
@@ -254,9 +174,35 @@ export default function AdminView({
           </h1>
 
           <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">
-            Validation des candidatures, gestion des campagnes et création des profils athlètes.
+            Validation des candidatures, création automatique des comptes Firebase Auth et création des profils athlètes.
           </p>
         </section>
+
+        {acceptedAccess && (
+          <section className="mt-8 rounded-[2rem] border border-emerald-300 bg-emerald-50 p-6 shadow-xl">
+            <h2 className="text-2xl font-black text-emerald-900">Compte athlète créé</h2>
+            <p className="mt-2 text-sm text-emerald-800">
+              Transmets ces accès à l’athlète, puis demande-lui de changer son mot de passe.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-xs font-bold uppercase text-zinc-500">Athlete ID</p>
+                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.athleteId}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-xs font-bold uppercase text-zinc-500">Courriel</p>
+                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.email}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-xs font-bold uppercase text-zinc-500">Mot de passe temporaire</p>
+                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.temporaryPassword}</p>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-8 grid gap-4 md:grid-cols-4">
           <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils actifs" />
@@ -406,7 +352,7 @@ export default function AdminView({
                     <b>{athlete.avatar} {athlete.name}</b>
                     <br />
                     <small className="text-zinc-500">
-                      {athlete.dojo} · {campaignTitle([], athlete.campaignId)}
+                      {athlete.dojo} · {campaignTitle(campaigns, athlete.campaignId)}
                     </small>
                   </span>
                   <span className="text-sm font-black">{progressOf(athlete)}%</span>
