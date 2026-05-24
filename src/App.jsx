@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -46,8 +46,8 @@ function AthleteRoute({ athletes, updates, wallMessages, setWallMessages, onOpen
   return (
     <AthletePublicPage
       athlete={athlete}
-      updates={updates}
-      wallMessages={wallMessages}
+      updates={updates || []}
+      wallMessages={wallMessages || []}
       setWallMessages={setWallMessages}
       goBack={() => navigate(-1)}
       onOpenCampaign={onOpenCampaign}
@@ -105,13 +105,22 @@ function ProtectedAdminRoute({ currentUser, authLoading, children }) {
   return children;
 }
 
+function isPublicAthlete(athlete) {
+  return (
+    athlete?.isPublic !== false &&
+    athlete?.status !== "suspendu" &&
+    athlete?.status !== "archivé"
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
   const [athletes, setAthletes] = useState(athletesSeed);
-  const [campaigns] = useState(campaignsSeed);
+  const [firebaseCampaigns, setFirebaseCampaigns] = useState([]);
   const [wallMessages, setWallMessages] = useState(wallSeed);
 
   useEffect(() => {
@@ -125,7 +134,6 @@ export default function App() {
       try {
         const userRef = doc(db, "users", firebaseUser.uid);
         const userSnap = await getDoc(userRef);
-
         const userData = userSnap.exists() ? userSnap.data() : {};
 
         setCurrentUser({
@@ -133,6 +141,8 @@ export default function App() {
           email: firebaseUser.email,
           name: userData.name || firebaseUser.email,
           role: userData.role || "athlete",
+          athleteId: userData.athleteId || null,
+          familyId: userData.familyId || null,
         });
       } catch (error) {
         console.error("Erreur récupération rôle utilisateur:", error);
@@ -165,6 +175,47 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      setFirebaseCampaigns(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const campaigns = useMemo(() => {
+    const map = new Map();
+
+    campaignsSeed.forEach((campaign) => {
+      map.set(campaign.id, {
+        ...campaign,
+        source: "seed",
+      });
+    });
+
+    firebaseCampaigns.forEach((campaign) => {
+      map.set(campaign.id, {
+        ...campaign,
+        source: "firestore",
+      });
+    });
+
+    return Array.from(map.values());
+  }, [firebaseCampaigns]);
+
+  const publicAthletes = useMemo(() => {
+    return athletes.filter(isPublicAthlete);
+  }, [athletes]);
+
+  const publicCampaigns = useMemo(() => {
+    return campaigns.filter((campaign) => campaign.status !== "archivée");
+  }, [campaigns]);
 
   const goHome = () => navigate("/");
   const openAthletes = () => navigate("/athletes");
@@ -204,8 +255,8 @@ export default function App() {
           path="/"
           element={
             <HomePage
-              athletes={athletes}
-              campaigns={campaigns}
+              athletes={publicAthletes}
+              campaigns={publicCampaigns}
               openAthletes={openAthletes}
               openCampaigns={openCampaigns}
               openSignup={openSignup}
@@ -218,8 +269,8 @@ export default function App() {
           path="/athletes"
           element={
             <AthletesPage
-              athletes={athletes}
-              campaigns={campaigns}
+              athletes={publicAthletes}
+              campaigns={publicCampaigns}
               onOpenAthlete={openAthlete}
               onOpenCampaign={openCampaign}
             />
@@ -230,8 +281,8 @@ export default function App() {
           path="/campaigns"
           element={
             <CampaignsPage
-              campaigns={campaigns}
-              athletes={athletes}
+              campaigns={publicCampaigns}
+              athletes={publicAthletes}
               onOpenCampaign={openCampaign}
               openSignup={openSignup}
             />
@@ -243,7 +294,7 @@ export default function App() {
           element={
             <CampaignRoute
               campaigns={campaigns}
-              athletes={athletes}
+              athletes={publicAthletes}
               onOpenAthlete={openAthlete}
               openSignup={openSignup}
             />
@@ -255,8 +306,8 @@ export default function App() {
           element={
             <AthleteRoute
               athletes={athletes}
-              updates={updatesSeed}
-              wallMessages={wallMessages}
+              updates={updatesSeed || []}
+              wallMessages={wallMessages || []}
               setWallMessages={setWallMessages}
               onOpenCampaign={openCampaign}
             />
