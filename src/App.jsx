@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { collection, onSnapshot } from "firebase/firestore";
 
 import Header from "./components/Header";
@@ -21,13 +21,7 @@ import {
   wallSeed,
 } from "./data/demoData";
 
-function AthleteRoute({
-  athletes,
-  updates,
-  wallMessages,
-  setWallMessages,
-  onOpenCampaign,
-}) {
+function AthleteRoute({ athletes, updates, wallMessages, setWallMessages, onOpenCampaign }) {
   const { athleteId } = useParams();
   const navigate = useNavigate();
   const athlete = athletes.find((item) => item.id === athleteId);
@@ -37,10 +31,7 @@ function AthleteRoute({
       <main className="min-h-screen bg-black p-8 text-white">
         <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
           <h1 className="text-3xl font-black">Athlète introuvable</h1>
-          <button
-            onClick={() => navigate("/athletes")}
-            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
-          >
+          <button onClick={() => navigate("/athletes")} className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black">
             Retour aux athlètes
           </button>
         </div>
@@ -70,10 +61,7 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
       <main className="min-h-screen bg-black p-8 text-white">
         <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
           <h1 className="text-3xl font-black">Campagne introuvable</h1>
-          <button
-            onClick={() => navigate("/campaigns")}
-            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
-          >
+          <button onClick={() => navigate("/campaigns")} className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black">
             Retour aux campagnes
           </button>
         </div>
@@ -90,6 +78,14 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
       openSignup={openSignup}
     />
   );
+}
+
+function ProtectedAdminRoute({ currentUser, children }) {
+  if (!currentUser || currentUser.role !== "admin") {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
 }
 
 export default function App() {
@@ -202,16 +198,13 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/signup"
-          element={<SignupView goBack={() => navigate(-1)} />}
-        />
+        <Route path="/signup" element={<SignupView goBack={goHome} />} />
 
         <Route
           path="/login"
           element={
             <LoginView
-              goBack={() => navigate(-1)}
+              goBack={goHome}
               setCurrentUser={setCurrentUser}
               openAdmin={openAdmin}
             />
@@ -221,33 +214,20 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <AdminView
-              athletes={athletes}
-              campaigns={campaigns}
-              wallMessages={wallMessages}
-              setWallMessages={setWallMessages}
-              goBack={() => navigate(-1)}
-              onOpenAthlete={openAthlete}
-            />
+            <ProtectedAdminRoute currentUser={currentUser}>
+              <AdminView
+                athletes={athletes}
+                campaigns={campaigns}
+                wallMessages={wallMessages}
+                setWallMessages={setWallMessages}
+                goBack={goHome}
+                onOpenAthlete={openAthlete}
+              />
+            </ProtectedAdminRoute>
           }
         />
 
-        <Route
-          path="*"
-          element={
-            <main className="min-h-screen bg-black p-8 text-white">
-              <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
-                <h1 className="text-3xl font-black">Page introuvable</h1>
-                <button
-                  onClick={goHome}
-                  className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
-                >
-                  Retour à l’accueil
-                </button>
-              </div>
-            </main>
-          }
-        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
