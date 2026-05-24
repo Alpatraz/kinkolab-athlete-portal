@@ -31,20 +31,33 @@ function slugify(value) {
 }
 
 function generateTemporaryPassword() {
-  return `Kinko-${Math.random().toString(36).slice(2, 8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+  return `Kinko-${Math.random().toString(36).slice(2, 8)}-${Math.floor(
+    1000 + Math.random() * 9000
+  )}`;
 }
 
-function buildAthlete(application, uid) {
+function buildFamilyId(application) {
+  const familyName =
+    application.familyName ||
+    application.parentName ||
+    `${application.lastName || ""}-family`;
+
+  return slugify(familyName || `family-${Date.now()}`);
+}
+
+function buildAthlete(application, uid, familyId) {
   const athleteName =
     application.athleteName ||
     `${application.firstName || ""} ${application.lastName || ""}`.trim();
 
   const athleteId = slugify(athleteName || `athlete-${Date.now()}`);
-  const campaignName = application.campaignTitle || application.campaignId || "Programme Athlètes Kinko";
+  const campaignName =
+    application.campaignTitle || application.campaignId || "Programme Athlètes Kinko";
 
   return {
     id: athleteId,
     userId: uid,
+    familyId,
 
     name: athleteName,
     firstName: application.firstName || "",
@@ -52,6 +65,7 @@ function buildAthlete(application, uid) {
 
     email: application.email || application.parentEmail || "",
     phone: application.phone || "",
+
     parentName: application.parentName || "",
     parentEmail: application.parentEmail || "",
     parentPhone: application.parentPhone || "",
@@ -172,21 +186,26 @@ exports.handler = async function (event) {
         statusCode: 200,
         body: JSON.stringify({
           athleteId: application.athleteId,
+          userId: application.userId,
+          email: application.email || application.parentEmail,
           alreadyAccepted: true,
         }),
       };
     }
 
-    const email = application.email || application.parentEmail;
+    const email = application.parentEmail || application.email;
 
     if (!email) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "No email found on application" }),
+        body: JSON.stringify({
+          error: "No email found on application",
+        }),
       };
     }
 
     const temporaryPassword = generateTemporaryPassword();
+    const familyId = buildFamilyId(application);
 
     let userRecord;
 
@@ -195,6 +214,7 @@ exports.handler = async function (event) {
         email,
         password: temporaryPassword,
         displayName:
+          application.parentName ||
           application.athleteName ||
           `${application.firstName || ""} ${application.lastName || ""}`.trim(),
         emailVerified: false,
@@ -211,14 +231,45 @@ exports.handler = async function (event) {
       }
     }
 
-    const athlete = buildAthlete(application, userRecord.uid);
+    const athlete = buildAthlete(application, userRecord.uid, familyId);
 
     await db.collection("athletes").doc(athlete.id).set(athlete, { merge: true });
+
+    await db.collection("families").doc(familyId).set(
+      {
+        id: familyId,
+        name: application.familyName || application.parentName || athlete.lastName,
+        ownerUserId: userRecord.uid,
+        contactEmail: email,
+        contactName: application.parentName || "",
+        athleteIds: admin.firestore.FieldValue.arrayUnion(athlete.id),
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    await db.collection("users").doc(userRecord.uid).set(
+      {
+        uid: userRecord.uid,
+        email,
+        name: application.parentName || athlete.name,
+        role: "athlete",
+        athleteId: athlete.id,
+        familyId,
+        athleteIds: admin.firestore.FieldValue.arrayUnion(athlete.id),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     await appRef.update({
       status: "accepté",
       athleteId: athlete.id,
       userId: userRecord.uid,
+      familyId,
       acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -227,6 +278,7 @@ exports.handler = async function (event) {
       statusCode: 200,
       body: JSON.stringify({
         athleteId: athlete.id,
+        familyId,
         userId: userRecord.uid,
         email,
         temporaryPassword,
