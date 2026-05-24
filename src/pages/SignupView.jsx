@@ -117,21 +117,40 @@ export default function SignupView({ goBack }) {
   }
 
   if (submitted) {
-    return (
-      <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
-        <div className="mx-auto max-w-4xl rounded-[2rem] bg-white p-8 text-center shadow-xl">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl text-black" style={{ background: gold }}>
-            <CheckCircle2 size={34} />
-          </div>
-          <h1 className="mt-5 text-4xl font-black text-zinc-950">Demande envoyée</h1>
-          <p className="mt-3 text-zinc-600">La demande apparaîtra maintenant dans l’admin global.</p>
-          <button onClick={goBack} className="mt-6 rounded-2xl bg-black px-6 py-4 font-black text-white">
-            Retour
-          </button>
+  return (
+    <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
+      <div className="mx-auto max-w-4xl rounded-[2rem] bg-white p-8 text-center shadow-xl">
+        <div
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl text-black"
+          style={{ background: gold }}
+        >
+          <CheckCircle2 size={34} />
         </div>
-      </main>
-    );
-  }
+
+        <h1 className="mt-5 text-4xl font-black text-zinc-950">
+          Demande reçue
+        </h1>
+
+        <p className="mx-auto mt-3 max-w-2xl text-zinc-600">
+          Votre candidature va être examinée par l’équipe KinkoLab.
+        </p>
+
+        <p className="mx-auto mt-3 max-w-2xl text-zinc-600">
+          Vous recevrez une réponse par courriel dans les 24 prochaines heures.
+          Si votre candidature est acceptée, vos identifiants de connexion vous
+          seront transmis afin d’accéder à votre espace athlète privé.
+        </p>
+
+        <button
+          onClick={goBack}
+          className="mt-6 rounded-2xl bg-black px-6 py-4 font-black text-white"
+        >
+          Retour à l’accueil
+        </button>
+      </div>
+    </main>
+  );
+}
 
   return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
