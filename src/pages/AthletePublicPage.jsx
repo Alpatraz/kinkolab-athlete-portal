@@ -287,6 +287,67 @@ export default function AthletePublicPage({
       .filter(Boolean);
   }
 
+  function buildParticipationSupportUrl(participation, campaign) {
+    const baseUrl =
+      participation.shopifyUrl ||
+      campaign?.shopifyUrl ||
+      safeAthlete.shopifyUrl ||
+      "https://kinkolab.com";
+
+    const url = new URL(baseUrl, window.location.origin);
+
+    url.searchParams.set("campaignId", participation.campaignId || "");
+    url.searchParams.set("participationId", participation.id || "");
+    url.searchParams.set("fundingMode", participation.fundingMode || "individual");
+    url.searchParams.set("fundingGroupId", participation.fundingGroupId || "");
+    url.searchParams.set("athleteId", participation.athleteId || safeAthlete.id || "");
+
+    if (participation.familyId) {
+      url.searchParams.set("familyId", participation.familyId);
+    }
+
+    return url.toString();
+  }
+
+  function buildParticipationSponsorUrl(participation, campaign) {
+    const baseUrl =
+      participation.sponsorUrl ||
+      campaign?.sponsorUrl ||
+      safeAthlete.sponsorUrl ||
+      safeAthlete.shopifyUrl ||
+      "https://kinkolab.com";
+
+    const url = new URL(baseUrl, window.location.origin);
+
+    url.searchParams.set("campaignId", participation.campaignId || "");
+    url.searchParams.set("participationId", participation.id || "");
+    url.searchParams.set("fundingMode", participation.fundingMode || "individual");
+    url.searchParams.set("fundingGroupId", participation.fundingGroupId || "");
+    url.searchParams.set("athleteId", participation.athleteId || safeAthlete.id || "");
+
+    if (participation.familyId) {
+      url.searchParams.set("familyId", participation.familyId);
+    }
+
+    return url.toString();
+  }
+
+  function supportButtonLabel(participation, campaign) {
+    if (participation.fundingMode === "family") {
+      return `Soutenir la famille ${participation.familyName || safeAthlete.familyName || ""} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
+    }
+
+    return `Soutenir ${firstName} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
+  }
+
+  function sponsorButtonLabel(participation, campaign) {
+    if (participation.fundingMode === "family") {
+      return `Commanditer la famille pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
+    }
+
+    return `Commanditer ${firstName} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
+  }
+
   const firstName =
     safeAthlete.firstName ||
     (safeAthlete.name || "l’athlète").split(" ")[0];
@@ -433,29 +494,14 @@ export default function AthletePublicPage({
                   className="text-sm font-bold leading-6"
                   style={{ color: gold }}
                 >
-                  Lors de l’achat, sélectionnez{" "}
-                  {safeAthlete.name || "cet athlète"} comme athlète supporté.
+                  Pour soutenir correctement cet athlète, utilisez les boutons
+                  dans les campagnes actives ci-dessous. Ils attribuent le
+                  soutien à la bonne campagne, au bon athlète ou au bon fonds
+                  commun familial.
                 </p>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                <a
-                  href={safeAthlete.shopifyUrl || "https://kinkolab.com"}
-                  className="flex items-center gap-2 rounded-2xl px-4 py-3 font-black text-black"
-                  style={{ background: gold }}
-                >
-                  <Store size={18} /> Acheter un t-shirt ou hoodie et soutenir{" "}
-                  {firstName}
-                </a>
-
-                <a
-                  href={safeAthlete.sponsorUrl || "https://kinkolab.com"}
-                  className="flex items-center gap-2 rounded-2xl border border-zinc-700 px-4 py-3 font-bold text-white hover:bg-zinc-900"
-                >
-                  <HeartHandshake size={18} /> Faire un don / commandite pour{" "}
-                  {firstName}
-                </a>
-
                 <button
                   onClick={copyShareLink}
                   className="flex items-center gap-2 rounded-2xl border border-zinc-700 px-4 py-3 font-bold text-white hover:bg-zinc-900"
@@ -480,7 +526,8 @@ export default function AthletePublicPage({
           <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
             <SectionTitle icon={Megaphone} title="Campagnes actives">
               Cet athlète peut participer à plusieurs campagnes, seul ou avec sa
-              famille.
+              famille. Utilisez les boutons de chaque campagne pour attribuer le
+              soutien au bon fonds.
             </SectionTitle>
 
             <div className="mt-6 grid gap-4">
@@ -498,6 +545,8 @@ export default function AthletePublicPage({
                     : 0;
 
                 const familyAthletes = familyGroupAthletes(participation);
+                const supportUrl = buildParticipationSupportUrl(participation, campaign);
+                const sponsorUrl = buildParticipationSponsorUrl(participation, campaign);
 
                 return (
                   <div
@@ -603,6 +652,36 @@ export default function AthletePublicPage({
                     <div className="mt-5">
                       <ProgressBar value={percent} />
                     </div>
+
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <a
+                        href={supportUrl}
+                        className="flex items-center gap-2 rounded-2xl px-5 py-4 font-black text-black"
+                        style={{ background: gold }}
+                      >
+                        <Store size={18} />
+                        {supportButtonLabel(participation, campaign)}
+                      </a>
+
+                      <a
+                        href={sponsorUrl}
+                        className="flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-4 font-black text-white hover:bg-zinc-900"
+                      >
+                        <HeartHandshake size={18} />
+                        {sponsorButtonLabel(participation, campaign)}
+                      </a>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                      <p className="text-xs font-bold uppercase text-zinc-500">
+                        Attribution du soutien
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-zinc-300">
+                        {participation.fundingMode === "family"
+                          ? `Les ventes, dons ou commandites de cette campagne seront attribués au fonds commun ${participation.fundingGroupId}.`
+                          : `Les ventes, dons ou commandites de cette campagne seront attribués à ${safeAthlete.name}.`}
+                      </p>
+                    </div>
                   </div>
                 );
               })}
@@ -681,16 +760,17 @@ export default function AthletePublicPage({
 
           <div className="rounded-[2rem] bg-zinc-950 p-6">
             <SectionTitle icon={Gift} title={`Comment soutenir ${firstName} ?`}>
-              Plusieurs façons simples permettent d’aider concrètement
-              l’athlète.
+              Utilisez les boutons dans les campagnes actives pour que le
+              soutien soit attribué au bon athlète, à la bonne famille et à la
+              bonne campagne.
             </SectionTitle>
 
             <div className="mt-6 grid gap-3">
               {(supportSteps.length
                 ? supportSteps
                 : [
-                    "Acheter un produit supporter",
-                    "Faire un don ou une commandite",
+                    "Choisir la campagne active à soutenir",
+                    "Acheter un produit supporter ou faire un don",
                     "Partager la page",
                     "Laisser un message d’encouragement",
                   ]
@@ -746,32 +826,15 @@ export default function AthletePublicPage({
 
         <section className="mt-8 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6">
           <SectionTitle icon={Store} title="Soutenir via la boutique KinkoLab">
-            Lors de l’achat, sélectionnez {safeAthlete.name || "cet athlète"}{" "}
-            comme athlète supporté.
+            Le soutien se fait maintenant depuis les boutons de chaque campagne
+            active afin d’attribuer les fonds au bon groupe.
           </SectionTitle>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <a
-              href={safeAthlete.shopifyUrl || "https://kinkolab.com"}
-              className="rounded-2xl px-5 py-4 font-black text-black"
-              style={{ background: gold }}
-            >
-              Acheter un t-shirt ou hoodie et soutenir {firstName}
-            </a>
-
-            <a
-              href={safeAthlete.sponsorUrl || "https://kinkolab.com"}
-              className="rounded-2xl border border-zinc-700 px-5 py-4 font-black text-white hover:bg-zinc-900"
-            >
-              Faire un don / commandite pour {firstName}
-            </a>
-
-            <button
-              onClick={copyShareLink}
-              className="rounded-2xl border border-zinc-700 px-5 py-4 font-black text-white hover:bg-zinc-900"
-            >
-              {copied ? "Lien copié" : "Partager la page"}
-            </button>
+          <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <p className="text-sm font-bold leading-6" style={{ color: gold }}>
+              Sélectionnez une campagne active plus haut pour soutenir cet
+              athlète individuellement ou soutenir son fonds commun familial.
+            </p>
           </div>
         </section>
 
@@ -989,16 +1052,16 @@ export default function AthletePublicPage({
 
           <div className="mt-6 grid gap-3">
             <div className="rounded-2xl bg-black/60 p-4 text-sm leading-6 text-zinc-200">
-              Les profits des produits achetés en sélectionnant{" "}
-              {safeAthlete.name || "cet athlète"} sont ajoutés à sa campagne.
+              Les profits des produits achetés depuis une campagne individuelle
+              sont attribués à l’athlète sélectionné.
             </div>
             <div className="rounded-2xl bg-black/60 p-4 text-sm leading-6 text-zinc-200">
-              Les dons et commandites associés à{" "}
-              {safeAthlete.name || "cet athlète"} sont ajoutés à son objectif.
+              Les profits des produits achetés depuis une campagne familiale
+              sont attribués au fonds commun familial de cette campagne.
             </div>
             <div className="rounded-2xl bg-black/60 p-4 text-sm leading-6 text-zinc-200">
               Les commandites d’événement sont versées au fonds commun de la
-              campagne.
+              campagne ou au fonds familial selon le mode de financement choisi.
             </div>
           </div>
         </section>
