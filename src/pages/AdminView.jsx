@@ -36,14 +36,16 @@ function StatusPill({ status }) {
   const colors = {
     actif: "bg-emerald-50 text-emerald-700 border-emerald-200",
     accepté: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
     suspendu: "bg-amber-50 text-amber-700 border-amber-200",
+    suspendue: "bg-amber-50 text-amber-700 border-amber-200",
+    terminee: "bg-blue-50 text-blue-700 border-blue-200",
+    terminée: "bg-blue-50 text-blue-700 border-blue-200",
     archive: "bg-zinc-100 text-zinc-700 border-zinc-300",
     archivé: "bg-zinc-100 text-zinc-700 border-zinc-300",
-    campagne_arretee: "bg-red-50 text-red-700 border-red-200",
+    archivée: "bg-zinc-100 text-zinc-700 border-zinc-300",
     en_attente: "bg-amber-50 text-amber-700 border-amber-200",
     refusé: "bg-red-50 text-red-700 border-red-200",
-    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    terminee: "bg-blue-50 text-blue-700 border-blue-200",
   };
 
   return (
@@ -64,6 +66,7 @@ function AdminButton({ children, onClick, variant = "dark", disabled = false }) 
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black disabled:opacity-50 ${styles[variant]}`}
@@ -72,6 +75,32 @@ function AdminButton({ children, onClick, variant = "dark", disabled = false }) 
     </button>
   );
 }
+
+function makeCampaignId(title, year) {
+  return `${title || "campagne"}-${year || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const emptyCampaign = {
+  title: "",
+  year: "2026",
+  type: "event",
+  status: "active",
+  country: "",
+  city: "",
+  startDate: "",
+  endDate: "",
+  eventDate: "",
+  goal: "",
+  shopifyUrl: "",
+  sponsorUrl: "",
+  description: "",
+};
 
 export default function AdminView({
   athletes,
@@ -88,17 +117,9 @@ export default function AdminView({
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [acceptedAccess, setAcceptedAccess] = useState(null);
-
-  const [newCampaign, setNewCampaign] = useState({
-    title: "",
-    year: "2026",
-    type: "event",
-    status: "active",
-    country: "",
-    goal: "",
-    shopifyUrl: "",
-    description: "",
-  });
+  const [newCampaign, setNewCampaign] = useState(emptyCampaign);
+  const [editingCampaignId, setEditingCampaignId] = useState("");
+  const [editingCampaign, setEditingCampaign] = useState(emptyCampaign);
 
   useEffect(() => {
     const unsubApps = onSnapshot(
@@ -126,8 +147,10 @@ export default function AdminView({
 
   const allCampaigns = useMemo(() => {
     const map = new Map();
+
     campaigns.forEach((campaign) => map.set(campaign.id, campaign));
     firestoreCampaigns.forEach((campaign) => map.set(campaign.id, campaign));
+
     return Array.from(map.values());
   }, [campaigns, firestoreCampaigns]);
 
@@ -204,40 +227,84 @@ export default function AdminView({
     }
   }
 
-  async function updateCampaignStatus(campaign, status) {
-    try {
-      await updateDoc(doc(db, "campaigns", campaign.id), {
-        status,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      alert("Impossible de modifier cette campagne. Si c’est une campagne de démo, recrée-la dans Firestore.");
-    }
-  }
-
   async function createCampaign() {
     if (!newCampaign.title.trim()) {
       alert("Le titre de la campagne est obligatoire.");
       return;
     }
 
-    await addDoc(collection(db, "campaigns"), {
-      ...newCampaign,
-      goal: Number(newCampaign.goal || 0),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const campaignId = makeCampaignId(newCampaign.title, newCampaign.year);
 
-    setNewCampaign({
-      title: "",
-      year: "2026",
-      type: "event",
-      status: "active",
-      country: "",
-      goal: "",
-      shopifyUrl: "",
-      description: "",
+    await updateDocOrCreateCampaign(campaignId, newCampaign);
+
+    setNewCampaign(emptyCampaign);
+  }
+
+  async function updateDocOrCreateCampaign(campaignId, data) {
+    const normalized = {
+      ...data,
+      id: campaignId,
+      goal: Number(data.goal || 0),
+      updatedAt: serverTimestamp(),
+    };
+
+    const campaignRef = doc(db, "campaigns", campaignId);
+
+    try {
+      await updateDoc(campaignRef, normalized);
+    } catch {
+      await addDoc(collection(db, "campaigns"), {
+        ...normalized,
+        createdAt: serverTimestamp(),
+      });
+    }
+  }
+
+  function startEditCampaign(campaign) {
+    setEditingCampaignId(campaign.id);
+    setEditingCampaign({
+      title: campaign.title || "",
+      year: campaign.year || "2026",
+      type: campaign.type || "event",
+      status: campaign.status || "active",
+      country: campaign.country || "",
+      city: campaign.city || "",
+      startDate: campaign.startDate || "",
+      endDate: campaign.endDate || "",
+      eventDate: campaign.eventDate || "",
+      goal: campaign.goal || "",
+      shopifyUrl: campaign.shopifyUrl || "",
+      sponsorUrl: campaign.sponsorUrl || "",
+      description: campaign.description || "",
     });
+  }
+
+  async function saveEditedCampaign() {
+    if (!editingCampaignId) return;
+
+    try {
+      await updateDoc(doc(db, "campaigns", editingCampaignId), {
+        ...editingCampaign,
+        goal: Number(editingCampaign.goal || 0),
+        updatedAt: serverTimestamp(),
+      });
+
+      setEditingCampaignId("");
+      setEditingCampaign(emptyCampaign);
+    } catch {
+      alert("Impossible de modifier cette campagne. Les campagnes de démonstration doivent être recréées dans Firestore pour être modifiables.");
+    }
+  }
+
+  async function updateCampaignStatus(campaign, status) {
+    try {
+      await updateDoc(doc(db, "campaigns", campaign.id), {
+        status,
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      alert("Impossible de modifier cette campagne. Si c’est une campagne de démo, recrée-la dans Firestore.");
+    }
   }
 
   function approveMessage(id) {
@@ -515,48 +582,24 @@ export default function AdminView({
               </div>
 
               <div className="mt-5 grid gap-3">
-                <input
-                  value={newCampaign.title}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, title: event.target.value })}
-                  placeholder="Titre"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
+                <input value={newCampaign.title} onChange={(event) => setNewCampaign({ ...newCampaign, title: event.target.value })} placeholder="Titre" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newCampaign.year} onChange={(event) => setNewCampaign({ ...newCampaign, year: event.target.value })} placeholder="Année" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newCampaign.country} onChange={(event) => setNewCampaign({ ...newCampaign, country: event.target.value })} placeholder="Pays" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newCampaign.city} onChange={(event) => setNewCampaign({ ...newCampaign, city: event.target.value })} placeholder="Ville" className="rounded-2xl border border-zinc-200 p-3" />
 
-                <input
-                  value={newCampaign.year}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, year: event.target.value })}
-                  placeholder="Année"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
+                <label className="text-sm font-black text-zinc-700">Date de début</label>
+                <input type="date" value={newCampaign.startDate} onChange={(event) => setNewCampaign({ ...newCampaign, startDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                <input
-                  value={newCampaign.country}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, country: event.target.value })}
-                  placeholder="Pays / lieu"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
+                <label className="text-sm font-black text-zinc-700">Date de fin</label>
+                <input type="date" value={newCampaign.endDate} onChange={(event) => setNewCampaign({ ...newCampaign, endDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                <input
-                  value={newCampaign.goal}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, goal: event.target.value })}
-                  type="number"
-                  placeholder="Objectif global"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
+                <label className="text-sm font-black text-zinc-700">Date de compétition / événement</label>
+                <input type="date" value={newCampaign.eventDate} onChange={(event) => setNewCampaign({ ...newCampaign, eventDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                <input
-                  value={newCampaign.shopifyUrl}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, shopifyUrl: event.target.value })}
-                  placeholder="Lien Shopify"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
-
-                <textarea
-                  value={newCampaign.description}
-                  onChange={(event) => setNewCampaign({ ...newCampaign, description: event.target.value })}
-                  placeholder="Description"
-                  className="min-h-28 rounded-2xl border border-zinc-200 p-3"
-                />
+                <input value={newCampaign.goal} onChange={(event) => setNewCampaign({ ...newCampaign, goal: event.target.value })} type="number" placeholder="Objectif global" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newCampaign.shopifyUrl} onChange={(event) => setNewCampaign({ ...newCampaign, shopifyUrl: event.target.value })} placeholder="Lien Shopify" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newCampaign.sponsorUrl} onChange={(event) => setNewCampaign({ ...newCampaign, sponsorUrl: event.target.value })} placeholder="Lien commandite" className="rounded-2xl border border-zinc-200 p-3" />
+                <textarea value={newCampaign.description} onChange={(event) => setNewCampaign({ ...newCampaign, description: event.target.value })} placeholder="Description" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
 
                 <AdminButton onClick={createCampaign}>
                   <Save size={16} /> Créer la campagne
@@ -573,30 +616,72 @@ export default function AdminView({
               <div className="mt-5 space-y-3">
                 {allCampaigns.map((campaign) => (
                   <div key={campaign.id} className="rounded-2xl border border-zinc-200 p-5">
-                    <h3 className="text-xl font-black text-zinc-950">{campaign.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-600">
-                      {campaign.year || ""} · {campaign.country || ""} · Objectif : {money(Number(campaign.goal || 0))}
-                    </p>
+                    {editingCampaignId === campaign.id ? (
+                      <div className="grid gap-3">
+                        <input value={editingCampaign.title} onChange={(event) => setEditingCampaign({ ...editingCampaign, title: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={editingCampaign.year} onChange={(event) => setEditingCampaign({ ...editingCampaign, year: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={editingCampaign.country} onChange={(event) => setEditingCampaign({ ...editingCampaign, country: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={editingCampaign.city} onChange={(event) => setEditingCampaign({ ...editingCampaign, city: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <StatusPill status={campaign.status || "active"} />
+                        <label className="text-sm font-black text-zinc-700">Date de début</label>
+                        <input type="date" value={editingCampaign.startDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, startDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                      <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>
-                        Active
-                      </AdminButton>
+                        <label className="text-sm font-black text-zinc-700">Date de fin</label>
+                        <input type="date" value={editingCampaign.endDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, endDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                      <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "suspendue")}>
-                        Suspendre
-                      </AdminButton>
+                        <label className="text-sm font-black text-zinc-700">Date de compétition / événement</label>
+                        <input type="date" value={editingCampaign.eventDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, eventDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
 
-                      <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "terminee")}>
-                        Terminée
-                      </AdminButton>
+                        <input type="number" value={editingCampaign.goal} onChange={(event) => setEditingCampaign({ ...editingCampaign, goal: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={editingCampaign.shopifyUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, shopifyUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={editingCampaign.sponsorUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, sponsorUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={editingCampaign.description} onChange={(event) => setEditingCampaign({ ...editingCampaign, description: event.target.value })} className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
 
-                      <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archivée")}>
-                        Archiver
-                      </AdminButton>
-                    </div>
+                        <div className="flex gap-2">
+                          <AdminButton variant="green" onClick={saveEditedCampaign}>Sauvegarder</AdminButton>
+                          <AdminButton variant="light" onClick={() => setEditingCampaignId("")}>Annuler</AdminButton>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="text-xl font-black text-zinc-950">{campaign.title}</h3>
+                        <p className="mt-1 text-sm text-zinc-600">
+                          {campaign.year || ""} · {campaign.city || ""} {campaign.country || ""} · Objectif : {money(Number(campaign.goal || 0))}
+                        </p>
+
+                        <p className="mt-1 text-sm text-zinc-600">
+                          Début : {campaign.startDate || "—"} · Fin : {campaign.endDate || "—"} · Événement : {campaign.eventDate || "—"}
+                        </p>
+
+                        {campaign.description && (
+                          <p className="mt-2 text-sm leading-6 text-zinc-600">{campaign.description}</p>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <StatusPill status={campaign.status || "active"} />
+
+                          <AdminButton variant="light" onClick={() => startEditCampaign(campaign)}>
+                            Modifier
+                          </AdminButton>
+
+                          <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>
+                            Active
+                          </AdminButton>
+
+                          <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "suspendue")}>
+                            Suspendre
+                          </AdminButton>
+
+                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "terminee")}>
+                            Terminée
+                          </AdminButton>
+
+                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archivée")}>
+                            Archiver
+                          </AdminButton>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
