@@ -1,16 +1,49 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Archive, Ban, CheckCircle2, DollarSign, Eye, FolderKanban,
-  Megaphone, MessageCircle, PencilLine, Plus, RotateCcw, Save, Shield,
-  Trash2, UserPlus2, Users, XCircle,
+  ArrowLeft,
+  Archive,
+  Ban,
+  CheckCircle2,
+  DollarSign,
+  Eye,
+  FolderKanban,
+  Megaphone,
+  MessageCircle,
+  PencilLine,
+  Plus,
+  RotateCcw,
+  Save,
+  Shield,
+  Trash2,
+  UserPlus2,
+  Users,
+  XCircle,
+  Link2,
 } from "lucide-react";
+
 import {
-  arrayRemove, arrayUnion, collection, doc, onSnapshot, orderBy, query,
-  serverTimestamp, setDoc, updateDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "../firebase";
-import { campaignTitle, gold, money, progressOf, totalRaised } from "../utils/format";
+
+import {
+  campaignTitle,
+  gold,
+  money,
+  progressOf,
+  totalRaised,
+} from "../utils/format";
+
 import StatCard from "../components/StatCard";
 
 function slugify(value) {
@@ -38,13 +71,22 @@ function StatusPill({ status }) {
   };
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${colors[status] || colors.en_attente}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${
+        colors[status] || colors.en_attente
+      }`}
+    >
       {status || "en_attente"}
     </span>
   );
 }
 
-function AdminButton({ children, onClick, variant = "dark", disabled = false }) {
+function AdminButton({
+  children,
+  onClick,
+  variant = "dark",
+  disabled = false,
+}) {
   const styles = {
     dark: "bg-black text-white",
     green: "bg-emerald-600 text-white",
@@ -90,16 +132,23 @@ export default function AdminView({
   onOpenAthlete,
 }) {
   const [activeTab, setActiveTab] = useState("candidatures");
+
   const [applications, setApplications] = useState([]);
   const [families, setFamilies] = useState([]);
   const [firestoreCampaigns, setFirestoreCampaigns] = useState([]);
+  const [participations, setParticipations] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
+
   const [acceptedAccess, setAcceptedAccess] = useState(null);
 
   const [newCampaign, setNewCampaign] = useState(emptyCampaign);
+
   const [editingCampaignId, setEditingCampaignId] = useState("");
-  const [editingCampaign, setEditingCampaign] = useState(emptyCampaign);
+
+  const [editingCampaign, setEditingCampaign] =
+    useState(emptyCampaign);
 
   const [newFamily, setNewFamily] = useState({
     name: "",
@@ -107,45 +156,204 @@ export default function AdminView({
     contactEmail: "",
   });
 
+  const [newParticipation, setNewParticipation] = useState({
+    athleteId: "",
+    campaignId: "",
+    fundingMode: "individual",
+    goal: "",
+  });
+
   useEffect(() => {
     const unsubApps = onSnapshot(
-      query(collection(db, "applications"), orderBy("createdAt", "desc")),
+      query(
+        collection(db, "applications"),
+        orderBy("createdAt", "desc")
+      ),
       (snapshot) => {
-        setApplications(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setApplications(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+
         setLoading(false);
       }
     );
 
-    const unsubFamilies = onSnapshot(collection(db, "families"), (snapshot) => {
-      setFamilies(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    const unsubFamilies = onSnapshot(
+      collection(db, "families"),
+      (snapshot) => {
+        setFamilies(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+      }
+    );
 
-    const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (snapshot) => {
-      setFirestoreCampaigns(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    const unsubCampaigns = onSnapshot(
+      collection(db, "campaigns"),
+      (snapshot) => {
+        setFirestoreCampaigns(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+      }
+    );
+
+    const unsubParticipations = onSnapshot(
+      collection(db, "campaignParticipations"),
+      (snapshot) => {
+        setParticipations(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+      }
+    );
 
     return () => {
       unsubApps();
       unsubFamilies();
       unsubCampaigns();
+      unsubParticipations();
     };
   }, []);
 
   const allCampaigns = useMemo(() => {
     const map = new Map();
-    campaigns.forEach((campaign) => map.set(campaign.id, campaign));
-    firestoreCampaigns.forEach((campaign) => map.set(campaign.id, campaign));
+
+    campaigns.forEach((campaign) =>
+      map.set(campaign.id, campaign)
+    );
+
+    firestoreCampaigns.forEach((campaign) =>
+      map.set(campaign.id, campaign)
+    );
+
     return Array.from(map.values());
   }, [campaigns, firestoreCampaigns]);
 
   const pendingApplications = applications.filter(
-    (application) => (application.status || "en_attente") === "en_attente"
+    (application) =>
+      (application.status || "en_attente") === "en_attente"
   );
 
-  const pendingMessages = wallMessages.filter((message) => message.status === "en_attente");
+  const pendingMessages = wallMessages.filter(
+    (message) => message.status === "en_attente"
+  );
 
-  const athletesWithoutFamily = athletes.filter((athlete) => !athlete.familyId);
+  const athletesWithoutFamily = athletes.filter(
+    (athlete) => !athlete.familyId
+  );
 
+  async function createParticipation() {
+    if (
+      !newParticipation.athleteId ||
+      !newParticipation.campaignId
+    ) {
+      alert("Athlète et campagne obligatoires.");
+      return;
+    }
+
+    const athlete = athletes.find(
+      (a) => a.id === newParticipation.athleteId
+    );
+
+    const campaign = allCampaigns.find(
+      (c) => c.id === newParticipation.campaignId
+    );
+
+    if (!athlete || !campaign) {
+      alert("Athlète ou campagne introuvable.");
+      return;
+    }
+
+    let fundingGroupId = "";
+
+    if (newParticipation.fundingMode === "family") {
+      if (!athlete.familyId) {
+        alert(
+          "Cet athlète n’appartient à aucune famille."
+        );
+        return;
+      }
+
+      fundingGroupId = `${athlete.familyId}-${campaign.id}`;
+    } else {
+      fundingGroupId = `${athlete.id}-${campaign.id}`;
+    }
+
+    const participationId = slugify(
+      `${athlete.id}-${campaign.id}-${newParticipation.fundingMode}`
+    );
+
+    await setDoc(
+      doc(
+        db,
+        "campaignParticipations",
+        participationId
+      ),
+      {
+        athleteId: athlete.id,
+        athleteName: athlete.name,
+
+        familyId: athlete.familyId || null,
+        familyName: athlete.familyName || null,
+
+        campaignId: campaign.id,
+        campaignTitle: campaign.title,
+
+        fundingMode: newParticipation.fundingMode,
+        fundingGroupId,
+
+        goal: Number(newParticipation.goal || 0),
+
+        raisedShop: 0,
+        raisedOffline: 0,
+        raisedSponsorship: 0,
+
+        status: "active",
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    setNewParticipation({
+      athleteId: "",
+      campaignId: "",
+      fundingMode: "individual",
+      goal: "",
+    });
+
+    alert("Participation créée.");
+  }
+
+  function participationAthleteName(id) {
+    return athletes.find((a) => a.id === id)?.name || id;
+  }
+
+  function participationCampaignName(id) {
+    return (
+      allCampaigns.find((c) => c.id === id)?.title || id
+    );
+  }
+
+  const tabs = [
+    ["candidatures", "Candidatures"],
+    ["athletes", "Athlètes"],
+    ["families", "Familles"],
+    ["campaigns", "Campagnes"],
+    ["participations", "Participations"],
+    ["messages", "Messages"],
+  ];
   async function updateApplicationCampaign(applicationId, campaignId) {
     const campaign = allCampaigns.find((item) => item.id === campaignId);
 
@@ -209,7 +417,7 @@ export default function AdminView({
         updatedAt: serverTimestamp(),
       });
     } catch {
-      alert("Impossible de modifier cet athlète. Il s’agit peut-être d’un profil de démonstration.");
+      alert("Impossible de modifier cet athlète.");
     }
   }
 
@@ -268,7 +476,7 @@ export default function AdminView({
       setEditingCampaignId("");
       setEditingCampaign(emptyCampaign);
     } catch {
-      alert("Impossible de modifier cette campagne. Les campagnes de démonstration doivent être recréées dans Firestore.");
+      alert("Impossible de modifier cette campagne.");
     }
   }
 
@@ -279,7 +487,7 @@ export default function AdminView({
         updatedAt: serverTimestamp(),
       });
     } catch {
-      alert("Impossible de modifier cette campagne. Si c’est une campagne de démo, recrée-la dans Firestore.");
+      alert("Impossible de modifier cette campagne.");
     }
   }
 
@@ -343,6 +551,17 @@ export default function AdminView({
     }
   }
 
+  async function updateParticipationStatus(participation, status) {
+    try {
+      await updateDoc(doc(db, "campaignParticipations", participation.id), {
+        status,
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      alert("Impossible de modifier cette participation.");
+    }
+  }
+
   function approveMessage(id) {
     setWallMessages(
       wallMessages.map((message) =>
@@ -359,14 +578,6 @@ export default function AdminView({
     );
   }
 
-  const tabs = [
-    ["candidatures", "Candidatures"],
-    ["athletes", "Athlètes"],
-    ["families", "Familles"],
-    ["campaigns", "Campagnes"],
-    ["messages", "Messages"],
-  ];
-
   return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
@@ -382,7 +593,7 @@ export default function AdminView({
             Dashboard admin Kinko Athletes
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">
-            Gestion des candidatures, athlètes, familles, campagnes et validations.
+            Gestion des candidatures, athlètes, familles, campagnes, participations et validations.
           </p>
         </section>
 
@@ -429,9 +640,9 @@ export default function AdminView({
         )}
 
         <section className="mt-8 grid gap-4 md:grid-cols-4">
-          <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils actifs" />
+          <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils" />
           <StatCard light icon={Megaphone} label="Campagnes" value={allCampaigns.length} sub="Total" />
-          <StatCard light icon={MessageCircle} label="Messages" value={pendingMessages.length} sub="À valider" />
+          <StatCard light icon={Link2} label="Participations" value={participations.length} sub="Campagnes liées" />
           <StatCard light icon={DollarSign} label="Fonds suivis" value={money(athletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0))} sub="Total plateforme" />
         </section>
 
@@ -554,15 +765,12 @@ export default function AdminView({
                       <AdminButton variant="light" onClick={() => onOpenAthlete(athlete.id)}>
                         <Eye size={16} /> Voir
                       </AdminButton>
-
                       <AdminButton variant="amber" onClick={() => updateAthleteStatus(athlete, "suspendu")}>
                         <Ban size={16} /> Suspendre
                       </AdminButton>
-
                       <AdminButton variant="green" onClick={() => updateAthleteStatus(athlete, "actif")}>
                         <RotateCcw size={16} /> Réactiver
                       </AdminButton>
-
                       <AdminButton variant="light" onClick={() => updateAthleteStatus(athlete, "archivé")}>
                         <Archive size={16} /> Archiver
                       </AdminButton>
@@ -587,26 +795,9 @@ export default function AdminView({
               </div>
 
               <div className="mt-5 grid gap-3">
-                <input
-                  value={newFamily.name}
-                  onChange={(e) => setNewFamily({ ...newFamily, name: e.target.value })}
-                  placeholder="Nom de famille"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
-
-                <input
-                  value={newFamily.contactName}
-                  onChange={(e) => setNewFamily({ ...newFamily, contactName: e.target.value })}
-                  placeholder="Parent responsable"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
-
-                <input
-                  value={newFamily.contactEmail}
-                  onChange={(e) => setNewFamily({ ...newFamily, contactEmail: e.target.value })}
-                  placeholder="Courriel principal"
-                  className="rounded-2xl border border-zinc-200 p-3"
-                />
+                <input value={newFamily.name} onChange={(e) => setNewFamily({ ...newFamily, name: e.target.value })} placeholder="Nom de famille" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newFamily.contactName} onChange={(e) => setNewFamily({ ...newFamily, contactName: e.target.value })} placeholder="Parent responsable" className="rounded-2xl border border-zinc-200 p-3" />
+                <input value={newFamily.contactEmail} onChange={(e) => setNewFamily({ ...newFamily, contactEmail: e.target.value })} placeholder="Courriel principal" className="rounded-2xl border border-zinc-200 p-3" />
 
                 <AdminButton onClick={createFamily}>
                   <Save size={16} /> Créer la famille
@@ -631,16 +822,12 @@ export default function AdminView({
                           <p className="text-sm text-zinc-500">{family.contactName || "Responsable non défini"}</p>
                           <p className="text-sm text-zinc-500">{family.contactEmail}</p>
                         </div>
-
                         <StatusPill status={family.status || "active"} />
                       </div>
 
                       <div className="mt-5 space-y-2">
                         <p className="text-sm font-black text-zinc-700">Athlètes de la famille</p>
-
-                        {familyAthletes.length === 0 && (
-                          <p className="text-sm text-zinc-400">Aucun athlète rattaché.</p>
-                        )}
+                        {familyAthletes.length === 0 && <p className="text-sm text-zinc-400">Aucun athlète rattaché.</p>}
 
                         {familyAthletes.map((athlete) => (
                           <div key={athlete.id} className="flex items-center justify-between rounded-xl bg-zinc-100 px-4 py-3">
@@ -654,10 +841,7 @@ export default function AdminView({
 
                       <div className="mt-5 space-y-2">
                         <p className="text-sm font-black text-zinc-700">Ajouter un athlète sans famille</p>
-
-                        {athletesWithoutFamily.length === 0 && (
-                          <p className="text-sm text-zinc-400">Aucun athlète disponible.</p>
-                        )}
+                        {athletesWithoutFamily.length === 0 && <p className="text-sm text-zinc-400">Aucun athlète disponible.</p>}
 
                         {athletesWithoutFamily.map((athlete) => (
                           <button
@@ -727,16 +911,9 @@ export default function AdminView({
                         <input value={editingCampaign.year} onChange={(event) => setEditingCampaign({ ...editingCampaign, year: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={editingCampaign.country} onChange={(event) => setEditingCampaign({ ...editingCampaign, country: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={editingCampaign.city} onChange={(event) => setEditingCampaign({ ...editingCampaign, city: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de début</label>
                         <input type="date" value={editingCampaign.startDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, startDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de fin</label>
                         <input type="date" value={editingCampaign.endDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, endDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de compétition / événement</label>
                         <input type="date" value={editingCampaign.eventDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, eventDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
                         <input type="number" value={editingCampaign.goal} onChange={(event) => setEditingCampaign({ ...editingCampaign, goal: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={editingCampaign.shopifyUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, shopifyUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={editingCampaign.sponsorUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, sponsorUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
@@ -753,18 +930,12 @@ export default function AdminView({
                         <p className="mt-1 text-sm text-zinc-600">
                           {campaign.year || ""} · {campaign.city || ""} {campaign.country || ""} · Objectif : {money(Number(campaign.goal || 0))}
                         </p>
-
                         <p className="mt-1 text-sm text-zinc-600">
                           Début : {campaign.startDate || "—"} · Fin : {campaign.endDate || "—"} · Événement : {campaign.eventDate || "—"}
                         </p>
 
-                        {campaign.description && (
-                          <p className="mt-2 text-sm leading-6 text-zinc-600">{campaign.description}</p>
-                        )}
-
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <StatusPill status={campaign.status || "active"} />
-
                           <AdminButton variant="light" onClick={() => startEditCampaign(campaign)}>Modifier</AdminButton>
                           <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>Active</AdminButton>
                           <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "suspendue")}>Suspendre</AdminButton>
@@ -773,6 +944,136 @@ export default function AdminView({
                         </div>
                       </>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "participations" && (
+          <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <div className="flex items-center gap-3">
+                <Link2 style={{ color: gold }} />
+                <h2 className="text-2xl font-black text-zinc-950">Créer une participation</h2>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                <label className="text-sm font-black text-zinc-700">Athlète</label>
+                <select
+                  value={newParticipation.athleteId}
+                  onChange={(event) =>
+                    setNewParticipation({ ...newParticipation, athleteId: event.target.value })
+                  }
+                  className="rounded-2xl border border-zinc-200 p-3"
+                >
+                  <option value="">Choisir un athlète</option>
+                  {athletes.map((athlete) => (
+                    <option key={athlete.id} value={athlete.id}>
+                      {athlete.name}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="text-sm font-black text-zinc-700">Campagne</label>
+                <select
+                  value={newParticipation.campaignId}
+                  onChange={(event) =>
+                    setNewParticipation({ ...newParticipation, campaignId: event.target.value })
+                  }
+                  className="rounded-2xl border border-zinc-200 p-3"
+                >
+                  <option value="">Choisir une campagne</option>
+                  {allCampaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.title}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="text-sm font-black text-zinc-700">Mode de financement</label>
+                <select
+                  value={newParticipation.fundingMode}
+                  onChange={(event) =>
+                    setNewParticipation({ ...newParticipation, fundingMode: event.target.value })
+                  }
+                  className="rounded-2xl border border-zinc-200 p-3"
+                >
+                  <option value="individual">Individuel</option>
+                  <option value="family">Famille / fonds commun</option>
+                </select>
+
+                <input
+                  type="number"
+                  value={newParticipation.goal}
+                  onChange={(event) =>
+                    setNewParticipation({ ...newParticipation, goal: event.target.value })
+                  }
+                  placeholder="Objectif de participation"
+                  className="rounded-2xl border border-zinc-200 p-3"
+                />
+
+                <AdminButton onClick={createParticipation}>
+                  <Save size={16} /> Créer la participation
+                </AdminButton>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-zinc-950">Participations existantes</h2>
+
+              <div className="mt-5 space-y-3">
+                {participations.length === 0 && (
+                  <p className="text-zinc-500">Aucune participation créée.</p>
+                )}
+
+                {participations.map((participation) => (
+                  <div key={participation.id} className="rounded-2xl border border-zinc-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-xl font-black text-zinc-950">
+                          {participationAthleteName(participation.athleteId)}
+                        </h3>
+                        <p className="text-sm text-zinc-500">
+                          {participationCampaignName(participation.campaignId)}
+                        </p>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          Mode : <b>{participation.fundingMode === "family" ? "Famille" : "Individuel"}</b>
+                        </p>
+                        <p className="text-sm text-zinc-500">
+                          Groupe fonds : {participation.fundingGroupId}
+                        </p>
+                      </div>
+
+                      <StatusPill status={participation.status || "active"} />
+                    </div>
+
+                    <div className="mt-3 text-sm text-zinc-600">
+                      Objectif : <b>{money(participation.goal || 0)}</b> · Collecté :{" "}
+                      <b>
+                        {money(
+                          Number(participation.raisedShop || 0) +
+                            Number(participation.raisedOffline || 0) +
+                            Number(participation.raisedSponsorship || 0)
+                        )}
+                      </b>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <AdminButton variant="green" onClick={() => updateParticipationStatus(participation, "active")}>
+                        Active
+                      </AdminButton>
+                      <AdminButton variant="amber" onClick={() => updateParticipationStatus(participation, "suspendue")}>
+                        Suspendre
+                      </AdminButton>
+                      <AdminButton variant="light" onClick={() => updateParticipationStatus(participation, "terminee")}>
+                        Terminée
+                      </AdminButton>
+                      <AdminButton variant="light" onClick={() => updateParticipationStatus(participation, "archivée")}>
+                        Archiver
+                      </AdminButton>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -793,8 +1094,13 @@ export default function AdminView({
                   <p className="mt-1 text-sm text-zinc-600">{item.message}</p>
 
                   <div className="mt-4 flex gap-2">
-                    <AdminButton variant="green" onClick={() => approveMessage(item.id)}>Approuver</AdminButton>
-                    <AdminButton variant="red" onClick={() => refuseMessage(item.id)}>Refuser</AdminButton>
+                    <AdminButton variant="green" onClick={() => approveMessage(item.id)}>
+                      Approuver
+                    </AdminButton>
+
+                    <AdminButton variant="red" onClick={() => refuseMessage(item.id)}>
+                      Refuser
+                    </AdminButton>
                   </div>
                 </div>
               ))}
