@@ -12,6 +12,7 @@ import AthletePublicPage from "./pages/AthletePublicPage";
 import SignupView from "./pages/SignupView";
 import LoginView from "./pages/LoginView";
 import AdminView from "./pages/AdminView";
+import AthleteDashboard from "./pages/AthleteDashboard";
 
 import { auth, db } from "./firebase";
 
@@ -28,19 +29,7 @@ function AthleteRoute({ athletes, updates, wallMessages, setWallMessages, onOpen
   const athlete = athletes.find((item) => item.id === athleteId);
 
   if (!athlete) {
-    return (
-      <main className="min-h-screen bg-black p-8 text-white">
-        <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
-          <h1 className="text-3xl font-black">Athlète introuvable</h1>
-          <button
-            onClick={() => navigate("/athletes")}
-            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
-          >
-            Retour aux athlètes
-          </button>
-        </div>
-      </main>
-    );
+    return <Navigate to="/athletes" replace />;
   }
 
   return (
@@ -61,19 +50,7 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
   const campaign = campaigns.find((item) => item.id === campaignId);
 
   if (!campaign) {
-    return (
-      <main className="min-h-screen bg-black p-8 text-white">
-        <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
-          <h1 className="text-3xl font-black">Campagne introuvable</h1>
-          <button
-            onClick={() => navigate("/campaigns")}
-            className="mt-6 rounded-2xl bg-white px-5 py-3 font-black text-black"
-          >
-            Retour aux campagnes
-          </button>
-        </div>
-      </main>
-    );
+    return <Navigate to="/campaigns" replace />;
   }
 
   return (
@@ -91,14 +68,28 @@ function ProtectedAdminRoute({ currentUser, authLoading, children }) {
   if (authLoading) {
     return (
       <main className="min-h-screen bg-black p-8 text-white">
-        <div className="mx-auto max-w-4xl rounded-3xl bg-zinc-950 p-8">
-          <h1 className="text-3xl font-black">Chargement...</h1>
-        </div>
+        <h1 className="text-3xl font-black">Chargement...</h1>
       </main>
     );
   }
 
   if (!currentUser || currentUser.role !== "admin") {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function ProtectedDashboardRoute({ currentUser, authLoading, children }) {
+  if (authLoading) {
+    return (
+      <main className="min-h-screen bg-black p-8 text-white">
+        <h1 className="text-3xl font-black">Chargement...</h1>
+      </main>
+    );
+  }
+
+  if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
@@ -132,8 +123,7 @@ export default function App() {
       }
 
       try {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
+        const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
         const userData = userSnap.exists() ? userSnap.data() : {};
 
         setCurrentUser({
@@ -142,10 +132,11 @@ export default function App() {
           name: userData.name || firebaseUser.email,
           role: userData.role || "athlete",
           athleteId: userData.athleteId || null,
+          athleteIds: userData.athleteIds || [],
           familyId: userData.familyId || null,
         });
       } catch (error) {
-        console.error("Erreur récupération rôle utilisateur:", error);
+        console.error("Erreur récupération utilisateur:", error);
         setCurrentUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -193,17 +184,11 @@ export default function App() {
     const map = new Map();
 
     campaignsSeed.forEach((campaign) => {
-      map.set(campaign.id, {
-        ...campaign,
-        source: "seed",
-      });
+      map.set(campaign.id, { ...campaign, source: "seed" });
     });
 
     firebaseCampaigns.forEach((campaign) => {
-      map.set(campaign.id, {
-        ...campaign,
-        source: "firestore",
-      });
+      map.set(campaign.id, { ...campaign, source: "firestore" });
     });
 
     return Array.from(map.values());
@@ -214,7 +199,13 @@ export default function App() {
   }, [athletes]);
 
   const publicCampaigns = useMemo(() => {
-    return campaigns.filter((campaign) => campaign.status !== "archivée");
+    return campaigns.filter(
+      (campaign) =>
+        campaign.status !== "suspendue" &&
+        campaign.status !== "archivée" &&
+        campaign.status !== "archive" &&
+        campaign.status !== "archivé"
+    );
   }, [campaigns]);
 
   const goHome = () => navigate("/");
@@ -223,6 +214,7 @@ export default function App() {
   const openSignup = () => navigate("/signup");
   const openLogin = () => navigate("/login");
   const openAdmin = () => navigate("/admin");
+  const openDashboard = () => navigate("/dashboard");
   const openAthlete = (id) => navigate(`/athlete/${id}`);
   const openCampaign = (id) => navigate(`/campaign/${id}`);
 
@@ -323,7 +315,22 @@ export default function App() {
               goBack={goHome}
               setCurrentUser={setCurrentUser}
               openAdmin={openAdmin}
+              openDashboard={openDashboard}
             />
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedDashboardRoute currentUser={currentUser} authLoading={authLoading}>
+              <AthleteDashboard
+                currentUser={currentUser}
+                campaigns={campaigns}
+                goHome={goHome}
+                onOpenAthlete={openAthlete}
+              />
+            </ProtectedDashboardRoute>
           }
         />
 
