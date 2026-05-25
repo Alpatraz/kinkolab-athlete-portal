@@ -1,316 +1,163 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Archive,
-  Ban,
-  CheckCircle2,
+  Camera,
   DollarSign,
-  Eye,
-  FolderKanban,
   Megaphone,
   MessageCircle,
   PencilLine,
-  Plus,
-  RotateCcw,
-  Save,
   Users,
+  CheckCircle2,
   XCircle,
+  PauseCircle,
+  Archive,
+  Shield,
+  UserPlus2,
+  Save,
+  Trash2,
 } from "lucide-react";
 
 import {
-  addDoc,
   collection,
   doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
+  getDocs,
   updateDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
-import { campaignTitle, gold, money, progressOf } from "../utils/format";
-import StatCard from "../components/StatCard";
 import { db } from "../firebase";
 
-function StatusPill({ status }) {
-  const colors = {
-    actif: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    accepté: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    suspendu: "bg-amber-50 text-amber-700 border-amber-200",
-    suspendue: "bg-amber-50 text-amber-700 border-amber-200",
-    terminee: "bg-blue-50 text-blue-700 border-blue-200",
-    terminée: "bg-blue-50 text-blue-700 border-blue-200",
-    archive: "bg-zinc-100 text-zinc-700 border-zinc-300",
-    archivé: "bg-zinc-100 text-zinc-700 border-zinc-300",
-    archivée: "bg-zinc-100 text-zinc-700 border-zinc-300",
-    en_attente: "bg-amber-50 text-amber-700 border-amber-200",
-    refusé: "bg-red-50 text-red-700 border-red-200",
-  };
+import {
+  campaignTitle,
+  gold,
+  money,
+  progressOf,
+  totalRaised,
+} from "../utils/format";
 
-  return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${colors[status] || colors.en_attente}`}>
-      {status || "en_attente"}
-    </span>
-  );
-}
-
-function AdminButton({ children, onClick, variant = "dark", disabled = false }) {
-  const styles = {
-    dark: "bg-black text-white",
-    green: "bg-emerald-600 text-white",
-    red: "bg-red-600 text-white",
-    amber: "bg-amber-500 text-black",
-    light: "bg-white text-zinc-950 border border-zinc-300",
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black disabled:opacity-50 ${styles[variant]}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function makeCampaignId(title, year) {
-  return `${title || "campagne"}-${year || ""}`
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-const emptyCampaign = {
-  title: "",
-  year: "2026",
-  type: "event",
-  status: "active",
-  country: "",
-  city: "",
-  startDate: "",
-  endDate: "",
-  eventDate: "",
-  goal: "",
-  shopifyUrl: "",
-  sponsorUrl: "",
-  description: "",
-};
+import StatCard from "../components/StatCard";
 
 export default function AdminView({
-  athletes,
-  campaigns,
-  wallMessages,
+  athletes = [],
+  campaigns = [],
+  wallMessages = [],
   setWallMessages,
   goBack,
   onOpenAthlete,
 }) {
-  const [activeTab, setActiveTab] = useState("candidatures");
-  const [applications, setApplications] = useState([]);
   const [families, setFamilies] = useState([]);
-  const [firestoreCampaigns, setFirestoreCampaigns] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoadingId, setActionLoadingId] = useState("");
-  const [acceptedAccess, setAcceptedAccess] = useState(null);
-  const [newCampaign, setNewCampaign] = useState(emptyCampaign);
-  const [editingCampaignId, setEditingCampaignId] = useState("");
-  const [editingCampaign, setEditingCampaign] = useState(emptyCampaign);
+  const [familyName, setFamilyName] = useState("");
+  const [familyEmail, setFamilyEmail] = useState("");
+  const [familyContact, setFamilyContact] = useState("");
 
-  useEffect(() => {
-    const unsubApps = onSnapshot(
-      query(collection(db, "applications"), orderBy("createdAt", "desc")),
-      (snapshot) => {
-        setApplications(snapshot.docs.map((document) => ({ id: document.id, ...document.data() })));
-        setLoading(false);
-      }
-    );
-
-    const unsubFamilies = onSnapshot(collection(db, "families"), (snapshot) => {
-      setFamilies(snapshot.docs.map((document) => ({ id: document.id, ...document.data() })));
-    });
-
-    const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (snapshot) => {
-      setFirestoreCampaigns(snapshot.docs.map((document) => ({ id: document.id, ...document.data() })));
-    });
-
-    return () => {
-      unsubApps();
-      unsubFamilies();
-      unsubCampaigns();
-    };
-  }, []);
-
-  const allCampaigns = useMemo(() => {
-    const map = new Map();
-
-    campaigns.forEach((campaign) => map.set(campaign.id, campaign));
-    firestoreCampaigns.forEach((campaign) => map.set(campaign.id, campaign));
-
-    return Array.from(map.values());
-  }, [campaigns, firestoreCampaigns]);
-
-  const pendingApplications = applications.filter(
-    (application) => (application.status || "en_attente") === "en_attente"
+  const pendingMessages = (wallMessages || []).filter(
+    (message) => message.status === "en_attente"
   );
 
-  const pendingMessages = wallMessages.filter((message) => message.status === "en_attente");
-
-  async function updateApplicationCampaign(applicationId, campaignId) {
-    const campaign = allCampaigns.find((item) => item.id === campaignId);
-
-    await updateDoc(doc(db, "applications", applicationId), {
-      campaignId,
-      campaignTitle: campaign?.title || "",
-      updatedAt: serverTimestamp(),
-    });
-  }
-
-  async function acceptApplication(application) {
-    setActionLoadingId(application.id);
-    setAcceptedAccess(null);
-
+  async function loadFamilies() {
     try {
-      const response = await fetch("/.netlify/functions/accept-athlete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId: application.id }),
-      });
+      const snap = await getDocs(collection(db, "families"));
 
-      const data = await response.json();
+      const data = snap.docs.map((docItem) => ({
+        id: docItem.id,
+        ...docItem.data(),
+      }));
 
-      if (!response.ok) {
-        throw new Error(data.error || "Erreur lors de l’acceptation.");
-      }
-
-      setAcceptedAccess({
-        athleteId: data.athleteId,
-        email: data.email,
-        temporaryPassword: data.temporaryPassword,
-      });
+      setFamilies(data);
     } catch (error) {
-      alert(error.message || "Erreur lors de l’acceptation.");
-    } finally {
-      setActionLoadingId("");
+      console.error("Erreur chargement familles :", error);
     }
   }
 
-  async function refuseApplication(application) {
-    setActionLoadingId(application.id);
+  useEffect(() => {
+    loadFamilies();
+  }, []);
 
-    try {
-      await updateDoc(doc(db, "applications", application.id), {
-        status: "refusé",
-        refusedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      alert("Erreur lors du refus.");
-    } finally {
-      setActionLoadingId("");
-    }
-  }
-
-  async function updateAthleteStatus(athlete, status) {
-    try {
-      await updateDoc(doc(db, "athletes", athlete.id), {
-        status,
-        isPublic: status !== "suspendu" && status !== "archivé",
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      alert("Impossible de modifier cet athlète. Il s’agit peut-être d’un profil de démonstration.");
-    }
-  }
-
-  async function createCampaign() {
-    if (!newCampaign.title.trim()) {
-      alert("Le titre de la campagne est obligatoire.");
+  async function createFamily() {
+    if (!familyName || !familyEmail) {
+      alert("Nom de famille et courriel obligatoires.");
       return;
     }
 
-    const campaignId = makeCampaignId(newCampaign.title, newCampaign.year);
-
-    await updateDocOrCreateCampaign(campaignId, newCampaign);
-
-    setNewCampaign(emptyCampaign);
-  }
-
-  async function updateDocOrCreateCampaign(campaignId, data) {
-    const normalized = {
-      ...data,
-      id: campaignId,
-      goal: Number(data.goal || 0),
-      updatedAt: serverTimestamp(),
-    };
-
-    const campaignRef = doc(db, "campaigns", campaignId);
-
     try {
-      await updateDoc(campaignRef, normalized);
-    } catch {
-      await addDoc(collection(db, "campaigns"), {
-        ...normalized,
+      await addDoc(collection(db, "families"), {
+        name: familyName,
+        contactEmail: familyEmail,
+        contactName: familyContact,
+        athleteIds: [],
         createdAt: serverTimestamp(),
       });
+
+      setFamilyName("");
+      setFamilyEmail("");
+      setFamilyContact("");
+
+      loadFamilies();
+
+      alert("Famille créée.");
+    } catch (error) {
+      console.error(error);
+      alert("Erreur création famille.");
     }
   }
 
-  function startEditCampaign(campaign) {
-    setEditingCampaignId(campaign.id);
-    setEditingCampaign({
-      title: campaign.title || "",
-      year: campaign.year || "2026",
-      type: campaign.type || "event",
-      status: campaign.status || "active",
-      country: campaign.country || "",
-      city: campaign.city || "",
-      startDate: campaign.startDate || "",
-      endDate: campaign.endDate || "",
-      eventDate: campaign.eventDate || "",
-      goal: campaign.goal || "",
-      shopifyUrl: campaign.shopifyUrl || "",
-      sponsorUrl: campaign.sponsorUrl || "",
-      description: campaign.description || "",
-    });
-  }
-
-  async function saveEditedCampaign() {
-    if (!editingCampaignId) return;
-
+  async function addAthleteToFamily(athleteId, family) {
     try {
-      await updateDoc(doc(db, "campaigns", editingCampaignId), {
-        ...editingCampaign,
-        goal: Number(editingCampaign.goal || 0),
-        updatedAt: serverTimestamp(),
+      const athleteRef = doc(db, "athletes", athleteId);
+
+      const updatedIds = [...(family.athleteIds || []), athleteId];
+
+      await updateDoc(athleteRef, {
+        familyId: family.id,
+        familyName: family.name,
       });
 
-      setEditingCampaignId("");
-      setEditingCampaign(emptyCampaign);
-    } catch {
-      alert("Impossible de modifier cette campagne. Les campagnes de démonstration doivent être recréées dans Firestore pour être modifiables.");
+      await updateDoc(doc(db, "families", family.id), {
+        athleteIds: updatedIds,
+      });
+
+      loadFamilies();
+
+      alert("Athlète ajouté à la famille.");
+    } catch (error) {
+      console.error(error);
+      alert("Erreur ajout famille.");
     }
   }
 
-  async function updateCampaignStatus(campaign, status) {
+  async function removeAthleteFromFamily(athleteId, family) {
     try {
-      await updateDoc(doc(db, "campaigns", campaign.id), {
-        status,
-        updatedAt: serverTimestamp(),
+      const athleteRef = doc(db, "athletes", athleteId);
+
+      const updatedIds = (family.athleteIds || []).filter(
+        (id) => id !== athleteId
+      );
+
+      await updateDoc(athleteRef, {
+        familyId: null,
+        familyName: null,
       });
-    } catch {
-      alert("Impossible de modifier cette campagne. Si c’est une campagne de démo, recrée-la dans Firestore.");
+
+      await updateDoc(doc(db, "families", family.id), {
+        athleteIds: updatedIds,
+      });
+
+      loadFamilies();
+
+      alert("Athlète retiré.");
+    } catch (error) {
+      console.error(error);
+      alert("Erreur suppression famille.");
     }
   }
 
   function approveMessage(id) {
     setWallMessages(
       wallMessages.map((message) =>
-        message.id === id ? { ...message, status: "approuvé" } : message
+        message.id === id
+          ? { ...message, status: "approuvé" }
+          : message
       )
     );
   }
@@ -318,403 +165,278 @@ export default function AdminView({
   function refuseMessage(id) {
     setWallMessages(
       wallMessages.map((message) =>
-        message.id === id ? { ...message, status: "refusé" } : message
+        message.id === id
+          ? { ...message, status: "refusé" }
+          : message
       )
     );
   }
 
-  const tabs = [
-    ["candidatures", "Candidatures"],
-    ["athletes", "Athlètes"],
-    ["families", "Familles"],
-    ["campaigns", "Campagnes"],
-    ["messages", "Messages"],
-  ];
+  const athletesWithoutFamily = useMemo(() => {
+    return (athletes || []).filter((athlete) => !athlete.familyId);
+  }, [athletes]);
 
   return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <button onClick={goBack} className="mb-5 flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-950">
-          <ArrowLeft size={17} /> Retour
+        <button
+          onClick={goBack}
+          className="mb-5 flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-950"
+        >
+          <ArrowLeft size={17} />
+          Retour
         </button>
 
         <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-10">
-          <p className="text-sm font-bold uppercase tracking-[0.3em]" style={{ color: gold }}>
+          <p
+            className="text-sm font-bold uppercase tracking-[0.3em]"
+            style={{ color: gold }}
+          >
             Admin privé
           </p>
+
           <h1 className="mt-4 text-4xl font-black text-zinc-950 md:text-6xl">
-            Dashboard admin Kinko Athletes
+            Gestion Programme Athlètes
           </h1>
+
           <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">
-            Gestion des candidatures, athlètes, familles, campagnes et validations.
+            Gestion des candidatures, familles, campagnes et profils athlètes.
           </p>
         </section>
 
-        {acceptedAccess && (
-          <section className="mt-8 rounded-[2rem] border border-emerald-300 bg-emerald-50 p-6 shadow-xl">
-            <h2 className="text-2xl font-black text-emerald-900">Compte athlète créé</h2>
-            <p className="mt-2 text-sm text-emerald-800">
-              Copie ces accès avant de quitter cette page.
-            </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">Athlete ID</p>
-                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.athleteId}</p>
-              </div>
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">Courriel</p>
-                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.email}</p>
-              </div>
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">Mot de passe temporaire</p>
-                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.temporaryPassword}</p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <AdminButton
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `Courriel: ${acceptedAccess.email}\nMot de passe temporaire: ${acceptedAccess.temporaryPassword}`
-                  );
-                }}
-              >
-                Copier les accès
-              </AdminButton>
-
-              <AdminButton variant="light" onClick={() => setAcceptedAccess(null)}>
-                J’ai copié les accès
-              </AdminButton>
-
-              <AdminButton variant="light" onClick={() => onOpenAthlete(acceptedAccess.athleteId)}>
-                <Eye size={16} /> Voir la page publique
-              </AdminButton>
-            </div>
-          </section>
-        )}
-
         <section className="mt-8 grid gap-4 md:grid-cols-4">
-          <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils actifs" />
-          <StatCard light icon={Megaphone} label="Campagnes" value={allCampaigns.length} sub="Total" />
-          <StatCard light icon={MessageCircle} label="Messages" value={pendingMessages.length} sub="À valider" />
-          <StatCard light icon={DollarSign} label="Candidatures" value={pendingApplications.length} sub="En attente" />
+          <StatCard
+            light
+            icon={Users}
+            label="Athlètes"
+            value={athletes.length}
+            sub="Profils actifs"
+          />
+
+          <StatCard
+            light
+            icon={Megaphone}
+            label="Campagnes"
+            value={campaigns.length}
+            sub="Campagnes ouvertes"
+          />
+
+          <StatCard
+            light
+            icon={MessageCircle}
+            label="Messages à valider"
+            value={pendingMessages.length}
+            sub="Mur d’encouragement"
+          />
+
+          <StatCard
+            light
+            icon={DollarSign}
+            label="Fonds suivis"
+            value={money(
+              athletes.reduce(
+                (sum, athlete) => sum + totalRaised(athlete),
+                0
+              )
+            )}
+            sub="Total plateforme"
+          />
         </section>
 
-        <section className="mt-8 flex flex-wrap gap-2">
-          {tabs.map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`rounded-2xl px-5 py-3 font-black ${
-                activeTab === key ? "bg-black text-white" : "bg-white text-zinc-950"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </section>
-
-        {activeTab === "candidatures" && (
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-[2rem] bg-white p-6 shadow-xl">
             <div className="flex items-center gap-3">
-              <PencilLine style={{ color: gold }} />
-              <h2 className="text-2xl font-black text-zinc-950">Demandes en attente</h2>
+              <Shield style={{ color: gold }} />
+              <h2 className="text-2xl font-black text-zinc-950">
+                Familles
+              </h2>
             </div>
 
-            <div className="mt-5 space-y-4">
-              {loading && <p className="text-zinc-500">Chargement...</p>}
-              {!loading && pendingApplications.length === 0 && <p className="text-zinc-500">Aucune demande en attente.</p>}
+            <div className="mt-6 rounded-2xl bg-zinc-100 p-4">
+              <h3 className="text-lg font-black">Créer une famille</h3>
 
-              {pendingApplications.map((application) => {
-                const athleteName =
-                  application.athleteName ||
-                  `${application.firstName || ""} ${application.lastName || ""}`.trim();
+              <div className="mt-4 grid gap-3">
+                <input
+                  value={familyName}
+                  onChange={(e) => setFamilyName(e.target.value)}
+                  placeholder="Nom de famille"
+                  className="rounded-xl border border-zinc-300 px-4 py-3 outline-none focus:border-black"
+                />
+
+                <input
+                  value={familyContact}
+                  onChange={(e) => setFamilyContact(e.target.value)}
+                  placeholder="Parent responsable"
+                  className="rounded-xl border border-zinc-300 px-4 py-3 outline-none focus:border-black"
+                />
+
+                <input
+                  value={familyEmail}
+                  onChange={(e) => setFamilyEmail(e.target.value)}
+                  placeholder="Courriel principal"
+                  className="rounded-xl border border-zinc-300 px-4 py-3 outline-none focus:border-black"
+                />
+
+                <button
+                  onClick={createFamily}
+                  className="rounded-xl bg-black px-4 py-3 font-black text-white"
+                >
+                  Créer la famille
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {families.map((family) => {
+                const familyAthletes = (athletes || []).filter(
+                  (athlete) => athlete.familyId === family.id
+                );
 
                 return (
-                  <div key={application.id} className="rounded-2xl border border-zinc-200 p-5">
-                    {application.photo && (
-                      <img src={application.photo} alt={athleteName} className="mb-4 h-56 w-full rounded-2xl object-cover" />
-                    )}
-
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <div
+                    key={family.id}
+                    className="rounded-2xl border border-zinc-200 p-5"
+                  >
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-2xl font-black text-zinc-950">{athleteName || "Nom à confirmer"}</h3>
-                        <p className="mt-1 text-sm text-zinc-600">
-                          {application.city || "Ville inconnue"} · {application.province || "Province inconnue"}
+                        <h3 className="text-xl font-black">
+                          {family.name}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {family.contactName || "Aucun responsable"}
                         </p>
-                        <p className="mt-1 text-sm text-zinc-600">Dojo : {application.dojo || "À confirmer"}</p>
-                        <p className="mt-1 text-sm text-zinc-600">Objectif : {money(Number(application.desiredGoal || 0))}</p>
+
+                        <p className="text-sm text-zinc-500">
+                          {family.contactEmail}
+                        </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <AdminButton
-                          variant="green"
-                          disabled={actionLoadingId === application.id}
-                          onClick={() => acceptApplication(application)}
-                        >
-                          <CheckCircle2 size={17} />
-                          {actionLoadingId === application.id ? "Traitement..." : "Accepter"}
-                        </AdminButton>
-
-                        <AdminButton
-                          variant="red"
-                          disabled={actionLoadingId === application.id}
-                          onClick={() => refuseApplication(application)}
-                        >
-                          <XCircle size={17} /> Refuser
-                        </AdminButton>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
-                      <p><b>Courriel athlète :</b> {application.email}</p>
-                      <p><b>Parent :</b> {application.parentName}</p>
-                      <p><b>Courriel parent :</b> {application.parentEmail}</p>
-                      <p><b>Téléphone parent :</b> {application.parentPhone}</p>
-                      <p><b>Coach :</b> {application.coach}</p>
-                      <p><b>Discipline :</b> {application.discipline}</p>
-                      <p><b>Ceinture :</b> {application.belt}</p>
-                      <p><b>Famille :</b> {application.familyName}</p>
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="mb-2 block text-sm font-black text-zinc-700">Campagne associée</label>
-                      <select
-                        value={application.campaignId || ""}
-                        onChange={(event) => updateApplicationCampaign(application.id, event.target.value)}
-                        className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950"
+                      <div
+                        className="rounded-xl px-3 py-2 text-sm font-black text-black"
+                        style={{ background: gold }}
                       >
-                        {allCampaigns.map((campaign) => (
-                          <option key={campaign.id} value={campaign.id}>{campaign.title}</option>
-                        ))}
-                      </select>
+                        {familyAthletes.length} athlète(s)
+                      </div>
                     </div>
 
-                    {application.motivation && (
-                      <div className="mt-4 rounded-2xl bg-zinc-100 p-4 text-sm text-zinc-700">
-                        <b>Motivation :</b>
-                        <p className="mt-1">{application.motivation}</p>
+                    <div className="mt-5 space-y-2">
+                      {familyAthletes.length === 0 && (
+                        <p className="text-sm text-zinc-400">
+                          Aucun athlète dans cette famille.
+                        </p>
+                      )}
+
+                      {familyAthletes.map((athlete) => (
+                        <div
+                          key={athlete.id}
+                          className="flex items-center justify-between rounded-xl bg-zinc-100 px-4 py-3"
+                        >
+                          <div>
+                            <p className="font-black">
+                              {athlete.avatar} {athlete.name}
+                            </p>
+
+                            <p className="text-sm text-zinc-500">
+                              {athlete.dojo}
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() =>
+                              removeAthleteFromFamily(
+                                athlete.id,
+                                family
+                              )
+                            }
+                            className="rounded-xl bg-red-600 px-3 py-2 text-sm font-black text-white"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5">
+                      <label className="mb-2 block text-sm font-black text-zinc-700">
+                        Ajouter un athlète
+                      </label>
+
+                      <div className="space-y-2">
+                        {athletesWithoutFamily.map((athlete) => (
+                          <button
+                            key={athlete.id}
+                            onClick={() =>
+                              addAthleteToFamily(
+                                athlete.id,
+                                family
+                              )
+                            }
+                            className="flex w-full items-center justify-between rounded-xl border border-zinc-200 px-4 py-3 hover:bg-zinc-100"
+                          >
+                            <span>
+                              {athlete.avatar} {athlete.name}
+                            </span>
+
+                            <UserPlus2 size={18} />
+                          </button>
+                        ))}
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </section>
-        )}
+          </div>
 
-        {activeTab === "athletes" && (
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-black text-zinc-950">Gestion des athlètes</h2>
+          <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <Camera style={{ color: gold }} />
+              <h2 className="text-2xl font-black text-zinc-950">
+                Messages en attente
+              </h2>
+            </div>
 
             <div className="mt-5 space-y-3">
-              {athletes.map((athlete) => (
-                <div key={athlete.id} className="rounded-2xl border border-zinc-200 p-5">
-                  <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                    <div>
-                      <h3 className="text-xl font-black text-zinc-950">
-                        {athlete.avatar} {athlete.name}
-                      </h3>
-                      <p className="text-sm text-zinc-500">
-                        {athlete.dojo} · {campaignTitle(allCampaigns, athlete.campaignId)}
-                      </p>
-                      <div className="mt-2">
-                        <StatusPill status={athlete.status || "actif"} />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <AdminButton variant="light" onClick={() => onOpenAthlete(athlete.id)}>
-                        <Eye size={16} /> Voir
-                      </AdminButton>
-
-                      <AdminButton variant="amber" onClick={() => updateAthleteStatus(athlete, "suspendu")}>
-                        <Ban size={16} /> Suspendre
-                      </AdminButton>
-
-                      <AdminButton variant="green" onClick={() => updateAthleteStatus(athlete, "actif")}>
-                        <RotateCcw size={16} /> Réactiver
-                      </AdminButton>
-
-                      <AdminButton variant="light" onClick={() => updateAthleteStatus(athlete, "archivé")}>
-                        <Archive size={16} /> Archiver
-                      </AdminButton>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 text-sm text-zinc-600">
-                    Progression : <b>{progressOf(athlete)}%</b> · Objectif : <b>{money(athlete.goal || 0)}</b>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "families" && (
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-black text-zinc-950">Familles</h2>
-
-            <div className="mt-5 space-y-3">
-              {families.length === 0 && <p className="text-zinc-500">Aucune famille créée pour le moment.</p>}
-
-              {families.map((family) => (
-                <div key={family.id} className="rounded-2xl border border-zinc-200 p-5">
-                  <h3 className="text-xl font-black text-zinc-950">{family.name || family.id}</h3>
-                  <p className="mt-1 text-sm text-zinc-600">Courriel : {family.contactEmail}</p>
-                  <p className="mt-1 text-sm text-zinc-600">
-                    Athlètes : {(family.athleteIds || []).join(", ") || "Aucun"}
-                  </p>
-                  <StatusPill status={family.status || "active"} />
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "campaigns" && (
-          <section className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-              <div className="flex items-center gap-3">
-                <Plus style={{ color: gold }} />
-                <h2 className="text-2xl font-black text-zinc-950">Créer une campagne</h2>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <input value={newCampaign.title} onChange={(event) => setNewCampaign({ ...newCampaign, title: event.target.value })} placeholder="Titre" className="rounded-2xl border border-zinc-200 p-3" />
-                <input value={newCampaign.year} onChange={(event) => setNewCampaign({ ...newCampaign, year: event.target.value })} placeholder="Année" className="rounded-2xl border border-zinc-200 p-3" />
-                <input value={newCampaign.country} onChange={(event) => setNewCampaign({ ...newCampaign, country: event.target.value })} placeholder="Pays" className="rounded-2xl border border-zinc-200 p-3" />
-                <input value={newCampaign.city} onChange={(event) => setNewCampaign({ ...newCampaign, city: event.target.value })} placeholder="Ville" className="rounded-2xl border border-zinc-200 p-3" />
-
-                <label className="text-sm font-black text-zinc-700">Date de début</label>
-                <input type="date" value={newCampaign.startDate} onChange={(event) => setNewCampaign({ ...newCampaign, startDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                <label className="text-sm font-black text-zinc-700">Date de fin</label>
-                <input type="date" value={newCampaign.endDate} onChange={(event) => setNewCampaign({ ...newCampaign, endDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                <label className="text-sm font-black text-zinc-700">Date de compétition / événement</label>
-                <input type="date" value={newCampaign.eventDate} onChange={(event) => setNewCampaign({ ...newCampaign, eventDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                <input value={newCampaign.goal} onChange={(event) => setNewCampaign({ ...newCampaign, goal: event.target.value })} type="number" placeholder="Objectif global" className="rounded-2xl border border-zinc-200 p-3" />
-                <input value={newCampaign.shopifyUrl} onChange={(event) => setNewCampaign({ ...newCampaign, shopifyUrl: event.target.value })} placeholder="Lien Shopify" className="rounded-2xl border border-zinc-200 p-3" />
-                <input value={newCampaign.sponsorUrl} onChange={(event) => setNewCampaign({ ...newCampaign, sponsorUrl: event.target.value })} placeholder="Lien commandite" className="rounded-2xl border border-zinc-200 p-3" />
-                <textarea value={newCampaign.description} onChange={(event) => setNewCampaign({ ...newCampaign, description: event.target.value })} placeholder="Description" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-
-                <AdminButton onClick={createCampaign}>
-                  <Save size={16} /> Créer la campagne
-                </AdminButton>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-              <div className="flex items-center gap-3">
-                <FolderKanban style={{ color: gold }} />
-                <h2 className="text-2xl font-black text-zinc-950">Campagnes existantes</h2>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {allCampaigns.map((campaign) => (
-                  <div key={campaign.id} className="rounded-2xl border border-zinc-200 p-5">
-                    {editingCampaignId === campaign.id ? (
-                      <div className="grid gap-3">
-                        <input value={editingCampaign.title} onChange={(event) => setEditingCampaign({ ...editingCampaign, title: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <input value={editingCampaign.year} onChange={(event) => setEditingCampaign({ ...editingCampaign, year: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <input value={editingCampaign.country} onChange={(event) => setEditingCampaign({ ...editingCampaign, country: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <input value={editingCampaign.city} onChange={(event) => setEditingCampaign({ ...editingCampaign, city: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de début</label>
-                        <input type="date" value={editingCampaign.startDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, startDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de fin</label>
-                        <input type="date" value={editingCampaign.endDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, endDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <label className="text-sm font-black text-zinc-700">Date de compétition / événement</label>
-                        <input type="date" value={editingCampaign.eventDate} onChange={(event) => setEditingCampaign({ ...editingCampaign, eventDate: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-
-                        <input type="number" value={editingCampaign.goal} onChange={(event) => setEditingCampaign({ ...editingCampaign, goal: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <input value={editingCampaign.shopifyUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, shopifyUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <input value={editingCampaign.sponsorUrl} onChange={(event) => setEditingCampaign({ ...editingCampaign, sponsorUrl: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={editingCampaign.description} onChange={(event) => setEditingCampaign({ ...editingCampaign, description: event.target.value })} className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-
-                        <div className="flex gap-2">
-                          <AdminButton variant="green" onClick={saveEditedCampaign}>Sauvegarder</AdminButton>
-                          <AdminButton variant="light" onClick={() => setEditingCampaignId("")}>Annuler</AdminButton>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <h3 className="text-xl font-black text-zinc-950">{campaign.title}</h3>
-                        <p className="mt-1 text-sm text-zinc-600">
-                          {campaign.year || ""} · {campaign.city || ""} {campaign.country || ""} · Objectif : {money(Number(campaign.goal || 0))}
-                        </p>
-
-                        <p className="mt-1 text-sm text-zinc-600">
-                          Début : {campaign.startDate || "—"} · Fin : {campaign.endDate || "—"} · Événement : {campaign.eventDate || "—"}
-                        </p>
-
-                        {campaign.description && (
-                          <p className="mt-2 text-sm leading-6 text-zinc-600">{campaign.description}</p>
-                        )}
-
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <StatusPill status={campaign.status || "active"} />
-
-                          <AdminButton variant="light" onClick={() => startEditCampaign(campaign)}>
-                            Modifier
-                          </AdminButton>
-
-                          <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>
-                            Active
-                          </AdminButton>
-
-                          <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "suspendue")}>
-                            Suspendre
-                          </AdminButton>
-
-                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "terminee")}>
-                            Terminée
-                          </AdminButton>
-
-                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archivée")}>
-                            Archiver
-                          </AdminButton>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {activeTab === "messages" && (
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-black text-zinc-950">Messages en attente</h2>
-
-            <div className="mt-5 space-y-3">
-              {pendingMessages.length === 0 && <p className="text-zinc-500">Aucun message à valider.</p>}
+              {pendingMessages.length === 0 && (
+                <p className="text-zinc-500">
+                  Aucun message à valider.
+                </p>
+              )}
 
               {pendingMessages.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                  <p className="font-black text-zinc-950">{item.name}</p>
-                  <p className="mt-1 text-sm text-zinc-600">{item.message}</p>
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-zinc-200 p-4"
+                >
+                  <p className="font-black text-zinc-950">
+                    {item.name}
+                  </p>
+
+                  <p className="mt-1 text-sm text-zinc-600">
+                    {item.message}
+                  </p>
 
                   <div className="mt-4 flex gap-2">
-                    <AdminButton variant="green" onClick={() => approveMessage(item.id)}>
+                    <button
+                      onClick={() => approveMessage(item.id)}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white"
+                    >
                       Approuver
-                    </AdminButton>
+                    </button>
 
-                    <AdminButton variant="red" onClick={() => refuseMessage(item.id)}>
+                    <button
+                      onClick={() => refuseMessage(item.id)}
+                      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white"
+                    >
                       Refuser
-                    </AdminButton>
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          </div>
+        </section>
       </div>
     </main>
   );
