@@ -1,683 +1,192 @@
-import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Camera,
-  CheckCircle2,
-  DollarSign,
-  Megaphone,
-  MessageCircle,
-  PencilLine,
-  Users,
-  XCircle,
-} from "lucide-react";
+import { Search, UserRound, Target, MapPin } from "lucide-react";
+import { useMemo, useState } from "react";
+import { campaignTitle, gold, money, progressOf, totalRaised } from "../utils/format";
+import ProgressBar from "../components/ProgressBar";
 
-import {
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
+function isVisibleAthlete(athlete) {
+  return (
+    athlete &&
+    athlete.isPublic !== false &&
+    athlete.status !== "suspendu" &&
+    athlete.status !== "archivé"
+  );
+}
 
-import { campaignTitle, gold, money, progressOf } from "../utils/format";
-import StatCard from "../components/StatCard";
-import { db } from "../firebase";
-
-export default function AdminView({
-  athletes,
-  campaigns,
-  wallMessages,
-  setWallMessages,
-  goBack,
+export default function AthletesPage({
+  athletes = [],
+  campaigns = [],
   onOpenAthlete,
+  onOpenCampaign,
 }) {
-  const pendingMessages = wallMessages.filter(
-    (message) => message.status === "en_attente"
-  );
+  const [search, setSearch] = useState("");
 
-  const [applications, setApplications] = useState([]);
-  const [applicationsLoading, setApplicationsLoading] = useState(true);
-  const [actionLoadingId, setActionLoadingId] = useState("");
-  const [acceptedAccess, setAcceptedAccess] = useState(null);
+  const visibleAthletes = useMemo(() => {
+    return (athletes || [])
+      .filter(isVisibleAthlete)
+      .filter((athlete) => {
+        const text = [
+          athlete.name,
+          athlete.firstName,
+          athlete.lastName,
+          athlete.dojo,
+          athlete.city,
+          athlete.province,
+          athlete.discipline,
+          athlete.belt,
+          campaignTitle(campaigns || [], athlete.campaignId),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "applications"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map((document) => ({
-          id: document.id,
-          ...document.data(),
-        }));
-
-        setApplications(data);
-        setApplicationsLoading(false);
-      },
-      (error) => {
-        console.error("Erreur lecture applications:", error);
-        setApplicationsLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  const pendingApplications = applications.filter(
-    (application) =>
-      (application.status || "en_attente") === "en_attente"
-  );
-
-  async function updateApplicationCampaign(
-    applicationId,
-    campaignId
-  ) {
-    const campaign = campaigns.find(
-      (item) => item.id === campaignId
-    );
-
-    try {
-      await updateDoc(doc(db, "applications", applicationId), {
-        campaignId,
-        campaignTitle: campaign?.title || "",
-        updatedAt: serverTimestamp(),
+        return text.includes(search.toLowerCase());
       });
-    } catch (error) {
-      console.error(
-        "Erreur modification campagne:",
-        error
-      );
-
-      alert("Impossible de modifier la campagne.");
-    }
-  }
-
-  async function acceptApplication(application) {
-    setActionLoadingId(application.id);
-    setAcceptedAccess(null);
-
-    try {
-      const response = await fetch(
-        "/.netlify/functions/accept-athlete",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            applicationId: application.id,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Erreur lors de l’acceptation."
-        );
-      }
-
-      setAcceptedAccess({
-        athleteId: data.athleteId,
-        email: data.email,
-        temporaryPassword: data.temporaryPassword,
-      });
-    } catch (error) {
-      console.error("Erreur acceptation:", error);
-
-      alert(
-        error.message || "Erreur lors de l’acceptation."
-      );
-    } finally {
-      setActionLoadingId("");
-    }
-  }
-
-  async function refuseApplication(application) {
-    setActionLoadingId(application.id);
-
-    try {
-      await updateDoc(
-        doc(db, "applications", application.id),
-        {
-          status: "refusé",
-          refusedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }
-      );
-    } catch (error) {
-      console.error("Erreur refus:", error);
-
-      alert("Erreur lors du refus.");
-    } finally {
-      setActionLoadingId("");
-    }
-  }
-
-  function approveMessage(id) {
-    setWallMessages(
-      wallMessages.map((message) =>
-        message.id === id
-          ? { ...message, status: "approuvé" }
-          : message
-      )
-    );
-  }
-
-  function refuseMessage(id) {
-    setWallMessages(
-      wallMessages.map((message) =>
-        message.id === id
-          ? { ...message, status: "refusé" }
-          : message
-      )
-    );
-  }
+  }, [athletes, campaigns, search]);
 
   return (
-    <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
+    <main className="min-h-screen bg-black p-4 text-white md:p-8">
       <div className="mx-auto max-w-7xl">
-        <button
-          onClick={goBack}
-          className="mb-5 flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-950"
-        >
-          <ArrowLeft size={17} />
-          Retour
-        </button>
-
-        <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-10">
+        <section className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-10">
           <p
             className="text-sm font-bold uppercase tracking-[0.3em]"
             style={{ color: gold }}
           >
-            Admin privé
+            Athlètes
           </p>
 
-          <h1 className="mt-4 text-4xl font-black text-zinc-950 md:text-6xl">
-            Gestion Programme Athlètes
+          <h1 className="mt-4 text-4xl font-black md:text-6xl">
+            Athlètes soutenus par KinkoLab
           </h1>
 
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600">
-            Validation des candidatures,
-            création automatique des comptes Firebase
-            Auth et création des profils athlètes.
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-400">
+            Découvrez les athlètes actifs, leurs objectifs et leurs campagnes de financement.
           </p>
-        </section>
 
-        {acceptedAccess && (
-          <section className="mt-8 rounded-[2rem] border border-emerald-300 bg-emerald-50 p-6 shadow-xl">
-            <h2 className="text-2xl font-black text-emerald-900">
-              Compte athlète créé
-            </h2>
-
-            <p className="mt-2 text-sm text-emerald-800">
-              Copie ces accès avant de quitter cette
-              page. Le mot de passe temporaire ne sera
-              pas réaffiché après navigation.
-            </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">
-                  Athlete ID
-                </p>
-
-                <p className="mt-1 font-black text-zinc-950">
-                  {acceptedAccess.athleteId}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">
-                  Courriel
-                </p>
-
-                <p className="mt-1 font-black text-zinc-950">
-                  {acceptedAccess.email}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">
-                  Mot de passe temporaire
-                </p>
-
-                <p className="mt-1 font-black text-zinc-950">
-                  {
-                    acceptedAccess.temporaryPassword
-                  }
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `Courriel: ${acceptedAccess.email}
-Mot de passe temporaire: ${acceptedAccess.temporaryPassword}`
-                  );
-                }}
-                className="rounded-2xl bg-black px-5 py-3 font-black text-white"
-              >
-                Copier les accès
-              </button>
-
-              <button
-                onClick={() =>
-                  setAcceptedAccess(null)
-                }
-                className="rounded-2xl border border-emerald-300 bg-white px-5 py-3 font-black text-emerald-900"
-              >
-                J’ai copié les accès
-              </button>
-
-              <button
-                onClick={() =>
-                  onOpenAthlete(
-                    acceptedAccess.athleteId
-                  )
-                }
-                className="rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-black text-zinc-950"
-              >
-                Voir la page publique
-              </button>
-            </div>
-          </section>
-        )}
-
-        <section className="mt-8 grid gap-4 md:grid-cols-4">
-          <StatCard
-            light
-            icon={Users}
-            label="Athlètes"
-            value={athletes.length}
-            sub="Profils actifs"
-          />
-
-          <StatCard
-            light
-            icon={Megaphone}
-            label="Campagnes"
-            value={campaigns.length}
-            sub="Campagnes ouvertes"
-          />
-
-          <StatCard
-            light
-            icon={MessageCircle}
-            label="Messages à valider"
-            value={pendingMessages.length}
-            sub="Mur d’encouragement"
-          />
-
-          <StatCard
-            light
-            icon={DollarSign}
-            label="Demandes"
-            value={pendingApplications.length}
-            sub="En attente"
-          />
-        </section>
-
-        <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-          <div className="flex items-center gap-3">
-            <PencilLine style={{ color: gold }} />
-
-            <h2 className="text-2xl font-black text-zinc-950">
-              Demandes en attente
-            </h2>
+          <div className="relative mt-8 max-w-xl">
+            <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Rechercher un athlète, dojo, ville, discipline..."
+              className="w-full rounded-2xl border border-zinc-800 bg-black py-4 pl-12 pr-4 text-white outline-none focus:border-yellow-600"
+            />
           </div>
+        </section>
 
-          <div className="mt-5 space-y-4">
-            {applicationsLoading && (
-              <p className="text-zinc-500">
-                Chargement...
-              </p>
-            )}
+        <section className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {visibleAthletes.length === 0 && (
+            <div className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-zinc-400 md:col-span-2 lg:col-span-3">
+              Aucun athlète actif à afficher pour le moment.
+            </div>
+          )}
 
-            {!applicationsLoading &&
-              pendingApplications.length === 0 && (
-                <p className="text-zinc-500">
-                  Aucune demande en attente.
-                </p>
-              )}
+          {visibleAthletes.map((athlete) => {
+            const raised = totalRaised(athlete);
+            const progress = progressOf(athlete);
+            const campaignName = campaignTitle(campaigns || [], athlete.campaignId);
 
-            {pendingApplications.map(
-              (application) => {
-                const athleteName =
-                  application.athleteName ||
-                  `${application.firstName || ""} ${
-                    application.lastName || ""
-                  }`.trim();
+            return (
+              <article
+                key={athlete.id}
+                className="overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 shadow-xl"
+              >
+                <div className="h-56 bg-gradient-to-br from-zinc-900 to-black">
+                  {athlete.photoUrl ? (
+                    <img
+                      src={athlete.photoUrl}
+                      alt={athlete.name || "Athlète"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-7xl">
+                      {athlete.avatar || "🥋"}
+                    </div>
+                  )}
+                </div>
 
-                return (
-                  <div
-                    key={application.id}
-                    className="rounded-2xl border border-zinc-200 p-5"
-                  >
-                    {application.photo && (
-                      <img
-                        src={application.photo}
-                        alt={athleteName}
-                        className="mb-4 h-56 w-full rounded-2xl object-cover"
-                      />
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-black text-white">
+                        {athlete.name || "Athlète Kinko"}
+                      </h2>
+
+                      <p className="mt-1 flex items-center gap-2 text-sm text-zinc-400">
+                        <MapPin size={15} />
+                        {athlete.dojo || "Dojo à confirmer"}
+                      </p>
+                    </div>
+
+                    <div
+                      className="flex h-12 w-12 items-center justify-center rounded-2xl text-black"
+                      style={{ background: gold }}
+                    >
+                      <UserRound size={24} />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-bold text-zinc-300">
+                      {athlete.discipline || "Arts martiaux"}
+                    </span>
+
+                    <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-bold text-zinc-300">
+                      {athlete.belt || "Niveau à confirmer"}
+                    </span>
+
+                    {campaignName && (
+                      <button
+                        onClick={() => onOpenCampaign?.(athlete.campaignId)}
+                        className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-bold text-zinc-300 hover:bg-zinc-800"
+                      >
+                        {campaignName}
+                      </button>
                     )}
+                  </div>
 
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">
+                    {athlete.bio ||
+                      athlete.fundingPurpose ||
+                      "Cet athlète prépare sa campagne de financement avec KinkoLab."}
+                  </p>
+
+                  <div className="mt-5 rounded-2xl bg-black p-4">
+                    <div className="flex items-center justify-between gap-4">
                       <div>
-                        <h3 className="text-2xl font-black text-zinc-950">
-                          {athleteName ||
-                            "Nom à confirmer"}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-zinc-600">
-                          {application.city ||
-                            "Ville inconnue"}{" "}
-                          ·{" "}
-                          {application.province ||
-                            "Province inconnue"}
+                        <p className="text-xs uppercase text-zinc-500">Fonds suivis</p>
+                        <p className="mt-1 text-2xl font-black text-white">
+                          {money(raised)}
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() =>
-                            acceptApplication(
-                              application
-                            )
-                          }
-                          disabled={
-                            actionLoadingId ===
-                            application.id
-                          }
-                          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white disabled:opacity-50"
-                        >
-                          <CheckCircle2 size={17} />
-
-                          {actionLoadingId ===
-                          application.id
-                            ? "Traitement..."
-                            : "Accepter"}
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            refuseApplication(
-                              application
-                            )
-                          }
-                          disabled={
-                            actionLoadingId ===
-                            application.id
-                          }
-                          className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white disabled:opacity-50"
-                        >
-                          <XCircle size={17} />
-                          Refuser
-                        </button>
+                      <div className="text-right">
+                        <p className="text-xs uppercase text-zinc-500">Objectif</p>
+                        <p className="mt-1 font-black" style={{ color: gold }}>
+                          {money(athlete.goal || 0)}
+                        </p>
                       </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
-                      <p>
-                        <b>
-                          Date de naissance :
-                        </b>{" "}
-                        {application.birthDate}
-                      </p>
-
-                      <p>
-                        <b>
-                          Courriel athlète :
-                        </b>{" "}
-                        {application.email}
-                      </p>
-
-                      <p>
-                        <b>
-                          Téléphone athlète :
-                        </b>{" "}
-                        {application.phone}
-                      </p>
-
-                      <p>
-                        <b>Parent :</b>{" "}
-                        {application.parentName}
-                      </p>
-
-                      <p>
-                        <b>
-                          Courriel parent :
-                        </b>{" "}
-                        {application.parentEmail}
-                      </p>
-
-                      <p>
-                        <b>
-                          Téléphone parent :
-                        </b>{" "}
-                        {application.parentPhone}
-                      </p>
-
-                      <p>
-                        <b>Dojo :</b>{" "}
-                        {application.dojo}
-                      </p>
-
-                      <p>
-                        <b>Coach :</b>{" "}
-                        {application.coach}
-                      </p>
-
-                      <p>
-                        <b>Discipline :</b>{" "}
-                        {application.discipline}
-                      </p>
-
-                      <p>
-                        <b>Ceinture :</b>{" "}
-                        {application.belt}
-                      </p>
-
-                      <p>
-                        <b>Objectif :</b>{" "}
-                        {money(
-                          Number(
-                            application.desiredGoal ||
-                              0
-                          )
-                        )}
-                      </p>
-
-                      <p>
-                        <b>
-                          Réseaux sociaux :
-                        </b>{" "}
-                        {
-                          application.athleteSocials
-                        }
-                      </p>
-
-                      <p>
-                        <b>
-                          Famille / groupe :
-                        </b>{" "}
-                        {application.familyName}
-                      </p>
                     </div>
 
                     <div className="mt-4">
-                      <label className="mb-2 block text-sm font-black text-zinc-700">
-                        Campagne associée
-                      </label>
-
-                      <select
-                        value={
-                          application.campaignId ||
-                          ""
-                        }
-                        onChange={(event) =>
-                          updateApplicationCampaign(
-                            application.id,
-                            event.target.value
-                          )
-                        }
-                        className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 outline-none"
-                      >
-                        {campaigns.map(
-                          (campaign) => (
-                            <option
-                              key={campaign.id}
-                              value={
-                                campaign.id
-                              }
-                            >
-                              {campaign.title}
-                            </option>
-                          )
-                        )}
-                      </select>
+                      <ProgressBar value={progress} />
                     </div>
 
-                    {application.campaignReason && (
-                      <div className="mt-4 rounded-2xl bg-zinc-100 p-4">
-                        <p className="text-xs font-bold uppercase text-zinc-500">
-                          Pourquoi cette
-                          campagne ?
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6 text-zinc-700">
-                          {
-                            application.campaignReason
-                          }
-                        </p>
-                      </div>
-                    )}
-
-                    {application.motivation && (
-                      <div className="mt-3 rounded-2xl bg-zinc-100 p-4">
-                        <p className="text-xs font-bold uppercase text-zinc-500">
-                          Motivation /
-                          histoire
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6 text-zinc-700">
-                          {
-                            application.motivation
-                          }
-                        </p>
-                      </div>
-                    )}
+                    <p className="mt-2 text-xs text-zinc-500">
+                      {progress}% de l’objectif atteint
+                    </p>
                   </div>
-                );
-              }
-            )}
-          </div>
-        </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-          <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-            <div className="flex items-center gap-3">
-              <PencilLine style={{ color: gold }} />
-
-              <h2 className="text-2xl font-black text-zinc-950">
-                Athlètes
-              </h2>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {athletes.map((athlete) => (
-                <button
-                  key={athlete.id}
-                  onClick={() =>
-                    onOpenAthlete(athlete.id)
-                  }
-                  className="flex w-full items-center justify-between rounded-2xl bg-zinc-100 p-4 text-left hover:bg-zinc-200"
-                >
-                  <span>
-                    <b>
-                      {athlete.avatar}{" "}
-                      {athlete.name}
-                    </b>
-
-                    <br />
-
-                    <small className="text-zinc-500">
-                      {athlete.dojo} ·{" "}
-                      {campaignTitle(
-                        campaigns,
-                        athlete.campaignId
-                      )}
-                    </small>
-                  </span>
-
-                  <span className="text-sm font-black">
-                    {progressOf(athlete)}%
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-            <div className="flex items-center gap-3">
-              <Camera style={{ color: gold }} />
-
-              <h2 className="text-2xl font-black text-zinc-950">
-                Messages en attente
-              </h2>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {pendingMessages.length === 0 && (
-                <p className="text-zinc-500">
-                  Aucun message à valider.
-                </p>
-              )}
-
-              {pendingMessages.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-zinc-200 p-4"
-                >
-                  <p className="font-black text-zinc-950">
-                    {item.name}
-                  </p>
-
-                  <p className="mt-1 text-sm text-zinc-600">
-                    {item.message}
-                  </p>
-
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() =>
-                        approveMessage(item.id)
-                      }
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white"
-                    >
-                      Approuver
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        refuseMessage(item.id)
-                      }
-                      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white"
-                    >
-                      Refuser
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onOpenAthlete?.(athlete.id)}
+                    className="mt-5 w-full rounded-2xl px-5 py-4 font-black text-black"
+                    style={{ background: gold }}
+                  >
+                    Voir la page athlète
+                  </button>
                 </div>
-              ))}
-            </div>
-          </div>
+              </article>
+            );
+          })}
         </section>
       </div>
     </main>
