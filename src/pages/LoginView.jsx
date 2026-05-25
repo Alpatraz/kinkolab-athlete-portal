@@ -10,7 +10,12 @@ import { doc, getDoc } from "firebase/firestore";
 import { gold } from "../utils/format";
 import { auth, db } from "../firebase";
 
-export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
+export default function LoginView({
+  goBack,
+  setCurrentUser,
+  openAdmin,
+  openDashboard,
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +49,7 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
         role: userData.role || "athlete",
         athleteId: userData.athleteId || null,
         familyId: userData.familyId || null,
+        athleteIds: userData.athleteIds || [],
       };
 
       setCurrentUser(connectedUser);
@@ -51,7 +57,7 @@ export default function LoginView({ goBack, setCurrentUser, openAdmin }) {
       if (connectedUser.role === "admin") {
         openAdmin();
       } else {
-        goBack();
+        openDashboard();
       }
     } catch (error) {
       console.error("Erreur connexion:", error);
