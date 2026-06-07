@@ -357,6 +357,7 @@ export default function App() {
               <AthleteDashboard
                 currentUser={currentUser}
                 campaigns={campaigns}
+                participations={participations}
                 goHome={goHome}
                 onOpenAthlete={openAthlete}
               />
