@@ -194,10 +194,6 @@ export default function AthletePublicPage({
   const [messageOpen, setMessageOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const raised = totalRaised(safeAthlete);
-  const sponsorship = Number(safeAthlete.raisedSponsorship || 0);
-  const remaining = Math.max(Number(safeAthlete.goal || 0) - raised, 0);
-
   const needs = safeAthlete.needs || [];
   const sponsors = safeAthlete.sponsors || [];
   const fundingEvents = safeAthlete.fundingEvents || [];
@@ -210,6 +206,12 @@ export default function AthletePublicPage({
       participation.status !== "suspendue" &&
       participation.status !== "archivée"
   );
+
+  const familyParticipations = athleteParticipations.filter(
+    (participation) => participation.fundingMode === "family"
+  );
+
+  const primaryFamilyParticipation = familyParticipations[0] || null;
 
   function participationRaised(participation) {
     if (!participation) return 0;
@@ -332,6 +334,10 @@ export default function AthletePublicPage({
     return url.toString();
   }
 
+  const firstName =
+    safeAthlete.firstName ||
+    (safeAthlete.name || "l’athlète").split(" ")[0];
+
   function supportButtonLabel(participation, campaign) {
     if (participation.fundingMode === "family") {
       return `Soutenir la famille ${participation.familyName || safeAthlete.familyName || ""} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
@@ -348,13 +354,35 @@ export default function AthletePublicPage({
     return `Commanditer ${firstName} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
   }
 
-  const firstName =
-    safeAthlete.firstName ||
-    (safeAthlete.name || "l’athlète").split(" ")[0];
-
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
-  function submitMessage() {
+  const legacyRaised = totalRaised(safeAthlete);
+  const legacySponsorship = Number(safeAthlete.raisedSponsorship || 0);
+  const legacyRemaining = Math.max(Number(safeAthlete.goal || 0) - legacyRaised, 0);
+
+  const mainCampaign = primaryFamilyParticipation
+    ? participationCampaign(primaryFamilyParticipation)
+    : null;
+
+  const mainFamilyAthletes = primaryFamilyParticipation
+    ? familyGroupAthletes(primaryFamilyParticipation)
+    : [];
+
+  const mainFamilyGoal = primaryFamilyParticipation
+    ? participationGoal(primaryFamilyParticipation)
+    : 0;
+
+  const mainFamilyRaised = primaryFamilyParticipation
+    ? participationRaised(primaryFamilyParticipation)
+    : 0;
+
+  const mainFamilyRemaining = Math.max(mainFamilyGoal - mainFamilyRaised, 0);
+
+  const mainFamilyPercent =
+    mainFamilyGoal > 0
+      ? Math.min(Math.round((mainFamilyRaised / mainFamilyGoal) * 100), 100)
+      : 0;
+    function submitMessage() {
     if (!message.name.trim() || !message.message.trim()) return;
 
     if (!setWallMessages) return;
@@ -432,9 +460,11 @@ export default function AthletePublicPage({
                 className="absolute bottom-4 left-4 rounded-full px-4 py-2 text-sm font-black text-black"
                 style={{ background: gold }}
               >
-                {safeAthlete.campaignBadge ||
-                  safeAthlete.program ||
-                  "Programme Athlètes"}
+                {primaryFamilyParticipation
+                  ? "Campagne familiale"
+                  : safeAthlete.campaignBadge ||
+                    safeAthlete.program ||
+                    "Programme Athlètes"}
               </div>
             </div>
 
@@ -447,31 +477,64 @@ export default function AthletePublicPage({
               </p>
 
               <h1 className="mt-4 text-5xl font-black md:text-7xl">
-                {safeAthlete.name || "Athlète Kinko"}
+                {primaryFamilyParticipation
+                  ? `Famille ${primaryFamilyParticipation.familyName || safeAthlete.familyName || ""}`
+                  : safeAthlete.name || "Athlète Kinko"}
               </h1>
 
               <p className="mt-3 text-2xl font-black text-white">
-                {safeAthlete.athleteLabel || "Athlète Kinko"} —{" "}
-                {safeAthlete.campaignBadge ||
-                  safeAthlete.program ||
-                  "Programme Athlètes"}
+                {primaryFamilyParticipation
+                  ? mainCampaign?.title ||
+                    primaryFamilyParticipation.campaignTitle ||
+                    "Campagne familiale"
+                  : `${safeAthlete.athleteLabel || "Athlète Kinko"} — ${
+                      safeAthlete.campaignBadge ||
+                      safeAthlete.program ||
+                      "Programme Athlètes"
+                    }`}
               </p>
 
               <p className="mt-2 text-lg text-zinc-300">
                 Dojo {safeAthlete.dojo || "à confirmer"}
               </p>
 
-              {safeAthlete.familyName && (
+              {safeAthlete.familyName && !primaryFamilyParticipation && (
                 <p className="mt-2 text-lg text-zinc-300">
                   Famille {safeAthlete.familyName}
                 </p>
               )}
 
+              {primaryFamilyParticipation && mainFamilyAthletes.length > 0 && (
+                <div className="mt-5 rounded-2xl bg-black p-4">
+                  <p className="text-sm font-black" style={{ color: gold }}>
+                    Athlètes de cette campagne
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {mainFamilyAthletes.map((familyAthlete) => (
+                      <button
+                        key={familyAthlete.id}
+                        onClick={() => {
+                          if (familyAthlete.id !== safeAthlete.id) {
+                            window.location.href = `/athlete/${familyAthlete.id}`;
+                          }
+                        }}
+                        className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-200 hover:bg-zinc-800"
+                      >
+                        {familyAthlete.avatar || "🥋"} {familyAthlete.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-300">
-                Objectif :{" "}
-                {safeAthlete.fundingPurpose ||
-                  "financer sa participation à la compétition"}
-                .
+                {primaryFamilyParticipation
+                  ? "Cette page présente un fonds commun familial lié à une campagne précise."
+                  : `Objectif : ${
+                      safeAthlete.fundingPurpose ||
+                      "financer sa participation à la compétition"
+                    }.`}
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -494,7 +557,7 @@ export default function AthletePublicPage({
                   className="text-sm font-bold leading-6"
                   style={{ color: gold }}
                 >
-                  Pour soutenir correctement cet athlète, utilisez les boutons
+                  Pour soutenir correctement cette page, utilisez les boutons
                   dans les campagnes actives ci-dessous. Ils attribuent le
                   soutien à la bonne campagne, au bon athlète ou au bon fonds
                   commun familial.
@@ -509,18 +572,74 @@ export default function AthletePublicPage({
                   <Share2 size={18} /> {copied ? "Lien copié" : "Partager la page"}
                 </button>
 
-                {safeAthlete.campaignId && (
+                {primaryFamilyParticipation?.campaignId ? (
                   <button
-                    onClick={() => onOpenCampaign?.(safeAthlete.campaignId)}
+                    onClick={() =>
+                      onOpenCampaign?.(primaryFamilyParticipation.campaignId)
+                    }
                     className="flex items-center gap-2 rounded-2xl border border-zinc-700 px-4 py-3 font-bold text-white hover:bg-zinc-900"
                   >
                     <Megaphone size={18} /> Voir campagne
                   </button>
+                ) : (
+                  safeAthlete.campaignId && (
+                    <button
+                      onClick={() => onOpenCampaign?.(safeAthlete.campaignId)}
+                      className="flex items-center gap-2 rounded-2xl border border-zinc-700 px-4 py-3 font-bold text-white hover:bg-zinc-900"
+                    >
+                      <Megaphone size={18} /> Voir campagne
+                    </button>
+                  )
                 )}
               </div>
             </div>
           </div>
         </section>
+
+        {primaryFamilyParticipation && (
+          <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
+            <SectionTitle icon={Users} title="Objectif commun famille">
+              Les montants ci-dessous regroupent les athlètes de la même famille
+              associés à cette campagne.
+            </SectionTitle>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl bg-black p-4">
+                <p className="text-xs uppercase text-zinc-500">
+                  Objectif commun
+                </p>
+                <p className="mt-1 text-3xl font-black">
+                  {money(mainFamilyGoal)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-black p-4">
+                <p className="text-xs uppercase text-zinc-500">
+                  Déjà amassé
+                </p>
+                <p className="mt-1 text-3xl font-black">
+                  {money(mainFamilyRaised)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-black p-4">
+                <p className="text-xs uppercase text-zinc-500">
+                  Reste à financer
+                </p>
+                <p className="mt-1 text-3xl font-black" style={{ color: gold }}>
+                  {money(mainFamilyRemaining)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <ProgressBar value={mainFamilyPercent} />
+              <p className="mt-2 text-sm text-zinc-400">
+                {mainFamilyPercent} % de l’objectif familial atteint
+              </p>
+            </div>
+          </section>
+        )}
 
         {athleteParticipations.length > 0 && (
           <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
@@ -545,8 +664,14 @@ export default function AthletePublicPage({
                     : 0;
 
                 const familyAthletes = familyGroupAthletes(participation);
-                const supportUrl = buildParticipationSupportUrl(participation, campaign);
-                const sponsorUrl = buildParticipationSponsorUrl(participation, campaign);
+                const supportUrl = buildParticipationSupportUrl(
+                  participation,
+                  campaign
+                );
+                const sponsorUrl = buildParticipationSponsorUrl(
+                  participation,
+                  campaign
+                );
 
                 return (
                   <div
@@ -689,108 +814,105 @@ export default function AthletePublicPage({
           </section>
         )}
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[2rem] bg-zinc-950 p-6">
-            <SectionTitle icon={Sparkles} title="Objectif financier" />
+        {!primaryFamilyParticipation && (
+          <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-[2rem] bg-zinc-950 p-6">
+              <SectionTitle icon={Sparkles} title="Objectif financier" />
 
-            <div className="mt-6 grid gap-3">
-              <div className="rounded-2xl bg-black p-4">
-                <p className="text-xs uppercase text-zinc-500">
-                  Objectif total
-                </p>
-                <p className="mt-1 text-3xl font-black">
-                  {money(safeAthlete.goal || 0)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-black p-4">
-                <p className="text-xs uppercase text-zinc-500">Déjà amassé</p>
-                <p className="mt-1 text-3xl font-black">{money(raised)}</p>
-              </div>
-
-              <div className="rounded-2xl bg-black p-4">
-                <p className="text-xs uppercase text-zinc-500">
-                  Reste à financer
-                </p>
-                <p
-                  className="mt-1 text-3xl font-black"
-                  style={{ color: gold }}
-                >
-                  {money(remaining)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <ProgressBar value={progressOf(safeAthlete)} />
-              <p className="mt-2 text-sm text-zinc-400">
-                {progressOf(safeAthlete)} % de l’objectif atteint
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-3 text-sm text-zinc-300">
-              <div className="flex justify-between rounded-2xl bg-black p-4">
-                <span>Ventes boutique</span>
-                <b>{money(safeAthlete.raisedShop || 0)}</b>
-              </div>
-
-              <div className="flex justify-between rounded-2xl bg-black p-4">
-                <span>Dons / activités</span>
-                <b>{money(safeAthlete.raisedOffline || 0)}</b>
-              </div>
-
-              <div className="flex justify-between rounded-2xl bg-black p-4">
-                <span>Commandites</span>
-                <b>{money(sponsorship)}</b>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
-              <p
-                className="text-sm font-bold leading-6"
-                style={{ color: gold }}
-              >
-                {safeAthlete.profitNote ||
-                  `100 % des profits des ventes associées à ${
-                    safeAthlete.name || "cet athlète"
-                  } sont remis à ${safeAthlete.name || "cet athlète"}.`}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] bg-zinc-950 p-6">
-            <SectionTitle icon={Gift} title={`Comment soutenir ${firstName} ?`}>
-              Utilisez les boutons dans les campagnes actives pour que le
-              soutien soit attribué au bon athlète, à la bonne famille et à la
-              bonne campagne.
-            </SectionTitle>
-
-            <div className="mt-6 grid gap-3">
-              {(supportSteps.length
-                ? supportSteps
-                : [
-                    "Choisir la campagne active à soutenir",
-                    "Acheter un produit supporter ou faire un don",
-                    "Partager la page",
-                    "Laisser un message d’encouragement",
-                  ]
-              ).map((step, index) => (
-                <div
-                  key={`${step}-${index}`}
-                  className="flex items-center gap-4 rounded-2xl bg-black p-4"
-                >
-                  <div
-                    className="flex h-9 w-9 items-center justify-center rounded-full font-black text-black"
-                    style={{ background: gold }}
-                  >
-                    {index + 1}
-                  </div>
-                  <p className="font-bold text-zinc-200">{step}</p>
+              <div className="mt-6 grid gap-3">
+                <div className="rounded-2xl bg-black p-4">
+                  <p className="text-xs uppercase text-zinc-500">
+                    Objectif total
+                  </p>
+                  <p className="mt-1 text-3xl font-black">
+                    {money(safeAthlete.goal || 0)}
+                  </p>
                 </div>
-              ))}
+
+                <div className="rounded-2xl bg-black p-4">
+                  <p className="text-xs uppercase text-zinc-500">
+                    Déjà amassé
+                  </p>
+                  <p className="mt-1 text-3xl font-black">
+                    {money(legacyRaised)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-black p-4">
+                  <p className="text-xs uppercase text-zinc-500">
+                    Reste à financer
+                  </p>
+                  <p
+                    className="mt-1 text-3xl font-black"
+                    style={{ color: gold }}
+                  >
+                    {money(legacyRemaining)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <ProgressBar value={progressOf(safeAthlete)} />
+                <p className="mt-2 text-sm text-zinc-400">
+                  {progressOf(safeAthlete)} % de l’objectif atteint
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-3 text-sm text-zinc-300">
+                <div className="flex justify-between rounded-2xl bg-black p-4">
+                  <span>Ventes boutique</span>
+                  <b>{money(safeAthlete.raisedShop || 0)}</b>
+                </div>
+
+                <div className="flex justify-between rounded-2xl bg-black p-4">
+                  <span>Dons / activités</span>
+                  <b>{money(safeAthlete.raisedOffline || 0)}</b>
+                </div>
+
+                <div className="flex justify-between rounded-2xl bg-black p-4">
+                  <span>Commandites</span>
+                  <b>{money(legacySponsorship)}</b>
+                </div>
+              </div>
             </div>
-          </div>
-        </section>
+
+            <div className="rounded-[2rem] bg-zinc-950 p-6">
+              <SectionTitle
+                icon={Gift}
+                title={`Comment soutenir ${firstName} ?`}
+              >
+                Utilisez les boutons dans les campagnes actives pour que le
+                soutien soit attribué au bon athlète, à la bonne famille et à la
+                bonne campagne.
+              </SectionTitle>
+
+              <div className="mt-6 grid gap-3">
+                {(supportSteps.length
+                  ? supportSteps
+                  : [
+                      "Choisir la campagne active à soutenir",
+                      "Acheter un produit supporter ou faire un don",
+                      "Partager la page",
+                      "Laisser un message d’encouragement",
+                    ]
+                ).map((step, index) => (
+                  <div
+                    key={`${step}-${index}`}
+                    className="flex items-center gap-4 rounded-2xl bg-black p-4"
+                  >
+                    <div
+                      className="flex h-9 w-9 items-center justify-center rounded-full font-black text-black"
+                      style={{ background: gold }}
+                    >
+                      {index + 1}
+                    </div>
+                    <p className="font-bold text-zinc-200">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
           <SectionTitle icon={Target} title="À quoi servira le financement ?">
