@@ -19,6 +19,7 @@ function getRawBody(event) {
 
 function verifyShopifyHmac(event) {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+
   const hmacHeader =
     event.headers["x-shopify-hmac-sha256"] ||
     event.headers["X-Shopify-Hmac-Sha256"] ||
@@ -26,50 +27,70 @@ function verifyShopifyHmac(event) {
 
   if (!secret || !hmacHeader) return false;
 
-  const rawBody = getRawBody(event);
-
   const digest = crypto
     .createHmac("sha256", secret)
-    .update(rawBody)
+    .update(getRawBody(event))
     .digest("base64");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(digest, "utf8"),
-    Buffer.from(hmacHeader, "utf8")
-  );
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(digest, "utf8"),
+      Buffer.from(hmacHeader, "utf8")
+    );
+  } catch {
+    return false;
+  }
 }
 
-async function fetchMetafields(ownerType, ownerId) {
-  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
-  const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+function propertyMap(properties = []) {
+  const map = {};
 
-  if (!shop || !token || !ownerId) return {};
-
-  const url = `https://${shop}/admin/api/2025-04/${ownerType}/${ownerId}/metafields.json`;
-
-  const response = await fetch(url, {
-    headers: {
-      "X-Shopify-Access-Token": token,
-      "Content-Type": "application/json",
-    },
+  properties.forEach((property) => {
+    if (!property?.name) return;
+    map[property.name] = property.value;
   });
 
-  if (!response.ok) return {};
-
-  const data = await response.json();
-  const metafields = data.metafields || [];
-
-  return metafields
-    .filter((field) => field.namespace === "kinko")
-    .reduce((acc, field) => {
-      acc[field.key] = field.value;
-      return acc;
-    }, {});
+  return map;
 }
 
 function toNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+async function updateParticipationRaisedShop(db, {
+  fundingGroupId,
+  athleteId,
+  campaignId,
+  fundingMode,
+  amount,
+}) {
+  if (!fundingGroupId || amount <= 0) return;
+
+  let query = db
+    .collection("campaignParticipations")
+    .where("fundingGroupId", "==", fundingGroupId);
+
+  const snap = await query.get();
+
+  if (snap.empty) return;
+
+  let targetDoc = null;
+
+  if (fundingMode === "individual" && athleteId) {
+    targetDoc =
+      snap.docs.find((docSnap) => docSnap.data().athleteId === athleteId) ||
+      snap.docs[0];
+  } else {
+    targetDoc =
+      snap.docs.find((docSnap) => docSnap.data().campaignId === campaignId) ||
+      snap.docs[0];
+  }
+
+  await targetDoc.ref.update({
+    raisedShop: admin.firestore.FieldValue.increment(amount),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 exports.handler = async function handler(event) {
@@ -110,46 +131,31 @@ exports.handler = async function handler(event) {
     };
   }
 
-  const existing = await db
+  const alreadyProcessed = await db
     .collection("fundTransactions")
     .where("orderId", "==", orderId)
     .limit(1)
     .get();
 
-  if (!existing.empty) {
+  if (!alreadyProcessed.empty) {
     return {
       statusCode: 200,
       body: "Order already processed.",
     };
   }
 
-  const batch = db.batch();
-  const participationUpdates = new Map();
+  let createdTransactions = 0;
 
   for (const item of order.line_items || []) {
-    const variantMetafields = await fetchMetafields(
-      "variants",
-      item.variant_id
-    );
+    const props = propertyMap(item.properties || []);
 
-    const productMetafields = await fetchMetafields(
-      "products",
-      item.product_id
-    );
+    const athleteId = props._athleteId || "";
+    const familyId = props._familyId || "";
+    const campaignId = props._campaignId || "";
+    const fundingMode = props._fundingMode || "individual";
+    const fundingGroupId = props._fundingGroupId || "";
+    const reservedAmountUnit = toNumber(props._reservedAmount);
 
-    const metafields = {
-      ...productMetafields,
-      ...variantMetafields,
-    };
-
-    const athleteId = metafields.athlete_id || null;
-    const campaignId = metafields.campaign_id || null;
-    const fundingMode = metafields.funding_mode || "individual";
-    const fundingGroupId =
-      metafields.funding_group_id ||
-      (athleteId && campaignId ? `${athleteId}-${campaignId}` : null);
-
-    const reservedAmountUnit = toNumber(metafields.reserved_amount);
     const quantity = Number(item.quantity || 1);
     const reservedAmount = reservedAmountUnit * quantity;
 
@@ -157,9 +163,7 @@ exports.handler = async function handler(event) {
       continue;
     }
 
-    const transactionRef = db.collection("fundTransactions").doc();
-
-    batch.set(transactionRef, {
+    await db.collection("fundTransactions").add({
       type: "shopify_sale",
 
       orderId,
@@ -169,10 +173,14 @@ exports.handler = async function handler(event) {
       lineItemId: String(item.id || ""),
       productId: String(item.product_id || ""),
       variantId: String(item.variant_id || ""),
+
       productTitle: item.title || "",
       variantTitle: item.variant_title || "",
 
-      athleteId,
+      supportLabel: props["Athlète ou famille soutenu"] || props["Supporté"] || "",
+
+      athleteId: athleteId || null,
+      familyId: familyId || null,
       campaignId,
       fundingMode,
       fundingGroupId,
@@ -190,34 +198,23 @@ exports.handler = async function handler(event) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    if (!participationUpdates.has(fundingGroupId)) {
-      participationUpdates.set(fundingGroupId, 0);
-    }
-
-    participationUpdates.set(
+    await updateParticipationRaisedShop(db, {
       fundingGroupId,
-      participationUpdates.get(fundingGroupId) + reservedAmount
-    );
-  }
-
-  for (const [fundingGroupId, amount] of participationUpdates.entries()) {
-    const participationsSnap = await db
-      .collection("campaignParticipations")
-      .where("fundingGroupId", "==", fundingGroupId)
-      .get();
-
-    participationsSnap.forEach((docSnap) => {
-      batch.update(docSnap.ref, {
-        raisedShop: admin.firestore.FieldValue.increment(amount),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      athleteId,
+      campaignId,
+      fundingMode,
+      amount: reservedAmount,
     });
-  }
 
-  await batch.commit();
+    createdTransactions += 1;
+  }
 
   return {
     statusCode: 200,
-    body: "Shopify order processed.",
+    body: JSON.stringify({
+      ok: true,
+      orderId,
+      createdTransactions,
+    }),
   };
 };
