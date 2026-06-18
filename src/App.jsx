@@ -287,11 +287,12 @@ export default function App() {
           path="/athletes"
           element={
             <AthletesPage
-              athletes={publicAthletes}
-              campaigns={publicCampaigns}
-              onOpenAthlete={openAthlete}
-              onOpenCampaign={openCampaign}
-            />
+  athletes={publicAthletes}
+  campaigns={publicCampaigns}
+  participations={participations}
+  onOpenAthlete={openAthlete}
+  onOpenCampaign={openCampaign}
+/>
           }
         />
 
