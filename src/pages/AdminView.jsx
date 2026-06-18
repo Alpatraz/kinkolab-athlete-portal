@@ -133,6 +133,7 @@ export default function AdminView({
   const [families, setFamilies] = useState([]);
   const [firestoreCampaigns, setFirestoreCampaigns] = useState([]);
   const [participations, setParticipations] = useState([]);
+  const [contributions, setContributions] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -200,11 +201,24 @@ export default function AdminView({
       }
     );
 
+    const unsubContributions = onSnapshot(
+      query(collection(db, "contributions"), orderBy("createdAt", "desc")),
+      (snapshot) => {
+        setContributions(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+      }
+    );
+
     return () => {
       unsubApps();
       unsubFamilies();
       unsubCampaigns();
       unsubParticipations();
+      unsubContributions();
     };
   }, []);
 
@@ -307,12 +321,100 @@ export default function AdminView({
     return allCampaigns.find((c) => c.id === id)?.title || id;
   }
 
+  function contributionAmount(contribution) {
+    return Number(
+      contribution.amountReserved || contribution.reservedAmount || 0
+    );
+  }
+
+  function contributionDate(contribution) {
+    if (contribution.createdAt?.toDate) {
+      return contribution.createdAt.toDate().toLocaleDateString("fr-CA");
+    }
+
+    return contribution.displayDate || contribution.orderCreatedAt || "—";
+  }
+
+  const financialSummary = useMemo(() => {
+    const reserved = contributions.reduce(
+      (sum, contribution) => sum + contributionAmount(contribution),
+      0
+    );
+
+    const paid = contributions
+      .filter((contribution) =>
+        ["paid_out", "paid", "versé", "versee", "versée"].includes(
+          contribution.status
+        )
+      )
+      .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+
+    return {
+      reserved,
+      paid,
+      balance: Math.max(reserved - paid, 0),
+      count: contributions.length,
+    };
+  }, [contributions]);
+
+  const financeRows = useMemo(() => {
+    const rows = new Map();
+
+    contributions.forEach((contribution) => {
+      const key =
+        contribution.fundingMode === "family"
+          ? `family-${contribution.fundingGroupId || contribution.familyId}`
+          : `athlete-${contribution.athleteId || contribution.supportLabel}`;
+
+      if (!rows.has(key)) {
+        rows.set(key, {
+          id: key,
+          label:
+            contribution.fundingMode === "family"
+              ? contribution.supportLabel ||
+                contribution.familyName ||
+                `Famille ${contribution.familyId || ""}`
+              : contribution.athleteName ||
+                contribution.supportLabel ||
+                contribution.athleteId ||
+                "Athlète",
+          type: contribution.fundingMode === "family" ? "Famille" : "Athlète",
+          campaignTitle: contribution.campaignTitle ||
+            participationCampaignName(contribution.campaignId),
+          reserved: 0,
+          paid: 0,
+          count: 0,
+        });
+      }
+
+      const row = rows.get(key);
+      const amount = contributionAmount(contribution);
+
+      row.reserved += amount;
+      row.count += 1;
+
+      if (
+        ["paid_out", "paid", "versé", "versee", "versée"].includes(
+          contribution.status
+        )
+      ) {
+        row.paid += amount;
+      }
+    });
+
+    return Array.from(rows.values()).map((row) => ({
+      ...row,
+      balance: Math.max(row.reserved - row.paid, 0),
+    }));
+  }, [contributions, allCampaigns]);
+
   const tabs = [
     ["candidatures", "Candidatures"],
     ["athletes", "Athlètes"],
     ["families", "Familles"],
     ["campaigns", "Campagnes"],
     ["participations", "Participations"],
+    ["finances", "Finances"],
     ["messages", "Messages"],
   ];
 
@@ -668,11 +770,9 @@ export default function AdminView({
           <StatCard
             light
             icon={DollarSign}
-            label="Fonds suivis"
-            value={money(
-              athletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0)
-            )}
-            sub="Total plateforme"
+            label="Fonds réservés"
+            value={money(financialSummary.reserved)}
+            sub="Shopify / contributions"
           />
         </section>
 
@@ -1544,6 +1644,142 @@ export default function AdminView({
                         <Trash2 size={15} />
                         Supprimer
                       </AdminButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "finances" && (
+          <section className="mt-8 space-y-6">
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <div className="flex items-center gap-3">
+                <DollarSign style={{ color: gold }} />
+                <h2 className="text-2xl font-black text-zinc-950">
+                  Finances athlètes
+                </h2>
+              </div>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Suivi des montants réservés automatiquement depuis Shopify. Le
+                solde correspond au montant à verser aux athlètes ou familles,
+                moins les contributions déjà marquées comme versées.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-4">
+                <StatCard
+                  light
+                  icon={DollarSign}
+                  label="Réservé"
+                  value={money(financialSummary.reserved)}
+                  sub="Total contributions"
+                />
+                <StatCard
+                  light
+                  icon={CheckCircle2}
+                  label="Versé"
+                  value={money(financialSummary.paid)}
+                  sub="Statut versé"
+                />
+                <StatCard
+                  light
+                  icon={FolderKanban}
+                  label="Solde"
+                  value={money(financialSummary.balance)}
+                  sub="À verser"
+                />
+                <StatCard
+                  light
+                  icon={Link2}
+                  label="Transactions"
+                  value={financialSummary.count}
+                  sub="Contributions"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-zinc-950">
+                Soldes par athlète / famille
+              </h2>
+
+              <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
+                <div className="grid grid-cols-[1.2fr_0.7fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 bg-zinc-100 p-4 text-xs font-black uppercase text-zinc-500">
+                  <span>Bénéficiaire</span>
+                  <span>Type</span>
+                  <span>Campagne</span>
+                  <span>Réservé</span>
+                  <span>Versé</span>
+                  <span>Solde</span>
+                </div>
+
+                {financeRows.length === 0 && (
+                  <p className="p-5 text-zinc-500">
+                    Aucune contribution enregistrée pour le moment.
+                  </p>
+                )}
+
+                {financeRows.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[1.2fr_0.7fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-t border-zinc-200 p-4 text-sm text-zinc-700"
+                  >
+                    <span className="font-black text-zinc-950">
+                      {row.label}
+                    </span>
+                    <span>{row.type}</span>
+                    <span>{row.campaignTitle || "—"}</span>
+                    <span className="font-black">{money(row.reserved)}</span>
+                    <span>{money(row.paid)}</span>
+                    <span className="font-black" style={{ color: gold }}>
+                      {money(row.balance)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-zinc-950">
+                Historique Shopify
+              </h2>
+
+              <div className="mt-5 space-y-3">
+                {contributions.length === 0 && (
+                  <p className="text-zinc-500">
+                    Aucune contribution enregistrée.
+                  </p>
+                )}
+
+                {contributions.map((contribution) => (
+                  <div
+                    key={contribution.id}
+                    className="rounded-2xl border border-zinc-200 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-black uppercase text-zinc-400">
+                          {contributionDate(contribution)} · {contribution.orderName || contribution.orderId || "Commande Shopify"}
+                        </p>
+                        <h3 className="mt-1 text-lg font-black text-zinc-950">
+                          {contribution.productName || contribution.productTitle || "Produit Shopify"}
+                        </h3>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          Soutien : {contribution.supportLabel || contribution.athleteName || contribution.familyName || "—"}
+                        </p>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          Client : {contribution.customerName || contribution.customerEmail || "—"}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-zinc-950">
+                          {money(contributionAmount(contribution))}
+                        </p>
+                        <StatusPill status={contribution.status || "reserved"} />
+                      </div>
                     </div>
                   </div>
                 ))}
