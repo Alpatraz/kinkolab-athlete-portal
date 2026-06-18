@@ -58,39 +58,41 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-async function updateParticipationRaisedShop(db, {
-  fundingGroupId,
-  athleteId,
-  campaignId,
-  fundingMode,
-  amount,
-}) {
-  if (!fundingGroupId || amount <= 0) return;
+function customerName(order) {
+  const firstName =
+    order.customer?.first_name ||
+    order.billing_address?.first_name ||
+    "";
 
-  let query = db
+  const lastName =
+    order.customer?.last_name ||
+    order.billing_address?.last_name ||
+    "";
+
+  return `${firstName} ${lastName}`.trim();
+}
+
+async function findParticipation(db, { fundingGroupId, athleteId, campaignId, fundingMode }) {
+  if (!fundingGroupId) return null;
+
+  const snap = await db
     .collection("campaignParticipations")
-    .where("fundingGroupId", "==", fundingGroupId);
+    .where("fundingGroupId", "==", fundingGroupId)
+    .get();
 
-  const snap = await query.get();
-
-  if (snap.empty) return;
-
-  let targetDoc = null;
+  if (snap.empty) return null;
 
   if (fundingMode === "individual" && athleteId) {
-    targetDoc =
+    return (
       snap.docs.find((docSnap) => docSnap.data().athleteId === athleteId) ||
-      snap.docs[0];
-  } else {
-    targetDoc =
-      snap.docs.find((docSnap) => docSnap.data().campaignId === campaignId) ||
-      snap.docs[0];
+      snap.docs[0]
+    );
   }
 
-  await targetDoc.ref.update({
-    raisedShop: admin.firestore.FieldValue.increment(amount),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  return (
+    snap.docs.find((docSnap) => docSnap.data().campaignId === campaignId) ||
+    snap.docs[0]
+  );
 }
 
 exports.handler = async function handler(event) {
@@ -145,6 +147,7 @@ exports.handler = async function handler(event) {
   }
 
   let createdTransactions = 0;
+  let createdContributions = 0;
 
   for (const item of order.line_items || []) {
     const props = propertyMap(item.properties || []);
@@ -163,7 +166,22 @@ exports.handler = async function handler(event) {
       continue;
     }
 
-    await db.collection("fundTransactions").add({
+    const supportLabel =
+      props["Athlète ou famille soutenu"] ||
+      props["Supporté"] ||
+      "";
+
+    const participationSnap = await findParticipation(db, {
+      fundingGroupId,
+      athleteId,
+      campaignId,
+      fundingMode,
+    });
+
+    const participation = participationSnap?.data() || {};
+
+    const basePayload = {
+      source: "shopify",
       type: "shopify_sale",
 
       orderId,
@@ -177,11 +195,17 @@ exports.handler = async function handler(event) {
       productTitle: item.title || "",
       variantTitle: item.variant_title || "",
 
-      supportLabel: props["Athlète ou famille soutenu"] || props["Supporté"] || "",
+      supportLabel,
 
-      athleteId: athleteId || null,
-      familyId: familyId || null,
+      athleteId: athleteId || participation.athleteId || null,
+      athleteName: participation.athleteName || null,
+
+      familyId: familyId || participation.familyId || null,
+      familyName: participation.familyName || null,
+
       campaignId,
+      campaignTitle: participation.campaignTitle || null,
+
       fundingMode,
       fundingGroupId,
 
@@ -190,23 +214,33 @@ exports.handler = async function handler(event) {
       reservedAmount,
 
       currency: order.currency || "CAD",
-      status: "reserved",
 
       customerEmail: order.email || null,
+      customerName: customerName(order) || null,
+
+      status: "reserved",
 
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
 
-    await updateParticipationRaisedShop(db, {
-      fundingGroupId,
-      athleteId,
-      campaignId,
-      fundingMode,
-      amount: reservedAmount,
-    });
-
+    await db.collection("fundTransactions").add(basePayload);
     createdTransactions += 1;
+
+    await db.collection("contributions").add({
+      ...basePayload,
+      amountReserved: reservedAmount,
+      productName: item.title || "",
+      displayDate: new Date().toISOString().slice(0, 10),
+    });
+    createdContributions += 1;
+
+    if (participationSnap) {
+      await participationSnap.ref.update({
+        raisedShop: admin.firestore.FieldValue.increment(reservedAmount),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   return {
@@ -215,6 +249,7 @@ exports.handler = async function handler(event) {
       ok: true,
       orderId,
       createdTransactions,
+      createdContributions,
     }),
   };
 };
