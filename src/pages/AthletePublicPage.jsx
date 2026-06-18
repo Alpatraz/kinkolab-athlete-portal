@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Copy,
   Gift,
+  ReceiptText,
   HeartHandshake,
   Mail,
   Megaphone,
@@ -21,6 +22,8 @@ import {
 
 import { cn, gold, money, progressOf, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../firebase";
 
 function SectionTitle({ icon: Icon, kicker, title, children }) {
   return (
@@ -164,6 +167,83 @@ function SponsorCard({ sponsor }) {
   );
 }
 
+function contributionAmount(contribution) {
+  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
+}
+
+function contributionDate(contribution) {
+  const value = contribution?.createdAt;
+
+  if (value?.toDate) {
+    return value.toDate().toLocaleDateString("fr-CA");
+  }
+
+  if (contribution?.displayDate) return contribution.displayDate;
+  if (contribution?.orderCreatedAt) return String(contribution.orderCreatedAt).slice(0, 10);
+
+  return "";
+}
+
+function ContributionCard({ contribution }) {
+  const amount = contributionAmount(contribution);
+
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-black p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: gold }}>
+            {contributionDate(contribution) || "Date à confirmer"}
+          </p>
+
+          <h3 className="mt-2 text-lg font-black text-white">
+            {contribution.productName || contribution.productTitle || "Contribution boutique"}
+          </h3>
+
+          <p className="mt-1 text-sm text-zinc-400">
+            {contribution.customerName || contribution.customerEmail || "Supporteur"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-right">
+          <p className="text-xs font-black uppercase text-emerald-400">
+            Montant remis
+          </p>
+          <p className="text-2xl font-black text-emerald-300">
+            + {money(amount)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl bg-zinc-950 p-3">
+          <p className="text-xs uppercase text-zinc-500">Campagne</p>
+          <p className="mt-1 text-sm font-black text-zinc-200">
+            {contribution.campaignTitle || contribution.campaignId || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-zinc-950 p-3">
+          <p className="text-xs uppercase text-zinc-500">Soutien</p>
+          <p className="mt-1 text-sm font-black text-zinc-200">
+            {contribution.supportLabel ||
+              contribution.athleteName ||
+              contribution.familyName ||
+              "—"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-zinc-950 p-3">
+          <p className="text-xs uppercase text-zinc-500">Commande</p>
+          <p className="mt-1 text-sm font-black text-zinc-200">
+            {contribution.orderName || contribution.orderId || "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function AthletePublicPage({
   athlete,
   athletes = [],
@@ -193,6 +273,7 @@ export default function AthletePublicPage({
 
   const [messageOpen, setMessageOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [contributions, setContributions] = useState([]);
 
   const needs = safeAthlete.needs || [];
   const sponsors = safeAthlete.sponsors || [];
@@ -212,6 +293,50 @@ export default function AthletePublicPage({
   );
 
   const primaryFamilyParticipation = familyParticipations[0] || null;
+
+  useEffect(() => {
+    if (!safeAthlete?.id) return;
+
+    const field =
+      primaryFamilyParticipation?.fundingMode === "family" &&
+      primaryFamilyParticipation?.fundingGroupId
+        ? "fundingGroupId"
+        : "athleteId";
+
+    const value =
+      field === "fundingGroupId"
+        ? primaryFamilyParticipation.fundingGroupId
+        : safeAthlete.id;
+
+    const q = query(collection(db, "contributions"), where(field, "==", value));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((document) => ({
+        id: document.id,
+        ...document.data(),
+      }));
+
+      data.sort((a, b) => {
+        const dateA =
+          a.createdAt?.seconds ||
+          (a.orderCreatedAt ? Date.parse(a.orderCreatedAt) / 1000 : 0);
+
+        const dateB =
+          b.createdAt?.seconds ||
+          (b.orderCreatedAt ? Date.parse(b.orderCreatedAt) / 1000 : 0);
+
+        return dateB - dateA;
+      });
+
+      setContributions(data);
+    });
+
+    return () => unsubscribe();
+  }, [
+    safeAthlete?.id,
+    primaryFamilyParticipation?.fundingGroupId,
+    primaryFamilyParticipation?.fundingMode,
+  ]);
 
   function participationRaised(participation) {
     if (!participation) return 0;
@@ -382,7 +507,13 @@ export default function AthletePublicPage({
     mainFamilyGoal > 0
       ? Math.min(Math.round((mainFamilyRaised / mainFamilyGoal) * 100), 100)
       : 0;
-    function submitMessage() {
+
+  const contributionsTotal = contributions.reduce(
+    (sum, contribution) => sum + contributionAmount(contribution),
+    0
+  );
+
+  function submitMessage() {
     if (!message.name.trim() || !message.message.trim()) return;
 
     if (!setWallMessages) return;
@@ -813,6 +944,52 @@ export default function AthletePublicPage({
             </div>
           </section>
         )}
+
+        <section className="mt-8 rounded-[2rem] bg-zinc-950 p-6">
+          <SectionTitle icon={ReceiptText} title="Contributions reçues">
+            Les contributions ci-dessous proviennent des achats Shopify
+            attribués à cette page. Elles permettent de suivre concrètement les
+            montants remis à l’athlète ou au fonds familial.
+          </SectionTitle>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl bg-black p-4">
+              <p className="text-xs uppercase text-zinc-500">Total reçu</p>
+              <p className="mt-1 text-3xl font-black" style={{ color: gold }}>
+                {money(contributionsTotal)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-black p-4">
+              <p className="text-xs uppercase text-zinc-500">Contributions</p>
+              <p className="mt-1 text-3xl font-black">
+                {contributions.length}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-black p-4">
+              <p className="text-xs uppercase text-zinc-500">Type</p>
+              <p className="mt-1 text-lg font-black">
+                {primaryFamilyParticipation ? "Fonds familial" : "Athlète individuel"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            {contributions.length === 0 && (
+              <p className="rounded-2xl bg-black p-5 text-zinc-500">
+                Aucune contribution reçue pour le moment.
+              </p>
+            )}
+
+            {contributions.map((contribution) => (
+              <ContributionCard
+                key={contribution.id}
+                contribution={contribution}
+              />
+            ))}
+          </div>
+        </section>
 
         {!primaryFamilyParticipation && (
           <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
