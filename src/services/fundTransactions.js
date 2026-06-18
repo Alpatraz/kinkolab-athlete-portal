@@ -15,6 +15,14 @@ export function transactionTotal(transactions = []) {
   );
 }
 
+export function contributionTotal(contributions = []) {
+  return contributions.reduce(
+    (sum, contribution) =>
+      sum + Number(contribution.amountReserved || contribution.reservedAmount || 0),
+    0
+  );
+}
+
 export function subscribeTransactionsByFundingGroup(fundingGroupId, callback) {
   if (!fundingGroupId) {
     callback([]);
@@ -28,55 +36,57 @@ export function subscribeTransactionsByFundingGroup(fundingGroupId, callback) {
   );
 
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-    );
+    callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   });
 }
 
-export function subscribeTransactionsByAthlete(athleteId, callback) {
+export function subscribeContributionsByFamily(familyId, callback) {
+  if (!familyId) {
+    callback([]);
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, "contributions"),
+    where("familyId", "==", familyId),
+    orderBy("createdAt", "desc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  });
+}
+
+export function subscribeContributionsByAthlete(athleteId, callback) {
   if (!athleteId) {
     callback([]);
     return () => {};
   }
 
   const q = query(
-    collection(db, "fundTransactions"),
+    collection(db, "contributions"),
     where("athleteId", "==", athleteId),
     orderBy("createdAt", "desc")
   );
 
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-    );
+    callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   });
 }
 
-export function subscribeTransactionsByCampaign(campaignId, callback) {
+export function subscribeContributionsByCampaign(campaignId, callback) {
   if (!campaignId) {
     callback([]);
     return () => {};
   }
 
   const q = query(
-    collection(db, "fundTransactions"),
+    collection(db, "contributions"),
     where("campaignId", "==", campaignId),
     orderBy("createdAt", "desc")
   );
 
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-    );
+    callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   });
 }
