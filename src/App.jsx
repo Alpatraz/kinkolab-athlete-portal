@@ -15,13 +15,7 @@ import AdminView from "./pages/AdminView";
 import AthleteDashboard from "./pages/AthleteDashboard";
 
 import { auth, db } from "./firebase";
-
-import {
-  athletesSeed,
-  campaignsSeed,
-  updatesSeed,
-  wallSeed,
-} from "./data/demoData";
+import { campaignsSeed } from "./data/demoData";
 
 function AthleteRoute({
   athletes,
@@ -121,10 +115,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [athletes, setAthletes] = useState(athletesSeed);
+  const [athletes, setAthletes] = useState([]);
   const [firebaseCampaigns, setFirebaseCampaigns] = useState([]);
   const [participations, setParticipations] = useState([]);
-  const [wallMessages, setWallMessages] = useState(wallSeed);
+  const [wallMessages, setWallMessages] = useState([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -170,10 +164,7 @@ export default function App() {
         ...docSnap.data(),
       }));
 
-      const seedIds = new Set(athletesSeed.map((athlete) => athlete.id));
-      const newAthletes = firebaseAthletes.filter((athlete) => !seedIds.has(athlete.id));
-
-      setAthletes([...athletesSeed, ...newAthletes]);
+      setAthletes(firebaseAthletes);
     });
 
     return () => unsubscribe();
@@ -328,7 +319,7 @@ export default function App() {
               athletes={athletes}
               campaigns={campaigns}
               participations={participations}
-              updates={updatesSeed || []}
+              updates={[]}
               wallMessages={wallMessages || []}
               setWallMessages={setWallMessages}
               onOpenCampaign={openCampaign}
