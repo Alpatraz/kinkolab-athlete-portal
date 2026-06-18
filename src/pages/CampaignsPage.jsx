@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, MapPin, Search, Users, DollarSign } from "lucide-react";
-import { gold, money, totalRaised } from "../utils/format";
+import { gold, money } from "../utils/format";
 
 function isVisibleCampaign(campaign) {
   return (
@@ -25,9 +25,29 @@ function campaignDate(campaign) {
   return "Date à confirmer";
 }
 
+function participationRaised(participation) {
+  return (
+    Number(participation?.raisedShop || 0) +
+    Number(participation?.raisedOffline || 0) +
+    Number(participation?.raisedSponsorship || 0)
+  );
+}
+
+function isActiveParticipation(participation) {
+  return (
+    participation &&
+    participation.status !== "suspendue" &&
+    participation.status !== "suspendu" &&
+    participation.status !== "archivée" &&
+    participation.status !== "archivé" &&
+    participation.status !== "archive"
+  );
+}
+
 export default function CampaignsPage({
   campaigns = [],
   athletes = [],
+  participations = [],
   onOpenCampaign,
   openSignup,
 }) {
@@ -54,10 +74,23 @@ export default function CampaignsPage({
       });
   }, [campaigns, search]);
 
+  function campaignParticipations(campaignId) {
+    return (participations || []).filter(
+      (participation) =>
+        participation.campaignId === campaignId &&
+        isActiveParticipation(participation)
+    );
+  }
+
   function campaignAthletes(campaignId) {
+    const activeParticipations = campaignParticipations(campaignId);
+    const athleteIds = new Set(
+      activeParticipations.map((participation) => participation.athleteId)
+    );
+
     return (athletes || []).filter(
       (athlete) =>
-        athlete.campaignId === campaignId &&
+        athleteIds.has(athlete.id) &&
         athlete.status !== "suspendu" &&
         athlete.status !== "archivé" &&
         athlete.isPublic !== false
@@ -65,8 +98,8 @@ export default function CampaignsPage({
   }
 
   function campaignRaised(campaignId) {
-    return campaignAthletes(campaignId).reduce(
-      (sum, athlete) => sum + totalRaised(athlete),
+    return campaignParticipations(campaignId).reduce(
+      (sum, participation) => sum + participationRaised(participation),
       0
     );
   }
