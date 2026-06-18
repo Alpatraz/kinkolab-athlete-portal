@@ -34,6 +34,47 @@ import {
 } from "../services/fundTransactions";
 import { uploadAthleteMedia } from "../services/mediaUpload";
 
+const PROVINCES = [
+  "Alberta",
+  "Colombie-Britannique",
+  "Île-du-Prince-Édouard",
+  "Manitoba",
+  "Nouveau-Brunswick",
+  "Nouvelle-Écosse",
+  "Nunavut",
+  "Ontario",
+  "Québec",
+  "Saskatchewan",
+  "Terre-Neuve-et-Labrador",
+  "Territoires du Nord-Ouest",
+  "Yukon",
+];
+
+const DISCIPLINES = [
+  "Karaté combat",
+  "Kata",
+  "Point Fighting",
+  "Light Contact",
+  "Kick Light",
+  "Arts martiaux",
+  "Autre",
+];
+
+const PROGRAMS = [
+  "WKC Spain 2026",
+  "WAKO Italie 2026",
+  "Saison compétitive 2026",
+  "Fonds Athlètes KinkoLab",
+  "Autre",
+];
+
+const ATHLETE_STATUSES = [
+  "Athlète",
+  "Parent / famille",
+  "Coach",
+  "Assistant coach",
+];
+
 function sumRaised(participation) {
   return (
     Number(participation?.raisedShop || 0) +
@@ -150,7 +191,7 @@ function AthleteMiniCard({ athlete, active, onClick }) {
   );
 }
 
-function CampaignGroupCard({ group, campaigns }) {
+function CampaignGroupCard({ group, campaigns, onEditParticipation }) {
   const percent = percentOf(group.raised, group.goal);
   const campaign = campaigns.find((item) => item.id === group.campaignId);
 
@@ -177,7 +218,17 @@ function CampaignGroupCard({ group, campaigns }) {
           </p>
         </div>
 
-        <StatusBadge status="active" />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status="active" />
+
+          <button
+            type="button"
+            onClick={() => onEditParticipation?.(group)}
+            className="rounded-2xl bg-black px-4 py-2 text-sm font-black text-white"
+          >
+            Modifier
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 rounded-2xl bg-zinc-100 p-4">
@@ -186,6 +237,19 @@ function CampaignGroupCard({ group, campaigns }) {
           {group.participations.map((item) => item.athleteName).join(", ")}
         </p>
       </div>
+
+      {(group.publicMessage || group.fundingNeeds || group.campaignReason) && (
+        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          {group.publicMessage && (
+            <p className="text-sm text-zinc-700">{group.publicMessage}</p>
+          )}
+          {group.fundingNeeds && (
+            <p className="mt-2 text-sm text-zinc-500">
+              Besoins : {group.fundingNeeds}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl bg-zinc-100 p-4">
@@ -236,7 +300,9 @@ function ContributionCard({ contribution }) {
           </h3>
 
           <p className="mt-1 text-sm text-zinc-500">
-            {contribution.customerName || contribution.customerEmail || "Client Shopify"}
+            {contribution.customerName ||
+              contribution.customerEmail ||
+              "Client Shopify"}
           </p>
         </div>
 
@@ -299,13 +365,34 @@ export default function AthleteDashboard({
   const [saved, setSaved] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  const [editingParticipationGroup, setEditingParticipationGroup] = useState(null);
+  const [savingParticipation, setSavingParticipation] = useState(false);
+
   const [form, setForm] = useState({
-    bio: "",
-    photoUrl: "",
+    firstName: "",
+    lastName: "",
+    displayName: "",
+    birthDate: "",
+    email: "",
+    phone: "",
+    city: "",
+    province: "",
     dojo: "",
     discipline: "",
     belt: "",
+    programRequested: "",
+    athleteStatus: "",
+    bio: "",
+    photoUrl: "",
     athleteSocials: "",
+  });
+
+  const [participationForm, setParticipationForm] = useState({
+    goal: "",
+    fundingNeeds: "",
+    campaignReason: "",
+    publicMessage: "",
+    isPublic: true,
   });
 
   const [newUpdate, setNewUpdate] = useState({
@@ -321,8 +408,7 @@ export default function AthleteDashboard({
     description: "",
     goal: "",
   });
-
-  useEffect(() => {
+    useEffect(() => {
     if (!currentUser?.familyId) return;
 
     async function loadFamily() {
@@ -385,12 +471,27 @@ export default function AthleteDashboard({
   useEffect(() => {
     if (!selectedAthlete) return;
 
+    const nameParts = String(selectedAthlete.name || "").split(" ");
+
     setForm({
-      bio: selectedAthlete.bio || "",
-      photoUrl: selectedAthlete.photoUrl || "",
+      firstName: selectedAthlete.firstName || nameParts[0] || "",
+      lastName:
+        selectedAthlete.lastName ||
+        nameParts.slice(1).join(" ") ||
+        "",
+      displayName: selectedAthlete.displayName || selectedAthlete.name || "",
+      birthDate: selectedAthlete.birthDate || "",
+      email: selectedAthlete.email || selectedAthlete.athleteEmail || "",
+      phone: selectedAthlete.phone || selectedAthlete.athletePhone || "",
+      city: selectedAthlete.city || "",
+      province: selectedAthlete.province || "",
       dojo: selectedAthlete.dojo || "",
       discipline: selectedAthlete.discipline || "",
       belt: selectedAthlete.belt || "",
+      programRequested: selectedAthlete.programRequested || "",
+      athleteStatus: selectedAthlete.athleteStatus || "",
+      bio: selectedAthlete.bio || selectedAthlete.presentation || "",
+      photoUrl: selectedAthlete.photoUrl || "",
       athleteSocials: selectedAthlete.athleteSocials || "",
     });
 
@@ -475,6 +576,10 @@ export default function AthleteDashboard({
           participations: [],
           goal: 0,
           raised: 0,
+          fundingNeeds: participation.fundingNeeds || "",
+          campaignReason: participation.campaignReason || "",
+          publicMessage: participation.publicMessage || "",
+          isPublic: participation.isPublic !== false,
         });
       }
 
@@ -483,6 +588,18 @@ export default function AthleteDashboard({
       group.participations.push(participation);
       group.goal += Number(participation.goal || 0);
       group.raised += sumRaised(participation);
+
+      if (!group.fundingNeeds && participation.fundingNeeds) {
+        group.fundingNeeds = participation.fundingNeeds;
+      }
+
+      if (!group.campaignReason && participation.campaignReason) {
+        group.campaignReason = participation.campaignReason;
+      }
+
+      if (!group.publicMessage && participation.publicMessage) {
+        group.publicMessage = participation.publicMessage;
+      }
     });
 
     return Array.from(map.values());
@@ -544,16 +661,39 @@ export default function AthleteDashboard({
   async function saveAthleteProfile() {
     if (!selectedAthlete?.id) return;
 
+    const displayName =
+      form.displayName.trim() ||
+      `${form.firstName.trim()} ${form.lastName.trim()}`.trim() ||
+      selectedAthlete.name;
+
     try {
       setSaving(true);
 
       await updateDoc(doc(db, "athletes", selectedAthlete.id), {
-        bio: form.bio,
-        photoUrl: form.photoUrl,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        name: displayName,
+        displayName,
+
+        birthDate: form.birthDate,
+        email: form.email,
+        athleteEmail: form.email,
+        phone: form.phone,
+        athletePhone: form.phone,
+        city: form.city,
+        province: form.province,
+
         dojo: form.dojo,
         discipline: form.discipline,
         belt: form.belt,
+        programRequested: form.programRequested,
+        athleteStatus: form.athleteStatus,
+
+        bio: form.bio,
+        presentation: form.bio,
+        photoUrl: form.photoUrl,
         athleteSocials: form.athleteSocials,
+
         updatedAt: serverTimestamp(),
       });
 
@@ -562,10 +702,78 @@ export default function AthleteDashboard({
       setTimeout(() => {
         setSaved(false);
       }, 2500);
-    } catch {
+    } catch (error) {
+      console.error("Erreur sauvegarde profil:", error);
       alert("Impossible d'enregistrer les modifications.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openParticipationEditor(group) {
+    setEditingParticipationGroup(group);
+
+    setParticipationForm({
+      goal: String(group.goal || ""),
+      fundingNeeds: group.fundingNeeds || "",
+      campaignReason: group.campaignReason || "",
+      publicMessage: group.publicMessage || "",
+      isPublic: group.isPublic !== false,
+    });
+
+    setActiveTab("campaigns");
+  }
+
+  async function saveParticipationGroup() {
+    if (!editingParticipationGroup) return;
+
+    const editableParticipations = editingParticipationGroup.participations || [];
+
+    if (!editableParticipations.length) return;
+
+    try {
+      setSavingParticipation(true);
+
+      const totalCurrentGoal = editableParticipations.reduce(
+        (sum, item) => sum + Number(item.goal || 0),
+        0
+      );
+
+      const desiredGoal = Number(participationForm.goal || 0);
+
+      await Promise.all(
+        editableParticipations.map((participation) => {
+          let nextGoal = desiredGoal;
+
+          if (
+            editableParticipations.length > 1 &&
+            totalCurrentGoal > 0 &&
+            participation.goal
+          ) {
+            nextGoal =
+              desiredGoal *
+              (Number(participation.goal || 0) / Number(totalCurrentGoal));
+          }
+
+          return updateDoc(doc(db, "campaignParticipations", participation.id), {
+            goal: Math.round(nextGoal),
+            fundingNeeds: participationForm.fundingNeeds,
+            campaignReason: participationForm.campaignReason,
+            publicMessage: participationForm.publicMessage,
+            isPublic: participationForm.isPublic,
+            updatedAt: serverTimestamp(),
+          });
+        })
+      );
+
+      setEditingParticipationGroup(null);
+
+      alert("Participation mise à jour.");
+    } catch (error) {
+      console.error("Erreur modification participation:", error);
+      alert("Impossible de modifier cette participation.");
+    } finally {
+      setSavingParticipation(false);
     }
   }
 
@@ -601,7 +809,8 @@ export default function AthleteDashboard({
       });
 
       alert("Nouvelle soumise pour validation.");
-    } catch {
+    } catch (error) {
+      console.error("Erreur ajout nouvelle:", error);
       alert("Impossible d'ajouter la nouvelle.");
     }
   }
@@ -638,12 +847,12 @@ export default function AthleteDashboard({
       });
 
       alert("Événement soumis pour validation.");
-    } catch {
+    } catch (error) {
+      console.error("Erreur ajout événement:", error);
       alert("Impossible de créer l'événement.");
     }
   }
-
-  return (
+    return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
         <button
@@ -685,73 +894,29 @@ export default function AthleteDashboard({
         {currentUser?.familyId && (
           <>
             <section className="mt-8 grid gap-4 md:grid-cols-4">
-              <StatBox
-                icon={Users}
-                label="Athlètes"
-                value={athletes.length}
-                sub="Profils rattachés"
-              />
-
-              <StatBox
-                icon={Target}
-                label="Campagnes"
-                value={familyFundingGroups.length}
-                sub="Groupes de financement"
-              />
-
-              <StatBox
-                icon={Wallet}
-                label="Objectif"
-                value={money(familyGoal)}
-                sub={`Reste : ${money(familyRemaining)}`}
-              />
-
-              <StatBox
-                icon={ReceiptText}
-                label="Contributions"
-                value={money(totalContributions)}
-                sub={`${contributions.length} contribution(s)`}
-              />
+              <StatBox icon={Users} label="Athlètes" value={athletes.length} sub="Profils rattachés" />
+              <StatBox icon={Target} label="Campagnes" value={familyFundingGroups.length} sub="Groupes de financement" />
+              <StatBox icon={Wallet} label="Objectif" value={money(familyGoal)} sub={`Reste : ${money(familyRemaining)}`} />
+              <StatBox icon={ReceiptText} label="Contributions" value={money(totalContributions)} sub={`${contributions.length} contribution(s)`} />
             </section>
 
             <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-              <h2 className="text-2xl font-black text-zinc-950">
-                Progression globale
-              </h2>
-
+              <h2 className="text-2xl font-black text-zinc-950">Progression globale</h2>
               <div className="mt-5">
                 <ProgressBar value={familyPercent} />
               </div>
-
               <p className="mt-3 text-sm text-zinc-500">
                 {money(familyRaised)} récoltés sur {money(familyGoal)}
               </p>
             </section>
 
             <section className="mt-8 flex flex-wrap gap-2">
-              <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>
-                Résumé
-              </TabButton>
-
-              <TabButton active={activeTab === "athletes"} onClick={() => setActiveTab("athletes")}>
-                Athlètes
-              </TabButton>
-
-              <TabButton active={activeTab === "campaigns"} onClick={() => setActiveTab("campaigns")}>
-                Campagnes
-              </TabButton>
-
-              <TabButton active={activeTab === "contributions"} onClick={() => setActiveTab("contributions")}>
-                Contributions
-              </TabButton>
-
-              <TabButton active={activeTab === "updates"} onClick={() => setActiveTab("updates")}>
-                Nouvelles
-              </TabButton>
-
-              <TabButton active={activeTab === "events"} onClick={() => setActiveTab("events")}>
-                Événements
-              </TabButton>
+              <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>Résumé</TabButton>
+              <TabButton active={activeTab === "athletes"} onClick={() => setActiveTab("athletes")}>Athlètes</TabButton>
+              <TabButton active={activeTab === "campaigns"} onClick={() => setActiveTab("campaigns")}>Campagnes</TabButton>
+              <TabButton active={activeTab === "contributions"} onClick={() => setActiveTab("contributions")}>Contributions</TabButton>
+              <TabButton active={activeTab === "updates"} onClick={() => setActiveTab("updates")}>Nouvelles</TabButton>
+              <TabButton active={activeTab === "events"} onClick={() => setActiveTab("events")}>Événements</TabButton>
             </section>
 
             {activeTab === "summary" && (
@@ -759,17 +924,11 @@ export default function AthleteDashboard({
                 <div className="rounded-[2rem] bg-white p-6 shadow-xl">
                   <div className="flex items-center gap-3">
                     <Users style={{ color: gold }} />
-                    <h2 className="text-2xl font-black text-zinc-950">
-                      Membres de la famille
-                    </h2>
+                    <h2 className="text-2xl font-black text-zinc-950">Membres de la famille</h2>
                   </div>
 
                   <div className="mt-5 grid gap-3">
-                    {athletes.length === 0 && (
-                      <p className="text-zinc-500">
-                        Aucun athlète rattaché à cette famille.
-                      </p>
-                    )}
+                    {athletes.length === 0 && <p className="text-zinc-500">Aucun athlète rattaché à cette famille.</p>}
 
                     {athletes.map((athlete) => (
                       <button
@@ -802,68 +961,23 @@ export default function AthleteDashboard({
                 <div className="rounded-[2rem] bg-white p-6 shadow-xl">
                   <div className="flex items-center gap-3">
                     <Target style={{ color: gold }} />
-                    <h2 className="text-2xl font-black text-zinc-950">
-                      Campagnes actives
-                    </h2>
+                    <h2 className="text-2xl font-black text-zinc-950">Campagnes actives</h2>
                   </div>
 
                   <div className="mt-5 space-y-4">
                     {familyFundingGroups.length === 0 && (
-                      <p className="text-zinc-500">
-                        Aucune campagne active pour cette famille.
-                      </p>
+                      <p className="text-zinc-500">Aucune campagne active pour cette famille.</p>
                     )}
 
                     {familyFundingGroups.map((group) => (
-                      <CampaignGroupCard key={group.fundingGroupId} group={group} campaigns={campaigns} />
+                      <CampaignGroupCard
+                        key={group.fundingGroupId}
+                        group={group}
+                        campaigns={campaigns}
+                        onEditParticipation={openParticipationEditor}
+                      />
                     ))}
                   </div>
-                </div>
-              </section>
-            )}
-
-            {activeTab === "contributions" && (
-              <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-                <div className="flex items-center gap-3">
-                  <ReceiptText style={{ color: gold }} />
-                  <h2 className="text-2xl font-black text-zinc-950">
-                    Historique des contributions
-                  </h2>
-                </div>
-
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <StatBox
-                    icon={ReceiptText}
-                    label="Total réservé"
-                    value={money(totalContributions)}
-                    sub="Depuis Shopify"
-                  />
-
-                  <StatBox
-                    icon={Wallet}
-                    label="Transactions"
-                    value={contributions.length}
-                    sub="Contributions enregistrées"
-                  />
-
-                  <StatBox
-                    icon={Target}
-                    label="Moyenne"
-                    value={money(contributions.length ? totalContributions / contributions.length : 0)}
-                    sub="Par contribution"
-                  />
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {contributions.length === 0 && (
-                    <p className="rounded-2xl bg-zinc-100 p-5 text-zinc-500">
-                      Aucune contribution enregistrée pour le moment.
-                    </p>
-                  )}
-
-                  {contributions.map((contribution) => (
-                    <ContributionCard key={contribution.id} contribution={contribution} />
-                  ))}
                 </div>
               </section>
             )}
@@ -873,9 +987,7 @@ export default function AthleteDashboard({
                 <div className="rounded-[2rem] bg-white p-6 shadow-xl">
                   <div className="flex items-center gap-3">
                     <UserRound style={{ color: gold }} />
-                    <h2 className="text-2xl font-black text-zinc-950">
-                      Choisir un athlète
-                    </h2>
+                    <h2 className="text-2xl font-black text-zinc-950">Choisir un athlète</h2>
                   </div>
 
                   <div className="mt-5 space-y-3">
@@ -894,9 +1006,7 @@ export default function AthleteDashboard({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <ImageIcon style={{ color: gold }} />
-                      <h2 className="text-2xl font-black text-zinc-950">
-                        Modifier le profil
-                      </h2>
+                      <h2 className="text-2xl font-black text-zinc-950">Modifier le profil</h2>
                     </div>
 
                     {selectedAthlete && (
@@ -913,18 +1023,12 @@ export default function AthleteDashboard({
                   {selectedAthlete && (
                     <div className="mt-5 grid gap-4">
                       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-sm font-black text-zinc-700">
-                          Photo de profil
-                        </p>
+                        <p className="text-sm font-black text-zinc-700">Photo de profil</p>
 
                         <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-center">
                           <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl bg-zinc-200 text-4xl">
                             {form.photoUrl ? (
-                              <img
-                                src={form.photoUrl}
-                                alt={selectedAthlete.name}
-                                className="h-full w-full object-cover"
-                              />
+                              <img src={form.photoUrl} alt={selectedAthlete.name} className="h-full w-full object-cover" />
                             ) : (
                               selectedAthlete.avatar || "🥋"
                             )}
@@ -934,13 +1038,7 @@ export default function AthleteDashboard({
                             <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-black px-5 py-3 font-black text-white">
                               <ImageIcon size={18} />
                               {uploadingPhoto ? "Téléversement..." : "Téléverser une photo"}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleAthletePhotoUpload}
-                                disabled={uploadingPhoto}
-                                className="hidden"
-                              />
+                              <input type="file" accept="image/*" onChange={handleAthletePhotoUpload} disabled={uploadingPhoto} className="hidden" />
                             </label>
 
                             <p className="mt-2 text-xs text-zinc-500">
@@ -957,10 +1055,40 @@ export default function AthleteDashboard({
                         />
                       </div>
 
-                      <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Biographie / histoire de l’athlète" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                      <input value={form.dojo} onChange={(e) => setForm({ ...form, dojo: e.target.value })} placeholder="Dojo" className="rounded-2xl border border-zinc-200 p-3" />
-                      <input value={form.discipline} onChange={(e) => setForm({ ...form, discipline: e.target.value })} placeholder="Discipline" className="rounded-2xl border border-zinc-200 p-3" />
-                      <input value={form.belt} onChange={(e) => setForm({ ...form, belt: e.target.value })} placeholder="Ceinture / niveau" className="rounded-2xl border border-zinc-200 p-3" />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Prénom" className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Nom" className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Nom affiché publiquement" className="rounded-2xl border border-zinc-200 p-3 md:col-span-2" />
+                        <input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Courriel" className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Téléphone" className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Ville" className="rounded-2xl border border-zinc-200 p-3" />
+
+                        <select value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
+                          <option value="">Province</option>
+                          {PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
+                        </select>
+
+                        <select value={form.discipline} onChange={(e) => setForm({ ...form, discipline: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
+                          <option value="">Discipline</option>
+                          {DISCIPLINES.map((discipline) => <option key={discipline} value={discipline}>{discipline}</option>)}
+                        </select>
+
+                        <input value={form.dojo} onChange={(e) => setForm({ ...form, dojo: e.target.value })} placeholder="Club / Dojo" className="rounded-2xl border border-zinc-200 p-3" />
+                        <input value={form.belt} onChange={(e) => setForm({ ...form, belt: e.target.value })} placeholder="Ceinture / niveau" className="rounded-2xl border border-zinc-200 p-3" />
+
+                        <select value={form.programRequested} onChange={(e) => setForm({ ...form, programRequested: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
+                          <option value="">Programme demandé</option>
+                          {PROGRAMS.map((program) => <option key={program} value={program}>{program}</option>)}
+                        </select>
+
+                        <select value={form.athleteStatus} onChange={(e) => setForm({ ...form, athleteStatus: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
+                          <option value="">Statut</option>
+                          {ATHLETE_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </div>
+
+                      <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Présentation de l’athlète" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
                       <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
 
                       <button onClick={saveAthleteProfile} disabled={saving || uploadingPhoto} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
@@ -978,134 +1106,196 @@ export default function AthleteDashboard({
                 </div>
               </section>
             )}
-
             {activeTab === "campaigns" && (
-              <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-                <div className="flex items-center gap-3">
-                  <Target style={{ color: gold }} />
-                  <h2 className="text-2xl font-black text-zinc-950">
-                    Campagnes et participations
-                  </h2>
-                </div>
+  <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+    <div className="flex items-center gap-3">
+      <Target style={{ color: gold }} />
+      <h2 className="text-2xl font-black text-zinc-950">
+        Campagnes et participations
+      </h2>
+    </div>
 
-                <div className="mt-5 space-y-4">
-                  {familyFundingGroups.length === 0 && (
-                    <p className="text-zinc-500">
-                      Aucune participation active.
-                    </p>
-                  )}
+    <div className="mt-6 space-y-5">
+      {familyFundingGroups.map((group) => (
+        <div
+          key={group.fundingGroupId}
+          className="rounded-[2rem] border border-zinc-200 p-5"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p
+                className="text-sm font-bold uppercase tracking-[0.2em]"
+                style={{ color: gold }}
+              >
+                {group.mode === "family"
+                  ? "Fonds commun famille"
+                  : "Financement individuel"}
+              </p>
 
-                  {familyFundingGroups.map((group) => (
-                    <CampaignGroupCard key={group.fundingGroupId} group={group} campaigns={campaigns} />
-                  ))}
-                </div>
-              </section>
-            )}
+              <h3 className="mt-2 text-3xl font-black">
+                {group.title}
+              </h3>
+            </div>
 
+            <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
+              ACTIVE
+            </span>
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-zinc-100 p-4">
+            <p className="font-black">Participants</p>
+
+            <div className="mt-2 text-zinc-600">
+              {group.members.map((member) => member.name).join(", ")}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <StatMini
+              label="Objectif"
+              value={money(group.goal)}
+            />
+
+            <StatMini
+              label="Récolté"
+              value={money(group.raised)}
+            />
+
+            <StatMini
+              label="Reste"
+              value={money(group.goal - group.raised)}
+            />
+          </div>
+
+          <div className="mt-4">
+            <ProgressBar
+              value={
+                group.goal
+                  ? Math.round((group.raised / group.goal) * 100)
+                  : 0
+              }
+            />
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => openParticipationEditor(group)}
+              className="rounded-2xl bg-black px-5 py-3 font-black text-white"
+            >
+              Modifier les objectifs
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+            {activeTab === "contributions" && (
+  <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+    <h2 className="text-2xl font-black text-zinc-950">
+      Contributions reçues
+    </h2>
+
+    <div className="mt-5 space-y-3">
+      {contributions.length === 0 && (
+        <p className="text-zinc-500">
+          Aucune contribution enregistrée.
+        </p>
+      )}
+
+      {contributions.map((item) => (
+        <div
+          key={item.id}
+          className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4"
+        >
+          <div>
+            <p className="font-black">{item.name}</p>
+            <p className="text-sm text-zinc-500">
+              {item.createdAt?.toDate?.().toLocaleDateString()}
+            </p>
+          </div>
+
+          <div className="font-black" style={{ color: gold }}>
+            {money(item.amount)}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
             {activeTab === "updates" && (
-              <section className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-                  <div className="flex items-center gap-3">
-                    <Megaphone style={{ color: gold }} />
-                    <h2 className="text-2xl font-black text-zinc-950">
-                      Ajouter une nouvelle
-                    </h2>
-                  </div>
+  <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+    <div className="flex items-center justify-between">
+      <h2 className="text-2xl font-black text-zinc-950">
+        Nouvelles de la famille
+      </h2>
 
-                  <div className="mt-5 grid gap-3">
-                    <select value={selectedAthleteId} onChange={(e) => setSelectedAthleteId(e.target.value)} className="rounded-2xl border border-zinc-200 p-3">
-                      {athletes.map((athlete) => (
-                        <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
-                      ))}
-                    </select>
+      <button
+        onClick={() => setShowNewUpdate(true)}
+        className="rounded-2xl bg-black px-5 py-3 font-black text-white"
+      >
+        Publier une nouvelle
+      </button>
+    </div>
 
-                    <input value={newUpdate.title} onChange={(e) => setNewUpdate({ ...newUpdate, title: e.target.value })} placeholder="Titre" className="rounded-2xl border border-zinc-200 p-3" />
-                    <textarea value={newUpdate.content} onChange={(e) => setNewUpdate({ ...newUpdate, content: e.target.value })} placeholder="Texte" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                    <input value={newUpdate.mediaUrl} onChange={(e) => setNewUpdate({ ...newUpdate, mediaUrl: e.target.value })} placeholder="URL image ou média" className="rounded-2xl border border-zinc-200 p-3" />
+    <div className="mt-6 space-y-4">
+      {updates.map((update) => (
+        <div
+          key={update.id}
+          className="rounded-2xl border border-zinc-200 p-5"
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="font-black">
+              {update.title}
+            </h3>
 
-                    <button onClick={publishUpdate} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
-                      <Plus size={18} />
-                      Soumettre pour validation
-                    </button>
-                  </div>
-                </div>
+            <span className="text-sm text-zinc-500">
+              {update.createdAt?.toDate?.().toLocaleDateString()}
+            </span>
+          </div>
 
-                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-                  <h2 className="text-2xl font-black text-zinc-950">
-                    Nouvelles envoyées
-                  </h2>
-
-                  <div className="mt-5 space-y-3">
-                    {updates.length === 0 && <p className="text-zinc-500">Aucune nouvelle envoyée pour cet athlète.</p>}
-
-                    {updates.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">{item.title}</p>
-                          <StatusBadge status={item.status || "en_attente"} />
-                        </div>
-                        <p className="mt-1 text-sm text-zinc-600">{item.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-
+          <p className="mt-3 text-zinc-600">
+            {update.content}
+          </p>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
             {activeTab === "events" && (
-              <section className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-                  <div className="flex items-center gap-3">
-                    <CalendarDays style={{ color: gold }} />
-                    <h2 className="text-2xl font-black text-zinc-950">
-                      Ajouter un événement
-                    </h2>
-                  </div>
+  <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+    <div className="flex items-center justify-between">
+      <h2 className="text-2xl font-black text-zinc-950">
+        Événements
+      </h2>
 
-                  <div className="mt-5 grid gap-3">
-                    <select value={selectedAthleteId} onChange={(e) => setSelectedAthleteId(e.target.value)} className="rounded-2xl border border-zinc-200 p-3">
-                      {athletes.map((athlete) => (
-                        <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
-                      ))}
-                    </select>
+      <button
+        onClick={() => setShowNewEvent(true)}
+        className="rounded-2xl bg-black px-5 py-3 font-black text-white"
+      >
+        Ajouter un événement
+      </button>
+    </div>
 
-                    <input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Titre de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
-                    <input type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                    <textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Description" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                    <input type="number" value={newEvent.goal} onChange={(e) => setNewEvent({ ...newEvent, goal: e.target.value })} placeholder="Objectif de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
+    <div className="mt-6 space-y-4">
+      {events.map((event) => (
+        <div
+          key={event.id}
+          className="rounded-2xl border border-zinc-200 p-5"
+        >
+          <h3 className="font-black">
+            {event.title}
+          </h3>
 
-                    <button onClick={createFundingEvent} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
-                      <Plus size={18} />
-                      Soumettre pour validation
-                    </button>
-                  </div>
-                </div>
+          <p className="mt-2 text-zinc-600">
+            {event.description}
+          </p>
 
-                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-                  <h2 className="text-2xl font-black text-zinc-950">
-                    Événements envoyés
-                  </h2>
-
-                  <div className="mt-5 space-y-3">
-                    {fundingEvents.length === 0 && <p className="text-zinc-500">Aucun événement envoyé pour cet athlète.</p>}
-
-                    {fundingEvents.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">{item.title}</p>
-                          <StatusBadge status={item.status || "en_attente"} />
-                        </div>
-                        <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
-                        <p className="mt-2 text-sm text-zinc-500">Objectif : {money(item.goal || 0)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
-    </main>
-  );
-}
+          <p className="mt-3 text-sm font-bold" style={{ color: gold }}>
+            {event.date}
+          </p>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
