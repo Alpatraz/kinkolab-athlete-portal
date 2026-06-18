@@ -30,9 +30,7 @@ function AthleteRoute({
   const navigate = useNavigate();
   const athlete = athletes.find((item) => item.id === athleteId);
 
-  if (!athlete) {
-    return <Navigate to="/athletes" replace />;
-  }
+  if (!athlete) return <Navigate to="/athletes" replace />;
 
   return (
     <AthletePublicPage
@@ -60,9 +58,7 @@ function CampaignRoute({
   const navigate = useNavigate();
   const campaign = campaigns.find((item) => item.id === campaignId);
 
-  if (!campaign) {
-    return <Navigate to="/campaigns" replace />;
-  }
+  if (!campaign) return <Navigate to="/campaigns" replace />;
 
   return (
     <CampaignDetailPage
@@ -101,9 +97,7 @@ function ProtectedDashboardRoute({ currentUser, authLoading, children }) {
     );
   }
 
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!currentUser) return <Navigate to="/login" replace />;
 
   return children;
 }
@@ -166,12 +160,12 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "athletes"), (snapshot) => {
-      const firebaseAthletes = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-
-      setAthletes(firebaseAthletes);
+      setAthletes(
+        snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+      );
     });
 
     return () => unsubscribe();
@@ -179,12 +173,12 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "campaigns"), (snapshot) => {
-      const data = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-
-      setFirebaseCampaigns(data);
+      setFirebaseCampaigns(
+        snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+      );
     });
 
     return () => unsubscribe();
@@ -194,12 +188,12 @@ export default function App() {
     const unsubscribe = onSnapshot(
       collection(db, "campaignParticipations"),
       (snapshot) => {
-        const data = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-
-        setParticipations(data);
+        setParticipations(
+          snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }))
+        );
       }
     );
 
@@ -266,6 +260,7 @@ export default function App() {
         openCampaigns={openCampaigns}
         openAthletes={openAthletes}
         openAdmin={openAdmin}
+        openDashboard={openDashboard}
       />
 
       <Routes>
@@ -287,12 +282,12 @@ export default function App() {
           path="/athletes"
           element={
             <AthletesPage
-  athletes={publicAthletes}
-  campaigns={publicCampaigns}
-  participations={participations}
-  onOpenAthlete={openAthlete}
-  onOpenCampaign={openCampaign}
-/>
+              athletes={publicAthletes}
+              campaigns={publicCampaigns}
+              participations={participations}
+              onOpenAthlete={openAthlete}
+              onOpenCampaign={openCampaign}
+            />
           }
         />
 
