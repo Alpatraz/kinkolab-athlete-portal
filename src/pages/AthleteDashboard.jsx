@@ -6,6 +6,7 @@ import {
   ImageIcon,
   Megaphone,
   Plus,
+  ReceiptText,
   Save,
   Target,
   UserRound,
@@ -27,6 +28,10 @@ import {
 import { db } from "../firebase";
 import { campaignTitle, gold, money } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
+import {
+  contributionTotal,
+  subscribeContributionsByFamily,
+} from "../services/fundTransactions";
 
 function sumRaised(participation) {
   return (
@@ -39,6 +44,16 @@ function sumRaised(participation) {
 function percentOf(raised, goal) {
   if (!goal || Number(goal) <= 0) return 0;
   return Math.min(Math.round((Number(raised || 0) / Number(goal)) * 100), 100);
+}
+
+function formatDate(value) {
+  if (!value) return "";
+
+  if (value?.toDate) {
+    return value.toDate().toLocaleDateString("fr-CA");
+  }
+
+  return String(value).slice(0, 10);
 }
 
 function TabButton({ active, children, onClick }) {
@@ -198,6 +213,70 @@ function CampaignGroupCard({ group, campaigns }) {
   );
 }
 
+function ContributionCard({ contribution }) {
+  const amount = Number(
+    contribution.amountReserved || contribution.reservedAmount || 0
+  );
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400">
+            {formatDate(contribution.createdAt) ||
+              contribution.displayDate ||
+              "Date à confirmer"}
+          </p>
+
+          <h3 className="mt-2 text-lg font-black text-zinc-950">
+            {contribution.productName ||
+              contribution.productTitle ||
+              "Contribution Shopify"}
+          </h3>
+
+          <p className="mt-1 text-sm text-zinc-500">
+            {contribution.customerName || contribution.customerEmail || "Client Shopify"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-right">
+          <p className="text-xs font-black uppercase text-emerald-700">
+            Réservé
+          </p>
+          <p className="text-xl font-black text-emerald-800">
+            + {money(amount)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl bg-zinc-100 p-3">
+          <p className="text-xs uppercase text-zinc-500">Campagne</p>
+          <p className="mt-1 text-sm font-black text-zinc-800">
+            {contribution.campaignTitle || contribution.campaignId || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-zinc-100 p-3">
+          <p className="text-xs uppercase text-zinc-500">Soutien</p>
+          <p className="mt-1 text-sm font-black text-zinc-800">
+            {contribution.supportLabel ||
+              contribution.athleteName ||
+              contribution.familyName ||
+              "—"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-zinc-100 p-3">
+          <p className="text-xs uppercase text-zinc-500">Commande</p>
+          <p className="mt-1 text-sm font-black text-zinc-800">
+            {contribution.orderName || contribution.orderId || "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function AthleteDashboard({
   currentUser,
   campaigns = [],
@@ -212,6 +291,7 @@ export default function AthleteDashboard({
 
   const [updates, setUpdates] = useState([]);
   const [fundingEvents, setFundingEvents] = useState([]);
+  const [contributions, setContributions] = useState([]);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -280,6 +360,17 @@ export default function AthleteDashboard({
     return () => unsubscribe();
   }, [currentUser?.familyId, selectedAthleteId]);
 
+  useEffect(() => {
+    if (!currentUser?.familyId) return;
+
+    const unsubscribe = subscribeContributionsByFamily(
+      currentUser.familyId,
+      setContributions
+    );
+
+    return () => unsubscribe();
+  }, [currentUser?.familyId]);
+
   const selectedAthlete = useMemo(() => {
     return (
       athletes.find((athlete) => athlete.id === selectedAthleteId) ||
@@ -342,7 +433,8 @@ export default function AthleteDashboard({
 
     return () => unsubscribe();
   }, [selectedAthlete?.id]);
-    const familyAthleteIds = useMemo(() => {
+
+  const familyAthleteIds = useMemo(() => {
     return athletes.map((athlete) => athlete.id);
   }, [athletes]);
 
@@ -404,8 +496,9 @@ export default function AthleteDashboard({
   );
 
   const familyRemaining = Math.max(familyGoal - familyRaised, 0);
-
   const familyPercent = percentOf(familyRaised, familyGoal);
+
+  const totalContributions = contributionTotal(contributions);
 
   async function saveAthleteProfile() {
     if (!selectedAthlete?.id) return;
@@ -508,8 +601,7 @@ export default function AthleteDashboard({
       alert("Impossible de créer l'événement.");
     }
   }
-
-  return (
+    return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
         <button
@@ -533,7 +625,7 @@ export default function AthleteDashboard({
           </h1>
 
           <p className="mt-4 text-lg text-zinc-600">
-            Gérez vos profils, vos campagnes, vos nouvelles et vos événements de financement.
+            Gérez vos profils, vos campagnes, vos nouvelles, vos événements et vos contributions.
           </p>
         </section>
 
@@ -573,10 +665,10 @@ export default function AthleteDashboard({
               />
 
               <StatBox
-                icon={Megaphone}
-                label="Récolté"
-                value={money(familyRaised)}
-                sub={`${familyPercent}% atteint`}
+                icon={ReceiptText}
+                label="Contributions"
+                value={money(totalContributions)}
+                sub={`${contributions.length} contribution(s)`}
               />
             </section>
 
@@ -595,42 +687,32 @@ export default function AthleteDashboard({
             </section>
 
             <section className="mt-8 flex flex-wrap gap-2">
-              <TabButton
-                active={activeTab === "summary"}
-                onClick={() => setActiveTab("summary")}
-              >
+              <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>
                 Résumé
               </TabButton>
 
-              <TabButton
-                active={activeTab === "athletes"}
-                onClick={() => setActiveTab("athletes")}
-              >
+              <TabButton active={activeTab === "athletes"} onClick={() => setActiveTab("athletes")}>
                 Athlètes
               </TabButton>
 
-              <TabButton
-                active={activeTab === "campaigns"}
-                onClick={() => setActiveTab("campaigns")}
-              >
+              <TabButton active={activeTab === "campaigns"} onClick={() => setActiveTab("campaigns")}>
                 Campagnes
               </TabButton>
 
-              <TabButton
-                active={activeTab === "updates"}
-                onClick={() => setActiveTab("updates")}
-              >
+              <TabButton active={activeTab === "contributions"} onClick={() => setActiveTab("contributions")}>
+                Contributions
+              </TabButton>
+
+              <TabButton active={activeTab === "updates"} onClick={() => setActiveTab("updates")}>
                 Nouvelles
               </TabButton>
 
-              <TabButton
-                active={activeTab === "events"}
-                onClick={() => setActiveTab("events")}
-              >
+              <TabButton active={activeTab === "events"} onClick={() => setActiveTab("events")}>
                 Événements
               </TabButton>
             </section>
-                        {activeTab === "summary" && (
+
+            {activeTab === "summary" && (
               <section className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="rounded-[2rem] bg-white p-6 shadow-xl">
                   <div className="flex items-center gap-3">
@@ -658,23 +740,16 @@ export default function AthleteDashboard({
                       >
                         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 text-3xl">
                           {athlete.photoUrl ? (
-                            <img
-                              src={athlete.photoUrl}
-                              alt={athlete.name}
-                              className="h-full w-full object-cover"
-                            />
+                            <img src={athlete.photoUrl} alt={athlete.name} className="h-full w-full object-cover" />
                           ) : (
                             athlete.avatar || "🥋"
                           )}
                         </div>
 
                         <div>
-                          <p className="font-black text-zinc-950">
-                            {athlete.name}
-                          </p>
+                          <p className="font-black text-zinc-950">{athlete.name}</p>
                           <p className="text-sm text-zinc-500">
-                            {athlete.discipline || "Discipline à confirmer"} ·{" "}
-                            {athlete.dojo || "Dojo à confirmer"}
+                            {athlete.discipline || "Discipline à confirmer"} · {athlete.dojo || "Dojo à confirmer"}
                           </p>
                         </div>
                       </button>
@@ -698,13 +773,55 @@ export default function AthleteDashboard({
                     )}
 
                     {familyFundingGroups.map((group) => (
-                      <CampaignGroupCard
-                        key={group.fundingGroupId}
-                        group={group}
-                        campaigns={campaigns}
-                      />
+                      <CampaignGroupCard key={group.fundingGroupId} group={group} campaigns={campaigns} />
                     ))}
                   </div>
+                </div>
+              </section>
+            )}
+
+            {activeTab === "contributions" && (
+              <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <ReceiptText style={{ color: gold }} />
+                  <h2 className="text-2xl font-black text-zinc-950">
+                    Historique des contributions
+                  </h2>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <StatBox
+                    icon={ReceiptText}
+                    label="Total réservé"
+                    value={money(totalContributions)}
+                    sub="Depuis Shopify"
+                  />
+
+                  <StatBox
+                    icon={Wallet}
+                    label="Transactions"
+                    value={contributions.length}
+                    sub="Contributions enregistrées"
+                  />
+
+                  <StatBox
+                    icon={Target}
+                    label="Moyenne"
+                    value={money(contributions.length ? totalContributions / contributions.length : 0)}
+                    sub="Par contribution"
+                  />
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {contributions.length === 0 && (
+                    <p className="rounded-2xl bg-zinc-100 p-5 text-zinc-500">
+                      Aucune contribution enregistrée pour le moment.
+                    </p>
+                  )}
+
+                  {contributions.map((contribution) => (
+                    <ContributionCard key={contribution.id} contribution={contribution} />
+                  ))}
                 </div>
               </section>
             )}
@@ -751,109 +868,16 @@ export default function AthleteDashboard({
                     )}
                   </div>
 
-                  {!selectedAthlete && (
-                    <p className="mt-5 text-zinc-500">
-                      Sélectionnez un athlète.
-                    </p>
-                  )}
-
                   {selectedAthlete && (
                     <div className="mt-5 grid gap-4">
-                      <input
-                        value={form.photoUrl}
-                        onChange={(event) =>
-                          setForm({ ...form, photoUrl: event.target.value })
-                        }
-                        placeholder="URL de la photo"
-                        className="rounded-2xl border border-zinc-200 p-3"
-                      />
+                      <input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} placeholder="URL de la photo" className="rounded-2xl border border-zinc-200 p-3" />
+                      <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Biographie / histoire de l’athlète" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                      <input value={form.dojo} onChange={(e) => setForm({ ...form, dojo: e.target.value })} placeholder="Dojo" className="rounded-2xl border border-zinc-200 p-3" />
+                      <input value={form.discipline} onChange={(e) => setForm({ ...form, discipline: e.target.value })} placeholder="Discipline" className="rounded-2xl border border-zinc-200 p-3" />
+                      <input value={form.belt} onChange={(e) => setForm({ ...form, belt: e.target.value })} placeholder="Ceinture / niveau" className="rounded-2xl border border-zinc-200 p-3" />
+                      <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
 
-                      <textarea
-                        value={form.bio}
-                        onChange={(event) =>
-                          setForm({ ...form, bio: event.target.value })
-                        }
-                        placeholder="Biographie / histoire de l’athlète"
-                        className="min-h-32 rounded-2xl border border-zinc-200 p-3"
-                      />
-
-                      <input
-                        value={form.dojo}
-                        onChange={(event) =>
-                          setForm({ ...form, dojo: event.target.value })
-                        }
-                        placeholder="Dojo"
-                        className="rounded-2xl border border-zinc-200 p-3"
-                      />
-
-                      <input
-                        value={form.discipline}
-                        onChange={(event) =>
-                          setForm({ ...form, discipline: event.target.value })
-                        }
-                        placeholder="Discipline"
-                        className="rounded-2xl border border-zinc-200 p-3"
-                      />
-
-                      <input
-                        value={form.belt}
-                        onChange={(event) =>
-                          setForm({ ...form, belt: event.target.value })
-                        }
-                        placeholder="Ceinture / niveau"
-                        className="rounded-2xl border border-zinc-200 p-3"
-                      />
-
-                      <input
-                        value={form.athleteSocials}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            athleteSocials: event.target.value,
-                          })
-                        }
-                        placeholder="Réseaux sociaux"
-                        className="rounded-2xl border border-zinc-200 p-3"
-                      />
-
-                      <div className="rounded-2xl bg-zinc-100 p-4">
-                        <p className="text-sm font-black text-zinc-700">
-                          Participations de cet athlète
-                        </p>
-
-                        <div className="mt-3 space-y-2">
-                          {selectedAthleteParticipations.length === 0 && (
-                            <p className="text-sm text-zinc-500">
-                              Aucune participation active.
-                            </p>
-                          )}
-
-                          {selectedAthleteParticipations.map((participation) => (
-                            <div
-                              key={participation.id}
-                              className="rounded-xl bg-white p-3 text-sm text-zinc-700"
-                            >
-                              <b>
-                                {campaignTitle(
-                                  campaigns,
-                                  participation.campaignId
-                                )}
-                              </b>{" "}
-                              ·{" "}
-                              {participation.fundingMode === "family"
-                                ? "Fonds familial"
-                                : "Individuel"}{" "}
-                              · Objectif : {money(participation.goal || 0)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={saveAthleteProfile}
-                        disabled={saving}
-                        className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60"
-                      >
+                      <button onClick={saveAthleteProfile} disabled={saving} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
                         <Save size={18} />
                         {saving ? "Sauvegarde..." : "Sauvegarder"}
                       </button>
@@ -886,11 +910,7 @@ export default function AthleteDashboard({
                   )}
 
                   {familyFundingGroups.map((group) => (
-                    <CampaignGroupCard
-                      key={group.fundingGroupId}
-                      group={group}
-                      campaigns={campaigns}
-                    />
+                    <CampaignGroupCard key={group.fundingGroupId} group={group} campaigns={campaigns} />
                   ))}
                 </div>
               </section>
@@ -906,66 +926,18 @@ export default function AthleteDashboard({
                     </h2>
                   </div>
 
-                  <p className="mt-2 text-sm text-zinc-500">
-                    La nouvelle sera associée à l’athlète sélectionné et devra
-                    être validée avant publication.
-                  </p>
-
                   <div className="mt-5 grid gap-3">
-                    <select
-                      value={selectedAthleteId}
-                      onChange={(event) =>
-                        setSelectedAthleteId(event.target.value)
-                      }
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    >
+                    <select value={selectedAthleteId} onChange={(e) => setSelectedAthleteId(e.target.value)} className="rounded-2xl border border-zinc-200 p-3">
                       {athletes.map((athlete) => (
-                        <option key={athlete.id} value={athlete.id}>
-                          {athlete.name}
-                        </option>
+                        <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
                       ))}
                     </select>
 
-                    <input
-                      value={newUpdate.title}
-                      onChange={(event) =>
-                        setNewUpdate({
-                          ...newUpdate,
-                          title: event.target.value,
-                        })
-                      }
-                      placeholder="Titre"
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    />
+                    <input value={newUpdate.title} onChange={(e) => setNewUpdate({ ...newUpdate, title: e.target.value })} placeholder="Titre" className="rounded-2xl border border-zinc-200 p-3" />
+                    <textarea value={newUpdate.content} onChange={(e) => setNewUpdate({ ...newUpdate, content: e.target.value })} placeholder="Texte" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    <input value={newUpdate.mediaUrl} onChange={(e) => setNewUpdate({ ...newUpdate, mediaUrl: e.target.value })} placeholder="URL image ou média" className="rounded-2xl border border-zinc-200 p-3" />
 
-                    <textarea
-                      value={newUpdate.content}
-                      onChange={(event) =>
-                        setNewUpdate({
-                          ...newUpdate,
-                          content: event.target.value,
-                        })
-                      }
-                      placeholder="Texte"
-                      className="min-h-32 rounded-2xl border border-zinc-200 p-3"
-                    />
-
-                    <input
-                      value={newUpdate.mediaUrl}
-                      onChange={(event) =>
-                        setNewUpdate({
-                          ...newUpdate,
-                          mediaUrl: event.target.value,
-                        })
-                      }
-                      placeholder="URL image ou média"
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    />
-
-                    <button
-                      onClick={publishUpdate}
-                      className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white"
-                    >
+                    <button onClick={publishUpdate} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
                       <Plus size={18} />
                       Soumettre pour validation
                     </button>
@@ -978,27 +950,15 @@ export default function AthleteDashboard({
                   </h2>
 
                   <div className="mt-5 space-y-3">
-                    {updates.length === 0 && (
-                      <p className="text-zinc-500">
-                        Aucune nouvelle envoyée pour cet athlète.
-                      </p>
-                    )}
+                    {updates.length === 0 && <p className="text-zinc-500">Aucune nouvelle envoyée pour cet athlète.</p>}
 
                     {updates.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-zinc-200 p-4"
-                      >
+                      <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">
-                            {item.title}
-                          </p>
+                          <p className="font-black text-zinc-950">{item.title}</p>
                           <StatusBadge status={item.status || "en_attente"} />
                         </div>
-
-                        <p className="mt-1 text-sm text-zinc-600">
-                          {item.content}
-                        </p>
+                        <p className="mt-1 text-sm text-zinc-600">{item.content}</p>
                       </div>
                     ))}
                   </div>
@@ -1016,79 +976,19 @@ export default function AthleteDashboard({
                     </h2>
                   </div>
 
-                  <p className="mt-2 text-sm text-zinc-500">
-                    L’événement sera associé à l’athlète sélectionné et devra
-                    être validé avant publication.
-                  </p>
-
                   <div className="mt-5 grid gap-3">
-                    <select
-                      value={selectedAthleteId}
-                      onChange={(event) =>
-                        setSelectedAthleteId(event.target.value)
-                      }
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    >
+                    <select value={selectedAthleteId} onChange={(e) => setSelectedAthleteId(e.target.value)} className="rounded-2xl border border-zinc-200 p-3">
                       {athletes.map((athlete) => (
-                        <option key={athlete.id} value={athlete.id}>
-                          {athlete.name}
-                        </option>
+                        <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
                       ))}
                     </select>
 
-                    <input
-                      value={newEvent.title}
-                      onChange={(event) =>
-                        setNewEvent({
-                          ...newEvent,
-                          title: event.target.value,
-                        })
-                      }
-                      placeholder="Titre de l’événement"
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    />
+                    <input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Titre de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
+                    <input type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
+                    <textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Description" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    <input type="number" value={newEvent.goal} onChange={(e) => setNewEvent({ ...newEvent, goal: e.target.value })} placeholder="Objectif de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
 
-                    <input
-                      type="date"
-                      value={newEvent.date}
-                      onChange={(event) =>
-                        setNewEvent({
-                          ...newEvent,
-                          date: event.target.value,
-                        })
-                      }
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    />
-
-                    <textarea
-                      value={newEvent.description}
-                      onChange={(event) =>
-                        setNewEvent({
-                          ...newEvent,
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder="Description"
-                      className="min-h-32 rounded-2xl border border-zinc-200 p-3"
-                    />
-
-                    <input
-                      type="number"
-                      value={newEvent.goal}
-                      onChange={(event) =>
-                        setNewEvent({
-                          ...newEvent,
-                          goal: event.target.value,
-                        })
-                      }
-                      placeholder="Objectif de l’événement"
-                      className="rounded-2xl border border-zinc-200 p-3"
-                    />
-
-                    <button
-                      onClick={createFundingEvent}
-                      className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white"
-                    >
+                    <button onClick={createFundingEvent} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
                       <Plus size={18} />
                       Soumettre pour validation
                     </button>
@@ -1101,31 +1001,16 @@ export default function AthleteDashboard({
                   </h2>
 
                   <div className="mt-5 space-y-3">
-                    {fundingEvents.length === 0 && (
-                      <p className="text-zinc-500">
-                        Aucun événement envoyé pour cet athlète.
-                      </p>
-                    )}
+                    {fundingEvents.length === 0 && <p className="text-zinc-500">Aucun événement envoyé pour cet athlète.</p>}
 
                     {fundingEvents.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-zinc-200 p-4"
-                      >
+                      <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">
-                            {item.title}
-                          </p>
+                          <p className="font-black text-zinc-950">{item.title}</p>
                           <StatusBadge status={item.status || "en_attente"} />
                         </div>
-
-                        <p className="mt-1 text-sm text-zinc-600">
-                          {item.description}
-                        </p>
-
-                        <p className="mt-2 text-sm text-zinc-500">
-                          Objectif : {money(item.goal || 0)}
-                        </p>
+                        <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
+                        <p className="mt-2 text-sm text-zinc-500">Objectif : {money(item.goal || 0)}</p>
                       </div>
                     ))}
                   </div>
