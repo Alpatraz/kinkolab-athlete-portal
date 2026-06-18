@@ -32,6 +32,7 @@ import {
   contributionTotal,
   subscribeContributionsByFamily,
 } from "../services/fundTransactions";
+import { uploadAthleteMedia } from "../services/mediaUpload";
 
 function sumRaised(participation) {
   return (
@@ -277,6 +278,7 @@ function ContributionCard({ contribution }) {
     </div>
   );
 }
+
 export default function AthleteDashboard({
   currentUser,
   campaigns = [],
@@ -295,6 +297,7 @@ export default function AthleteDashboard({
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [form, setForm] = useState({
     bio: "",
@@ -500,6 +503,44 @@ export default function AthleteDashboard({
 
   const totalContributions = contributionTotal(contributions);
 
+  async function handleAthletePhotoUpload(event) {
+    const file = event.target.files?.[0];
+
+    if (!file || !selectedAthlete?.id) return;
+
+    try {
+      setUploadingPhoto(true);
+
+      const photoUrl = await uploadAthleteMedia(
+        file,
+        selectedAthlete.id,
+        "profile"
+      );
+
+      setForm((current) => ({
+        ...current,
+        photoUrl,
+      }));
+
+      await updateDoc(doc(db, "athletes", selectedAthlete.id), {
+        photoUrl,
+        updatedAt: serverTimestamp(),
+      });
+
+      setSaved(true);
+
+      setTimeout(() => {
+        setSaved(false);
+      }, 2500);
+    } catch (error) {
+      console.error("Erreur upload photo:", error);
+      alert("Impossible de téléverser la photo.");
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = "";
+    }
+  }
+
   async function saveAthleteProfile() {
     if (!selectedAthlete?.id) return;
 
@@ -601,7 +642,8 @@ export default function AthleteDashboard({
       alert("Impossible de créer l'événement.");
     }
   }
-    return (
+
+  return (
     <main className="min-h-screen bg-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
         <button
@@ -870,14 +912,58 @@ export default function AthleteDashboard({
 
                   {selectedAthlete && (
                     <div className="mt-5 grid gap-4">
-                      <input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} placeholder="URL de la photo" className="rounded-2xl border border-zinc-200 p-3" />
+                      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm font-black text-zinc-700">
+                          Photo de profil
+                        </p>
+
+                        <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-center">
+                          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl bg-zinc-200 text-4xl">
+                            {form.photoUrl ? (
+                              <img
+                                src={form.photoUrl}
+                                alt={selectedAthlete.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              selectedAthlete.avatar || "🥋"
+                            )}
+                          </div>
+
+                          <div className="flex-1">
+                            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-black px-5 py-3 font-black text-white">
+                              <ImageIcon size={18} />
+                              {uploadingPhoto ? "Téléversement..." : "Téléverser une photo"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleAthletePhotoUpload}
+                                disabled={uploadingPhoto}
+                                className="hidden"
+                              />
+                            </label>
+
+                            <p className="mt-2 text-xs text-zinc-500">
+                              La photo sera reliée automatiquement au profil public.
+                            </p>
+                          </div>
+                        </div>
+
+                        <input
+                          value={form.photoUrl}
+                          onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+                          placeholder="URL de la photo"
+                          className="mt-4 w-full rounded-2xl border border-zinc-200 bg-white p-3 text-sm"
+                        />
+                      </div>
+
                       <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Biographie / histoire de l’athlète" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
                       <input value={form.dojo} onChange={(e) => setForm({ ...form, dojo: e.target.value })} placeholder="Dojo" className="rounded-2xl border border-zinc-200 p-3" />
                       <input value={form.discipline} onChange={(e) => setForm({ ...form, discipline: e.target.value })} placeholder="Discipline" className="rounded-2xl border border-zinc-200 p-3" />
                       <input value={form.belt} onChange={(e) => setForm({ ...form, belt: e.target.value })} placeholder="Ceinture / niveau" className="rounded-2xl border border-zinc-200 p-3" />
                       <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
 
-                      <button onClick={saveAthleteProfile} disabled={saving} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
+                      <button onClick={saveAthleteProfile} disabled={saving || uploadingPhoto} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
                         <Save size={18} />
                         {saving ? "Sauvegarde..." : "Sauvegarder"}
                       </button>
