@@ -49,7 +49,13 @@ function AthleteRoute({
   );
 }
 
-function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
+function CampaignRoute({
+  campaigns,
+  athletes,
+  participations,
+  onOpenAthlete,
+  openSignup,
+}) {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const campaign = campaigns.find((item) => item.id === campaignId);
@@ -62,6 +68,7 @@ function CampaignRoute({ campaigns, athletes, onOpenAthlete, openSignup }) {
     <CampaignDetailPage
       campaign={campaign}
       athletes={athletes}
+      participations={participations || []}
       goBack={() => navigate(-1)}
       onOpenAthlete={onOpenAthlete}
       openSignup={openSignup}
@@ -294,6 +301,7 @@ export default function App() {
             <CampaignsPage
               campaigns={publicCampaigns}
               athletes={publicAthletes}
+              participations={participations}
               onOpenCampaign={openCampaign}
               openSignup={openSignup}
             />
@@ -306,6 +314,7 @@ export default function App() {
             <CampaignRoute
               campaigns={campaigns}
               athletes={publicAthletes}
+              participations={participations}
               onOpenAthlete={openAthlete}
               openSignup={openSignup}
             />
