@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import {
+  addDoc,
   arrayRemove,
   arrayUnion,
   collection,
@@ -116,6 +117,8 @@ const emptyCampaign = {
   goal: "",
   shopifyUrl: "",
   sponsorUrl: "",
+  collectionHandle: "",
+  collectionUrl: "",
   description: "",
 };
 
@@ -134,6 +137,7 @@ export default function AdminView({
   const [firestoreCampaigns, setFirestoreCampaigns] = useState([]);
   const [participations, setParticipations] = useState([]);
   const [contributions, setContributions] = useState([]);
+  const [payouts, setPayouts] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -154,6 +158,13 @@ export default function AdminView({
     campaignId: "",
     fundingMode: "individual",
     goal: "",
+  });
+
+  const [newPayout, setNewPayout] = useState({
+    targetKey: "",
+    amount: "",
+    method: "virement",
+    note: "",
   });
 
   useEffect(() => {
@@ -213,12 +224,25 @@ export default function AdminView({
       }
     );
 
+    const unsubPayouts = onSnapshot(
+      query(collection(db, "payouts"), orderBy("createdAt", "desc")),
+      (snapshot) => {
+        setPayouts(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }))
+        );
+      }
+    );
+
     return () => {
       unsubApps();
       unsubFamilies();
       unsubCampaigns();
       unsubParticipations();
       unsubContributions();
+      unsubPayouts();
     };
   }, []);
 
@@ -335,27 +359,36 @@ export default function AdminView({
     return contribution.displayDate || contribution.orderCreatedAt || "—";
   }
 
+  function payoutAmount(payout) {
+    return Number(payout.amount || 0);
+  }
+
+  function payoutDate(payout) {
+    if (payout.createdAt?.toDate) {
+      return payout.createdAt.toDate().toLocaleDateString("fr-CA");
+    }
+
+    return payout.date || "—";
+  }
+
   const financialSummary = useMemo(() => {
     const reserved = contributions.reduce(
       (sum, contribution) => sum + contributionAmount(contribution),
       0
     );
 
-    const paid = contributions
-      .filter((contribution) =>
-        ["paid_out", "paid", "versé", "versee", "versée"].includes(
-          contribution.status
-        )
-      )
-      .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+    const paid = payouts
+      .filter((payout) => (payout.status || "paid") === "paid")
+      .reduce((sum, payout) => sum + payoutAmount(payout), 0);
 
     return {
       reserved,
       paid,
       balance: Math.max(reserved - paid, 0),
       count: contributions.length,
+      payoutCount: payouts.length,
     };
-  }, [contributions]);
+  }, [contributions, payouts]);
 
   const financeRows = useMemo(() => {
     const rows = new Map();
@@ -379,7 +412,12 @@ export default function AdminView({
                 contribution.athleteId ||
                 "Athlète",
           type: contribution.fundingMode === "family" ? "Famille" : "Athlète",
-          campaignTitle: contribution.campaignTitle ||
+          athleteId: contribution.athleteId || null,
+          familyId: contribution.familyId || null,
+          fundingGroupId: contribution.fundingGroupId || null,
+          campaignId: contribution.campaignId || "",
+          campaignTitle:
+            contribution.campaignTitle ||
             participationCampaignName(contribution.campaignId),
           reserved: 0,
           paid: 0,
@@ -388,17 +426,33 @@ export default function AdminView({
       }
 
       const row = rows.get(key);
-      const amount = contributionAmount(contribution);
-
-      row.reserved += amount;
+      row.reserved += contributionAmount(contribution);
       row.count += 1;
+    });
 
-      if (
-        ["paid_out", "paid", "versé", "versee", "versée"].includes(
-          contribution.status
-        )
-      ) {
-        row.paid += amount;
+    payouts.forEach((payout) => {
+      const targetKey = payout.targetKey;
+      if (!targetKey) return;
+
+      if (!rows.has(targetKey)) {
+        rows.set(targetKey, {
+          id: targetKey,
+          label: payout.beneficiaryLabel || "Bénéficiaire",
+          type: payout.beneficiaryType || "—",
+          athleteId: payout.athleteId || null,
+          familyId: payout.familyId || null,
+          fundingGroupId: payout.fundingGroupId || null,
+          campaignId: payout.campaignId || "",
+          campaignTitle:
+            payout.campaignTitle || participationCampaignName(payout.campaignId),
+          reserved: 0,
+          paid: 0,
+          count: 0,
+        });
+      }
+
+      if ((payout.status || "paid") === "paid") {
+        rows.get(targetKey).paid += payoutAmount(payout);
       }
     });
 
@@ -406,7 +460,7 @@ export default function AdminView({
       ...row,
       balance: Math.max(row.reserved - row.paid, 0),
     }));
-  }, [contributions, allCampaigns]);
+  }, [contributions, payouts, allCampaigns]);
 
   const tabs = [
     ["candidatures", "Candidatures"],
@@ -523,6 +577,8 @@ export default function AdminView({
       goal: campaign.goal || "",
       shopifyUrl: campaign.shopifyUrl || "",
       sponsorUrl: campaign.sponsorUrl || "",
+      collectionHandle: campaign.collectionHandle || "",
+      collectionUrl: campaign.collectionUrl || "",
       description: campaign.description || "",
     });
   }
@@ -640,6 +696,59 @@ export default function AdminView({
     } catch {
       alert("Impossible de supprimer cette participation.");
     }
+  }
+
+  async function createPayout() {
+    const row = financeRows.find((item) => item.id === newPayout.targetKey);
+    const amount = Number(newPayout.amount || 0);
+
+    if (!row) {
+      alert("Choisis un bénéficiaire.");
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      alert("Le montant du versement doit être supérieur à 0.");
+      return;
+    }
+
+    if (amount > row.balance) {
+      const confirmed = window.confirm(
+        `Le versement (${money(amount)}) dépasse le solde disponible (${money(row.balance)}). Continuer ?`
+      );
+
+      if (!confirmed) return;
+    }
+
+    await addDoc(collection(db, "payouts"), {
+      targetKey: row.id,
+      beneficiaryLabel: row.label,
+      beneficiaryType: row.type,
+
+      athleteId: row.athleteId || null,
+      familyId: row.familyId || null,
+      fundingGroupId: row.fundingGroupId || null,
+
+      campaignId: row.campaignId || "",
+      campaignTitle: row.campaignTitle || "",
+
+      amount,
+      method: newPayout.method || "virement",
+      note: newPayout.note || "",
+      status: "paid",
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    setNewPayout({
+      targetKey: "",
+      amount: "",
+      method: "virement",
+      note: "",
+    });
+
+    alert("Versement enregistré.");
   }
 
   function approveMessage(id) {
@@ -1231,6 +1340,28 @@ export default function AdminView({
                   className="rounded-2xl border border-zinc-200 p-3"
                 />
                 <input
+                  value={newCampaign.collectionHandle}
+                  onChange={(event) =>
+                    setNewCampaign({
+                      ...newCampaign,
+                      collectionHandle: event.target.value,
+                    })
+                  }
+                  placeholder="Handle collection Shopify, ex. championnats-du-monde-2026"
+                  className="rounded-2xl border border-zinc-200 p-3"
+                />
+                <input
+                  value={newCampaign.collectionUrl}
+                  onChange={(event) =>
+                    setNewCampaign({
+                      ...newCampaign,
+                      collectionUrl: event.target.value,
+                    })
+                  }
+                  placeholder="URL collection Shopify complète"
+                  className="rounded-2xl border border-zinc-200 p-3"
+                />
+                <input
                   value={newCampaign.sponsorUrl}
                   onChange={(event) =>
                     setNewCampaign({
@@ -1370,6 +1501,28 @@ export default function AdminView({
                           className="rounded-2xl border border-zinc-200 p-3"
                         />
                         <input
+                          value={editingCampaign.collectionHandle}
+                          onChange={(event) =>
+                            setEditingCampaign({
+                              ...editingCampaign,
+                              collectionHandle: event.target.value,
+                            })
+                          }
+                          placeholder="Handle collection Shopify"
+                          className="rounded-2xl border border-zinc-200 p-3"
+                        />
+                        <input
+                          value={editingCampaign.collectionUrl}
+                          onChange={(event) =>
+                            setEditingCampaign({
+                              ...editingCampaign,
+                              collectionUrl: event.target.value,
+                            })
+                          }
+                          placeholder="URL collection Shopify"
+                          className="rounded-2xl border border-zinc-200 p-3"
+                        />
+                        <input
                           value={editingCampaign.sponsorUrl}
                           onChange={(event) =>
                             setEditingCampaign({
@@ -1417,6 +1570,15 @@ export default function AdminView({
                           {campaign.endDate || "—"} · Événement :{" "}
                           {campaign.eventDate || "—"}
                         </p>
+                        {(campaign.collectionHandle || campaign.collectionUrl) && (
+                          <p className="mt-1 text-sm text-zinc-600">
+                            Collection Shopify :{" "}
+                            <b>
+                              {campaign.collectionHandle ||
+                                campaign.collectionUrl}
+                            </b>
+                          </p>
+                        )}
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <StatusPill status={campaign.status || "active"} />
@@ -1663,9 +1825,8 @@ export default function AdminView({
               </div>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Suivi des montants réservés automatiquement depuis Shopify. Le
-                solde correspond au montant à verser aux athlètes ou familles,
-                moins les contributions déjà marquées comme versées.
+                Suivi des montants réservés automatiquement depuis Shopify et
+                des versements réellement effectués aux athlètes ou familles.
               </p>
 
               <div className="mt-5 grid gap-4 md:grid-cols-4">
@@ -1681,7 +1842,7 @@ export default function AdminView({
                   icon={CheckCircle2}
                   label="Versé"
                   value={money(financialSummary.paid)}
-                  sub="Statut versé"
+                  sub="Versements enregistrés"
                 />
                 <StatCard
                   light
@@ -1697,6 +1858,90 @@ export default function AdminView({
                   value={financialSummary.count}
                   sub="Contributions"
                 />
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 style={{ color: gold }} />
+                <h2 className="text-2xl font-black text-zinc-950">
+                  Enregistrer un versement
+                </h2>
+              </div>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Utilise ce formulaire lorsqu’un montant est réellement versé à
+                un athlète ou à une famille. Le solde à verser sera mis à jour
+                automatiquement.
+              </p>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.7fr]">
+                <select
+                  value={newPayout.targetKey}
+                  onChange={(event) =>
+                    setNewPayout({
+                      ...newPayout,
+                      targetKey: event.target.value,
+                    })
+                  }
+                  className="rounded-2xl border border-zinc-200 p-3"
+                >
+                  <option value="">Choisir un bénéficiaire</option>
+                  {financeRows.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.label} — {row.campaignTitle || "Campagne"} — solde{" "}
+                      {money(row.balance)}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  value={newPayout.amount}
+                  onChange={(event) =>
+                    setNewPayout({
+                      ...newPayout,
+                      amount: event.target.value,
+                    })
+                  }
+                  placeholder="Montant versé"
+                  className="rounded-2xl border border-zinc-200 p-3"
+                />
+
+                <select
+                  value={newPayout.method}
+                  onChange={(event) =>
+                    setNewPayout({
+                      ...newPayout,
+                      method: event.target.value,
+                    })
+                  }
+                  className="rounded-2xl border border-zinc-200 p-3"
+                >
+                  <option value="virement">Virement</option>
+                  <option value="interac">Interac</option>
+                  <option value="cheque">Chèque</option>
+                  <option value="cash">Comptant</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  value={newPayout.note}
+                  onChange={(event) =>
+                    setNewPayout({
+                      ...newPayout,
+                      note: event.target.value,
+                    })
+                  }
+                  placeholder="Note interne, référence de paiement, période, etc."
+                  className="rounded-2xl border border-zinc-200 p-3"
+                />
+
+                <AdminButton variant="green" onClick={createPayout}>
+                  <Save size={16} /> Enregistrer le versement
+                </AdminButton>
               </div>
             </div>
 
@@ -1736,6 +1981,53 @@ export default function AdminView({
                     <span className="font-black" style={{ color: gold }}>
                       {money(row.balance)}
                     </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-zinc-950">
+                Historique des versements
+              </h2>
+
+              <div className="mt-5 space-y-3">
+                {payouts.length === 0 && (
+                  <p className="text-zinc-500">
+                    Aucun versement enregistré pour le moment.
+                  </p>
+                )}
+
+                {payouts.map((payout) => (
+                  <div
+                    key={payout.id}
+                    className="rounded-2xl border border-zinc-200 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-black uppercase text-zinc-400">
+                          {payoutDate(payout)} · {payout.method || "Méthode non précisée"}
+                        </p>
+                        <h3 className="mt-1 text-lg font-black text-zinc-950">
+                          {payout.beneficiaryLabel || "Bénéficiaire"}
+                        </h3>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          Campagne : {payout.campaignTitle || payout.campaignId || "—"}
+                        </p>
+                        {payout.note && (
+                          <p className="mt-1 text-sm text-zinc-500">
+                            Note : {payout.note}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-zinc-950">
+                          {money(payoutAmount(payout))}
+                        </p>
+                        <StatusPill status="versé" />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
