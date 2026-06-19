@@ -17,6 +17,8 @@ import AthleteDashboard from "./pages/AthleteDashboard";
 import { auth, db } from "./firebase";
 import { campaignsSeed } from "./data/demoData";
 
+import EligibilityCriteriaPage from "./pages/EligibilityCriteriaPage";
+
 function AthleteRoute({
   athletes,
   campaigns,
@@ -332,6 +334,16 @@ export default function App() {
           }
         />
 
+<Route
+  path="/signup"
+  element={
+    <SignupView
+      goBack={goHome}
+      openEligibility={() => navigate("/criteres-admissibilite")}
+    />
+  }
+/>
+        
         <Route path="/signup" element={<SignupView goBack={goHome} />} />
 
         <Route
@@ -377,6 +389,16 @@ export default function App() {
           }
         />
 
+<Route
+  path="/criteres-admissibilite"
+  element={
+    <EligibilityCriteriaPage
+      goBack={goHome}
+      openSignup={openSignup}
+    />
+  }
+/>
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
