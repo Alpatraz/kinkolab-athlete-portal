@@ -11,15 +11,19 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+} from "firebase/firestore";
 import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
-import { useNavigate } from "react-router-dom";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-athlete-application-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
-const navigate = useNavigate();
 
 const PROVINCES = [
   "Alberta",
@@ -58,13 +62,23 @@ const ATHLETE_STATUSES = [
 
 function SectionTitle({ children }) {
   return (
-    <h2 className="mb-8 text-2xl font-medium uppercase tracking-wide" style={{ color: gold }}>
+    <h2
+      className="mb-8 text-2xl font-medium uppercase tracking-wide"
+      style={{ color: gold }}
+    >
       {children}
     </h2>
   );
 }
 
-function FormInput({ label, value, onChange, type = "text", required = true, placeholder = "" }) {
+function FormInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = true,
+  placeholder = "",
+}) {
   return (
     <label className="block">
       <span className="mb-3 block text-sm font-black text-white">
@@ -82,7 +96,13 @@ function FormInput({ label, value, onChange, type = "text", required = true, pla
   );
 }
 
-function FormTextarea({ label, value, onChange, required = true, placeholder = "" }) {
+function FormTextarea({
+  label,
+  value,
+  onChange,
+  required = true,
+  placeholder = "",
+}) {
   return (
     <label className="block">
       <span className="mb-3 block text-sm font-black text-white">
@@ -114,6 +134,7 @@ function FormSelect({ label, value, onChange, options, required = true }) {
         {options.map((option) => {
           const valueToUse = typeof option === "string" ? option : option.value;
           const labelToUse = typeof option === "string" ? option : option.label;
+
           return (
             <option key={valueToUse} value={valueToUse}>
               {labelToUse}
@@ -152,7 +173,7 @@ function HeroIcon({ icon: Icon, title, text }) {
   );
 }
 
-export default function SignupView({ goBack }) {
+export default function SignupView({ goBack, openEligibility }) {
   const [type, setType] = useState("individuel");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -235,6 +256,15 @@ export default function SignupView({ goBack }) {
   const selectedCampaignTitle = campaignTitle(campaignsSeed, form.campaignId);
   const heroImageUrl = pageSettings.heroImageUrl || DEFAULT_HERO_IMAGE_URL;
 
+  function handleOpenEligibility() {
+    if (typeof openEligibility === "function") {
+      openEligibility();
+      return;
+    }
+
+    console.warn("openEligibility n'a pas été fourni à SignupView.");
+  }
+
   async function submitApplication(event) {
     event.preventDefault();
     setSubmitting(true);
@@ -279,11 +309,13 @@ export default function SignupView({ goBack }) {
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl leading-7 text-zinc-300">
-            Votre candidature va être examinée par l’équipe KinkoLab. Vous recevrez une réponse par courriel après validation.
+            Votre candidature va être examinée par l’équipe KinkoLab. Vous
+            recevrez une réponse par courriel après validation.
           </p>
 
           <p className="mx-auto mt-3 max-w-2xl leading-7 text-zinc-400">
-            Si votre candidature est acceptée, vos identifiants de connexion vous seront transmis afin d’accéder à votre espace athlète privé.
+            Si votre candidature est acceptée, vos identifiants de connexion vous
+            seront transmis afin d’accéder à votre espace athlète privé.
           </p>
 
           <button
@@ -317,7 +349,10 @@ export default function SignupView({ goBack }) {
             Retour
           </button>
 
-          <p className="text-2xl font-black uppercase tracking-wide" style={{ color: gold }}>
+          <p
+            className="text-2xl font-black uppercase tracking-wide"
+            style={{ color: gold }}
+          >
             Programme Athlètes
           </p>
 
@@ -329,7 +364,8 @@ export default function SignupView({ goBack }) {
           </h1>
 
           <p className="mt-6 max-w-2xl text-xl leading-8 text-zinc-100">
-            Rejoignez une campagne de financement KinkoLab Supporters et représentez le Canada sur la scène internationale.
+            Rejoignez une campagne de financement KinkoLab Supporters et
+            représentez le Canada sur la scène internationale.
           </p>
 
           <div className="mt-9 grid max-w-5xl gap-5 md:grid-cols-4">
@@ -342,13 +378,16 @@ export default function SignupView({ goBack }) {
           <div className="mt-9 grid max-w-7xl gap-4 border border-yellow-700/70 bg-black/70 p-4 md:grid-cols-[1fr_1fr_auto] md:items-center">
             <div className="flex items-center gap-4">
               <CalendarDays size={44} style={{ color: gold }} />
-              <p className="text-2xl font-black uppercase">Postulez dès maintenant</p>
+              <p className="text-2xl font-black uppercase">
+                Postulez dès maintenant
+              </p>
             </div>
 
             <div className="flex items-center gap-4">
               <Check size={44} style={{ color: gold }} />
               <p className="text-xl font-black uppercase">
-                Évaluation des candidatures <span style={{ color: gold }}>selon les critères du programme</span>
+                Évaluation des candidatures{" "}
+                <span style={{ color: gold }}>selon les critères du programme</span>
               </p>
             </div>
 
@@ -377,12 +416,34 @@ export default function SignupView({ goBack }) {
             </h2>
 
             <p className="mt-6 max-w-4xl leading-8 text-zinc-200">
-              Présentez votre candidature afin de rejoindre une campagne de financement KinkoLab Supporters. Les candidatures sont analysées selon les critères du programme, les ressources disponibles, les places disponibles et les objectifs du programme.
+              Présentez votre candidature afin de rejoindre une campagne de
+              financement KinkoLab Supporters. Les candidatures sont analysées
+              selon les critères du programme, les ressources disponibles, les
+              places disponibles et les objectifs du programme.
             </p>
 
             <div className="mt-8 border-l-4 border-yellow-600 bg-zinc-950 p-6 text-sm leading-7 text-zinc-300">
-              <strong style={{ color: gold }}>Important :</strong>{" "}
-              Le dépôt d’une demande ne garantit pas automatiquement l’acceptation au programme ni l’obtention d’un soutien financier. Les montants attribués peuvent varier selon les ventes réalisées, les critères d’évaluation et les modalités du programme.
+              <strong style={{ color: gold }}>Important :</strong> Le dépôt
+              d’une demande ne garantit pas automatiquement l’acceptation au
+              programme ni l’obtention d’un soutien financier. Les montants
+              attribués peuvent varier selon les ventes réalisées, les critères
+              d’évaluation et les modalités du programme.
+            </div>
+
+            <div className="mt-6 border border-yellow-700/40 bg-black p-5 text-sm leading-7 text-zinc-300">
+              <p>
+                Avant de soumettre votre demande, vous pouvez consulter les
+                critères d’admissibilité et les conditions générales du programme.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleOpenEligibility}
+                className="mt-3 font-black uppercase tracking-[0.12em] hover:underline"
+                style={{ color: gold }}
+              >
+                Consulter les critères d’admissibilité →
+              </button>
             </div>
           </div>
 
@@ -427,16 +488,60 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Informations athlète</SectionTitle>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <FormInput label="Prénom" value={form.firstName} onChange={(value) => update("firstName", value)} />
-                <FormInput label="Nom" value={form.lastName} onChange={(value) => update("lastName", value)} />
-                <FormInput label="Date de naissance" type="date" value={form.birthDate} onChange={(value) => update("birthDate", value)} />
-                <FormInput label="Courriel" type="email" value={form.email} onChange={(value) => update("email", value)} />
-                <FormInput label="Téléphone" value={form.phone} onChange={(value) => update("phone", value)} />
-                <FormInput label="Ville" value={form.city} onChange={(value) => update("city", value)} />
-                <FormSelect label="Province" value={form.province} onChange={(value) => update("province", value)} options={PROVINCES} />
-                <FormInput label="Nom du parent / responsable" value={form.parentName} onChange={(value) => update("parentName", value)} />
-                <FormInput label="Courriel du parent" type="email" value={form.parentEmail} onChange={(value) => update("parentEmail", value)} />
-                <FormInput label="Téléphone du parent" value={form.parentPhone} onChange={(value) => update("parentPhone", value)} />
+                <FormInput
+                  label="Prénom"
+                  value={form.firstName}
+                  onChange={(value) => update("firstName", value)}
+                />
+                <FormInput
+                  label="Nom"
+                  value={form.lastName}
+                  onChange={(value) => update("lastName", value)}
+                />
+                <FormInput
+                  label="Date de naissance"
+                  type="date"
+                  value={form.birthDate}
+                  onChange={(value) => update("birthDate", value)}
+                />
+                <FormInput
+                  label="Courriel"
+                  type="email"
+                  value={form.email}
+                  onChange={(value) => update("email", value)}
+                />
+                <FormInput
+                  label="Téléphone"
+                  value={form.phone}
+                  onChange={(value) => update("phone", value)}
+                />
+                <FormInput
+                  label="Ville"
+                  value={form.city}
+                  onChange={(value) => update("city", value)}
+                />
+                <FormSelect
+                  label="Province"
+                  value={form.province}
+                  onChange={(value) => update("province", value)}
+                  options={PROVINCES}
+                />
+                <FormInput
+                  label="Nom du parent / responsable"
+                  value={form.parentName}
+                  onChange={(value) => update("parentName", value)}
+                />
+                <FormInput
+                  label="Courriel du parent"
+                  type="email"
+                  value={form.parentEmail}
+                  onChange={(value) => update("parentEmail", value)}
+                />
+                <FormInput
+                  label="Téléphone du parent"
+                  value={form.parentPhone}
+                  onChange={(value) => update("parentPhone", value)}
+                />
               </div>
             </section>
 
@@ -444,12 +549,42 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Informations sportives</SectionTitle>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <FormSelect label="Discipline" value={form.discipline} onChange={(value) => update("discipline", value)} options={DISCIPLINES} />
-                <FormInput label="Club / Dojo" value={form.dojo} onChange={(value) => update("dojo", value)} />
-                <FormInput label="Coach" value={form.coach} onChange={(value) => update("coach", value)} />
-                <FormInput label="Ceinture / niveau" value={form.belt} onChange={(value) => update("belt", value)} />
-                <FormSelect label="Programme demandé" value={form.campaignId} onChange={(value) => update("campaignId", value)} options={campaignsSeed.map((campaign) => ({ value: campaign.id, label: campaign.title }))} />
-                <FormSelect label="Statut" value={form.athleteStatus} onChange={(value) => update("athleteStatus", value)} options={ATHLETE_STATUSES} />
+                <FormSelect
+                  label="Discipline"
+                  value={form.discipline}
+                  onChange={(value) => update("discipline", value)}
+                  options={DISCIPLINES}
+                />
+                <FormInput
+                  label="Club / Dojo"
+                  value={form.dojo}
+                  onChange={(value) => update("dojo", value)}
+                />
+                <FormInput
+                  label="Coach"
+                  value={form.coach}
+                  onChange={(value) => update("coach", value)}
+                />
+                <FormInput
+                  label="Ceinture / niveau"
+                  value={form.belt}
+                  onChange={(value) => update("belt", value)}
+                />
+                <FormSelect
+                  label="Programme demandé"
+                  value={form.campaignId}
+                  onChange={(value) => update("campaignId", value)}
+                  options={campaignsSeed.map((campaign) => ({
+                    value: campaign.id,
+                    label: campaign.title,
+                  }))}
+                />
+                <FormSelect
+                  label="Statut"
+                  value={form.athleteStatus}
+                  onChange={(value) => update("athleteStatus", value)}
+                  options={ATHLETE_STATUSES}
+                />
               </div>
             </section>
 
@@ -457,10 +592,31 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Présentation</SectionTitle>
 
               <div className="grid gap-5">
-                <FormTextarea label="Présentez-vous" value={form.motivation} onChange={(value) => update("motivation", value)} placeholder="Parlez de votre parcours, de votre discipline et de ce qui vous motive." />
-                <FormTextarea label="Pourquoi souhaitez-vous rejoindre le programme ?" value={form.campaignReason} onChange={(value) => update("campaignReason", value)} placeholder="Expliquez pourquoi cette campagne est importante pour vous." />
-                <FormTextarea label="Objectifs sportifs" value={form.sportGoals} onChange={(value) => update("sportGoals", value)} placeholder="Vos objectifs pour la saison ou la compétition visée." />
-                <FormTextarea label="Compétitions visées" value={form.targetedCompetitions} onChange={(value) => update("targetedCompetitions", value)} required={false} placeholder="Ex. WKC Spain 2026, WAKO Italie 2026, championnats provinciaux..." />
+                <FormTextarea
+                  label="Présentez-vous"
+                  value={form.motivation}
+                  onChange={(value) => update("motivation", value)}
+                  placeholder="Parlez de votre parcours, de votre discipline et de ce qui vous motive."
+                />
+                <FormTextarea
+                  label="Pourquoi souhaitez-vous rejoindre le programme ?"
+                  value={form.campaignReason}
+                  onChange={(value) => update("campaignReason", value)}
+                  placeholder="Expliquez pourquoi cette campagne est importante pour vous."
+                />
+                <FormTextarea
+                  label="Objectifs sportifs"
+                  value={form.sportGoals}
+                  onChange={(value) => update("sportGoals", value)}
+                  placeholder="Vos objectifs pour la saison ou la compétition visée."
+                />
+                <FormTextarea
+                  label="Compétitions visées"
+                  value={form.targetedCompetitions}
+                  onChange={(value) => update("targetedCompetitions", value)}
+                  required={false}
+                  placeholder="Ex. WKC Spain 2026, WAKO Italie 2026, championnats provinciaux..."
+                />
               </div>
             </section>
 
@@ -468,14 +624,40 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Soutien à votre campagne</SectionTitle>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <FormInput label="Objectif financier souhaité" type="number" value={form.desiredGoal} onChange={(value) => update("desiredGoal", value)} />
-                <FormInput label="Nom affiché publiquement" value={form.publicDisplayName} onChange={(value) => update("publicDisplayName", value)} placeholder="Ex. Famille Saint-Étienne ou Anna Saint-Étienne" />
-                <FormInput label="Nom de famille / groupe familial" value={form.familyName} onChange={(value) => update("familyName", value)} />
-                <FormInput label="Lien photo ou vidéo de présentation" type="url" value={form.photo} onChange={(value) => update("photo", value)} required={false} />
+                <FormInput
+                  label="Objectif financier souhaité"
+                  type="number"
+                  value={form.desiredGoal}
+                  onChange={(value) => update("desiredGoal", value)}
+                />
+                <FormInput
+                  label="Nom affiché publiquement"
+                  value={form.publicDisplayName}
+                  onChange={(value) => update("publicDisplayName", value)}
+                  placeholder="Ex. Famille Saint-Étienne ou Anna Saint-Étienne"
+                />
+                <FormInput
+                  label="Nom de famille / groupe familial"
+                  value={form.familyName}
+                  onChange={(value) => update("familyName", value)}
+                />
+                <FormInput
+                  label="Lien photo ou vidéo de présentation"
+                  type="url"
+                  value={form.photo}
+                  onChange={(value) => update("photo", value)}
+                  required={false}
+                />
               </div>
 
               <div className="mt-6 border-l-4 border-yellow-600 bg-black p-5 text-sm leading-7 text-zinc-300">
-                Chaque hoodie supporter vendu via votre campagne attribue actuellement <strong className="text-white">{HOODIE_SUPPORT_AMOUNT} $ CAD</strong> à l’athlète ou à la famille sélectionné(e). Les produits ne sont pas personnalisés pour le moment.
+                Chaque hoodie supporter vendu via votre campagne attribue
+                actuellement{" "}
+                <strong className="text-white">
+                  {HOODIE_SUPPORT_AMOUNT} $ CAD
+                </strong>{" "}
+                à l’athlète ou à la famille sélectionné(e). Les produits ne sont
+                pas personnalisés pour le moment.
               </div>
             </section>
 
@@ -483,12 +665,42 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Réseaux sociaux</SectionTitle>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <FormInput label="Instagram" value={form.instagram} onChange={(value) => update("instagram", value)} required={false} />
-                <FormInput label="Facebook" value={form.facebook} onChange={(value) => update("facebook", value)} required={false} />
-                <FormInput label="TikTok" value={form.tiktok} onChange={(value) => update("tiktok", value)} required={false} />
-                <FormInput label="YouTube" value={form.youtube} onChange={(value) => update("youtube", value)} required={false} />
-                <FormInput label="Site web" value={form.website} onChange={(value) => update("website", value)} required={false} />
-                <FormInput label="Autres liens / réseaux sociaux" value={form.athleteSocials} onChange={(value) => update("athleteSocials", value)} required={false} />
+                <FormInput
+                  label="Instagram"
+                  value={form.instagram}
+                  onChange={(value) => update("instagram", value)}
+                  required={false}
+                />
+                <FormInput
+                  label="Facebook"
+                  value={form.facebook}
+                  onChange={(value) => update("facebook", value)}
+                  required={false}
+                />
+                <FormInput
+                  label="TikTok"
+                  value={form.tiktok}
+                  onChange={(value) => update("tiktok", value)}
+                  required={false}
+                />
+                <FormInput
+                  label="YouTube"
+                  value={form.youtube}
+                  onChange={(value) => update("youtube", value)}
+                  required={false}
+                />
+                <FormInput
+                  label="Site web"
+                  value={form.website}
+                  onChange={(value) => update("website", value)}
+                  required={false}
+                />
+                <FormInput
+                  label="Autres liens / réseaux sociaux"
+                  value={form.athleteSocials}
+                  onChange={(value) => update("athleteSocials", value)}
+                  required={false}
+                />
               </div>
             </section>
 
@@ -496,43 +708,66 @@ export default function SignupView({ goBack }) {
               <SectionTitle>Consentements obligatoires</SectionTitle>
 
               <div className="space-y-5">
-                <ConsentCheckbox checked={consents.rules} onChange={(value) => updateConsent("rules", value)}>
-                  J’ai lu et j’accepte les règles, critères, conditions et modalités du Programme Athlètes KinkoLab.
+                <ConsentCheckbox
+                  checked={consents.rules}
+                  onChange={(value) => updateConsent("rules", value)}
+                >
+                  J’ai lu et j’accepte les règles, critères, conditions et
+                  modalités du Programme Athlètes KinkoLab.
                 </ConsentCheckbox>
 
-                <ConsentCheckbox checked={consents.noGuarantee} onChange={(value) => updateConsent("noGuarantee", value)}>
-                  Je comprends qu’une demande ne garantit pas automatiquement une acceptation ni un financement.
+                <ConsentCheckbox
+                  checked={consents.noGuarantee}
+                  onChange={(value) => updateConsent("noGuarantee", value)}
+                >
+                  Je comprends qu’une demande ne garantit pas automatiquement une
+                  acceptation ni un financement.
                 </ConsentCheckbox>
 
-                <ConsentCheckbox checked={consents.imageUse} onChange={(value) => updateConsent("imageUse", value)}>
-                  J’autorise KinkoLab à utiliser certaines informations, images ou éléments de présentation liés au programme dans le cadre de ma campagne ou du Programme Athlètes.
+                <ConsentCheckbox
+                  checked={consents.imageUse}
+                  onChange={(value) => updateConsent("imageUse", value)}
+                >
+                  J’autorise KinkoLab à utiliser certaines informations, images
+                  ou éléments de présentation liés au programme dans le cadre de
+                  ma campagne ou du Programme Athlètes.
                 </ConsentCheckbox>
 
-                <ConsentCheckbox checked={consents.legalParent} onChange={(value) => updateConsent("legalParent", value)}>
-                  Si le participant est mineur, je confirme être le parent ou tuteur légal autorisé.
+                <ConsentCheckbox
+                  checked={consents.legalParent}
+                  onChange={(value) => updateConsent("legalParent", value)}
+                >
+                  Si le participant est mineur, je confirme être le parent ou
+                  tuteur légal autorisé.
                 </ConsentCheckbox>
 
-                <ConsentCheckbox checked={consents.revocation} onChange={(value) => updateConsent("revocation", value)}>
-                  Je comprends que KinkoLab peut suspendre, refuser ou révoquer une participation au programme selon ses règles et valeurs.
+                <ConsentCheckbox
+                  checked={consents.revocation}
+                  onChange={(value) => updateConsent("revocation", value)}
+                >
+                  Je comprends que KinkoLab peut suspendre, refuser ou révoquer
+                  une participation au programme selon ses règles et valeurs.
                 </ConsentCheckbox>
               </div>
             </section>
 
-<div className="mt-10 text-center">
-  <p className="text-zinc-400 text-sm">
-    En soumettant votre candidature, vous confirmez avoir pris connaissance des
-    critères d’admissibilité et des conditions du programme.
-  </p>
+            <div className="mt-10 text-center">
+              <p className="text-sm text-zinc-400">
+                En soumettant votre candidature, vous confirmez avoir pris
+                connaissance des critères d’admissibilité et des conditions du
+                programme.
+              </p>
 
-  <button
-    type="button"
-    onClick={() => navigate("/criteres-admissibilite")}
-    className="mt-3 text-sm font-semibold text-[#d1aa4a] hover:underline"
-  >
-    Consulter les critères d’admissibilité →
-  </button>
-</div>
-            
+              <button
+                type="button"
+                onClick={handleOpenEligibility}
+                className="mt-3 text-sm font-semibold hover:underline"
+                style={{ color: gold }}
+              >
+                Consulter les critères d’admissibilité →
+              </button>
+            </div>
+
             <button
               disabled={submitting}
               type="submit"
