@@ -15,9 +15,11 @@ import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/f
 import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-athlete-application-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
+const navigate = useNavigate();
 
 const PROVINCES = [
   "Alberta",
@@ -516,6 +518,21 @@ export default function SignupView({ goBack }) {
               </div>
             </section>
 
+<div className="mt-10 text-center">
+  <p className="text-zinc-400 text-sm">
+    En soumettant votre candidature, vous confirmez avoir pris connaissance des
+    critères d’admissibilité et des conditions du programme.
+  </p>
+
+  <button
+    type="button"
+    onClick={() => navigate("/criteres-admissibilite")}
+    className="mt-3 text-sm font-semibold text-[#d1aa4a] hover:underline"
+  >
+    Consulter les critères d’admissibilité →
+  </button>
+</div>
+            
             <button
               disabled={submitting}
               type="submit"
