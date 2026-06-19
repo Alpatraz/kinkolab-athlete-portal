@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  increment,
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -356,7 +357,21 @@ export default function AthleteDashboard({
     date: "",
     description: "",
     goal: "",
+    amountRaised: "",
+    participationId: "",
   });
+
+  const [newContribution, setNewContribution] = useState({
+    participationId: "",
+    athleteId: "",
+    amount: "",
+    source: "Contribution manuelle",
+    contributorName: "",
+    note: "",
+    date: new Date().toISOString().slice(0, 10),
+  });
+
+  const [savingContribution, setSavingContribution] = useState(false);
 
   useEffect(() => {
     if (!currentUser?.familyId) return;
@@ -460,6 +475,11 @@ export default function AthleteDashboard({
         participation.status !== "suspendu"
     );
   }, [participations, familyAthleteIds]);
+
+  const selectedAthleteParticipations = useMemo(() => {
+    if (!selectedAthlete?.id) return [];
+    return familyParticipations.filter((participation) => participation.athleteId === selectedAthlete.id);
+  }, [familyParticipations, selectedAthlete?.id]);
 
   const familyFundingGroups = useMemo(() => {
     const map = new Map();
@@ -654,25 +674,139 @@ export default function AthleteDashboard({
       return;
     }
 
+    const amountRaised = Number(newEvent.amountRaised || 0);
+    const linkedParticipation =
+      familyParticipations.find((item) => item.id === newEvent.participationId) ||
+      selectedAthleteParticipations[0] ||
+      null;
+
     try {
       await addDoc(collection(db, "fundraisingEvents"), {
         athleteId: selectedAthlete.id,
         athleteName: selectedAthlete.name,
         familyId: currentUser?.familyId || null,
+        campaignId: linkedParticipation?.campaignId || null,
+        campaignTitle:
+          linkedParticipation?.campaignTitle ||
+          campaignTitle(campaigns, linkedParticipation?.campaignId) ||
+          null,
+        participationId: linkedParticipation?.id || null,
         title: newEvent.title,
         date: newEvent.date,
         description: newEvent.description,
         goal: Number(newEvent.goal || 0),
-        raised: 0,
+        raised: amountRaised,
+        amountRaised,
         status: "en_attente",
         createdAt: serverTimestamp(),
       });
 
-      setNewEvent({ title: "", date: "", description: "", goal: "" });
+      if (amountRaised > 0 && linkedParticipation?.id) {
+        await updateDoc(doc(db, "campaignParticipations", linkedParticipation.id), {
+          raisedOffline: increment(amountRaised),
+          updatedAt: serverTimestamp(),
+        });
+
+        await addDoc(collection(db, "contributions"), {
+          familyId: currentUser?.familyId || null,
+          athleteId: selectedAthlete.id,
+          athleteName: selectedAthlete.name,
+          campaignId: linkedParticipation.campaignId || null,
+          campaignTitle:
+            linkedParticipation.campaignTitle ||
+            campaignTitle(campaigns, linkedParticipation.campaignId),
+          participationId: linkedParticipation.id,
+          source: "Événement",
+          productName: newEvent.title,
+          contributorName: "Événement de financement",
+          customerName: "Événement de financement",
+          amountReserved: amountRaised,
+          reservedAmount: amountRaised,
+          currency: "CAD",
+          note: newEvent.description || "Résultat financier d’un événement",
+          displayDate: newEvent.date || new Date().toISOString().slice(0, 10),
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setNewEvent({
+        title: "",
+        date: "",
+        description: "",
+        goal: "",
+        amountRaised: "",
+        participationId: "",
+      });
       alert("Événement soumis pour validation.");
     } catch (error) {
       console.error("Erreur ajout événement:", error);
       alert("Impossible de créer l'événement.");
+    }
+  }
+
+  async function createManualContribution() {
+    const amount = Number(newContribution.amount || 0);
+    if (!amount || amount <= 0) {
+      alert("Indique un montant valide.");
+      return;
+    }
+
+    const linkedParticipation = familyParticipations.find(
+      (item) => item.id === newContribution.participationId
+    );
+
+    if (!linkedParticipation) {
+      alert("Choisis une campagne ou une participation.");
+      return;
+    }
+
+    const athlete = athletes.find((item) => item.id === linkedParticipation.athleteId);
+
+    try {
+      setSavingContribution(true);
+
+      await addDoc(collection(db, "contributions"), {
+        familyId: currentUser?.familyId || null,
+        athleteId: linkedParticipation.athleteId,
+        athleteName: athlete?.name || linkedParticipation.athleteName || "Athlète",
+        campaignId: linkedParticipation.campaignId || null,
+        campaignTitle:
+          linkedParticipation.campaignTitle ||
+          campaignTitle(campaigns, linkedParticipation.campaignId),
+        participationId: linkedParticipation.id,
+        source: newContribution.source || "Contribution manuelle",
+        productName: newContribution.source || "Contribution manuelle",
+        contributorName: newContribution.contributorName || "Contribution manuelle",
+        customerName: newContribution.contributorName || "Contribution manuelle",
+        amountReserved: amount,
+        reservedAmount: amount,
+        currency: "CAD",
+        note: newContribution.note || "",
+        displayDate: newContribution.date || new Date().toISOString().slice(0, 10),
+        createdAt: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "campaignParticipations", linkedParticipation.id), {
+        raisedOffline: increment(amount),
+        updatedAt: serverTimestamp(),
+      });
+
+      setNewContribution({
+        participationId: "",
+        athleteId: "",
+        amount: "",
+        source: "Contribution manuelle",
+        contributorName: "",
+        note: "",
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+      alert("Contribution ajoutée.");
+    } catch (error) {
+      console.error("Erreur ajout contribution:", error);
+      alert("Impossible d’ajouter la contribution.");
+    } finally {
+      setSavingContribution(false);
     }
   }
 
@@ -860,12 +994,6 @@ export default function AthleteDashboard({
                             </p>
                           </div>
                         </div>
-                        <input
-                          value={form.photoUrl}
-                          onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
-                          placeholder="URL de la photo"
-                          className="mt-4 w-full rounded-2xl border border-zinc-200 bg-white p-3 text-sm"
-                        />
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
@@ -976,21 +1104,105 @@ export default function AthleteDashboard({
             )}
 
             {activeTab === "contributions" && (
-              <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-                <div className="flex items-center gap-3">
-                  <ReceiptText style={{ color: gold }} />
-                  <h2 className="text-2xl font-black text-zinc-950">Historique des contributions</h2>
+              <section className="mt-8 space-y-6">
+                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+                  <div className="flex items-center gap-3">
+                    <ReceiptText style={{ color: gold }} />
+                    <h2 className="text-2xl font-black text-zinc-950">Ajouter une contribution</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-500">
+                    Ajoutez ici les montants reçus hors Shopify : dons directs, Interac, argent remis au dojo, commandites locales ou ventes terrain. Le montant sera ajouté à la campagne choisie.
+                  </p>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    <select
+                      value={newContribution.participationId}
+                      onChange={(e) => setNewContribution({ ...newContribution, participationId: e.target.value })}
+                      className="rounded-2xl border border-zinc-200 p-3 md:col-span-2"
+                    >
+                      <option value="">Choisir la campagne / participation</option>
+                      {familyParticipations.map((participation) => {
+                        const athlete = athletes.find((item) => item.id === participation.athleteId);
+                        return (
+                          <option key={participation.id} value={participation.id}>
+                            {(athlete?.name || participation.athleteName || "Athlète")} — {participation.campaignTitle || campaignTitle(campaigns, participation.campaignId)}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newContribution.amount}
+                      onChange={(e) => setNewContribution({ ...newContribution, amount: e.target.value })}
+                      placeholder="Montant reçu"
+                      className="rounded-2xl border border-zinc-200 p-3"
+                    />
+
+                    <input
+                      type="date"
+                      value={newContribution.date}
+                      onChange={(e) => setNewContribution({ ...newContribution, date: e.target.value })}
+                      className="rounded-2xl border border-zinc-200 p-3"
+                    />
+
+                    <select
+                      value={newContribution.source}
+                      onChange={(e) => setNewContribution({ ...newContribution, source: e.target.value })}
+                      className="rounded-2xl border border-zinc-200 p-3"
+                    >
+                      <option>Contribution manuelle</option>
+                      <option>Don direct</option>
+                      <option>Interac</option>
+                      <option>Commandite locale</option>
+                      <option>Vente terrain</option>
+                      <option>Événement</option>
+                    </select>
+
+                    <input
+                      value={newContribution.contributorName}
+                      onChange={(e) => setNewContribution({ ...newContribution, contributorName: e.target.value })}
+                      placeholder="Nom du contributeur / source"
+                      className="rounded-2xl border border-zinc-200 p-3"
+                    />
+
+                    <textarea
+                      value={newContribution.note}
+                      onChange={(e) => setNewContribution({ ...newContribution, note: e.target.value })}
+                      placeholder="Note interne ou contexte"
+                      className="min-h-24 rounded-2xl border border-zinc-200 p-3 md:col-span-2"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={createManualContribution}
+                      disabled={savingContribution}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60 md:col-span-2"
+                    >
+                      <Plus size={18} />
+                      {savingContribution ? "Ajout..." : "Ajouter la contribution"}
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <StatBox icon={ReceiptText} label="Total réservé" value={money(totalContributions)} sub="Depuis Shopify" />
-                  <StatBox icon={Wallet} label="Transactions" value={contributions.length} sub="Contributions enregistrées" />
-                  <StatBox icon={Target} label="Moyenne" value={money(contributions.length ? totalContributions / contributions.length : 0)} sub="Par contribution" />
-                </div>
-                <div className="mt-6 space-y-4">
-                  {contributions.length === 0 && <p className="rounded-2xl bg-zinc-100 p-5 text-zinc-500">Aucune contribution enregistrée pour le moment.</p>}
-                  {contributions.map((contribution) => (
-                    <ContributionCard key={contribution.id} contribution={contribution} />
-                  ))}
+
+                <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+                  <div className="flex items-center gap-3">
+                    <ReceiptText style={{ color: gold }} />
+                    <h2 className="text-2xl font-black text-zinc-950">Historique des contributions</h2>
+                  </div>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <StatBox icon={ReceiptText} label="Total suivi" value={money(totalContributions)} sub="Shopify + contributions manuelles" />
+                    <StatBox icon={Wallet} label="Transactions" value={contributions.length} sub="Contributions enregistrées" />
+                    <StatBox icon={Target} label="Moyenne" value={money(contributions.length ? totalContributions / contributions.length : 0)} sub="Par contribution" />
+                  </div>
+                  <div className="mt-6 space-y-4">
+                    {contributions.length === 0 && <p className="rounded-2xl bg-zinc-100 p-5 text-zinc-500">Aucune contribution enregistrée pour le moment.</p>}
+                    {contributions.map((contribution) => (
+                      <ContributionCard key={contribution.id} contribution={contribution} />
+                    ))}
+                  </div>
                 </div>
               </section>
             )}
@@ -1049,10 +1261,23 @@ export default function AthleteDashboard({
                         <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
                       ))}
                     </select>
+                    <select
+                      value={newEvent.participationId}
+                      onChange={(e) => setNewEvent({ ...newEvent, participationId: e.target.value })}
+                      className="rounded-2xl border border-zinc-200 p-3"
+                    >
+                      <option value="">Campagne liée</option>
+                      {selectedAthleteParticipations.map((participation) => (
+                        <option key={participation.id} value={participation.id}>
+                          {participation.campaignTitle || campaignTitle(campaigns, participation.campaignId)}
+                        </option>
+                      ))}
+                    </select>
                     <input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Titre de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
                     <input type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                     <textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Description" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
                     <input type="number" value={newEvent.goal} onChange={(e) => setNewEvent({ ...newEvent, goal: e.target.value })} placeholder="Objectif de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
+                    <input type="number" value={newEvent.amountRaised} onChange={(e) => setNewEvent({ ...newEvent, amountRaised: e.target.value })} placeholder="Montant réellement récolté" className="rounded-2xl border border-zinc-200 p-3" />
                     <button type="button" onClick={createFundingEvent} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
                       <Plus size={18} />
                       Soumettre pour validation
@@ -1072,6 +1297,7 @@ export default function AthleteDashboard({
                         <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
                         <p className="mt-2 text-sm text-zinc-500">Date : {item.date || "À confirmer"}</p>
                         <p className="mt-1 text-sm text-zinc-500">Objectif : {money(item.goal || 0)}</p>
+                        <p className="mt-1 text-sm font-black text-emerald-700">Récolté : {money(item.raised || item.amountRaised || 0)}</p>
                       </div>
                     ))}
                   </div>
