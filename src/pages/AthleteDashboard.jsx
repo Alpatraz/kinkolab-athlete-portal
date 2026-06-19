@@ -58,14 +58,6 @@ const DISCIPLINES = [
   "Autre",
 ];
 
-const PROGRAMS = [
-  "WKC Spain 2026",
-  "WAKO Italie 2026",
-  "Saison compétitive 2026",
-  "Fonds Athlètes KinkoLab",
-  "Autre",
-];
-
 const ATHLETE_STATUSES = [
   "Athlète",
   "Parent / famille",
@@ -429,7 +421,7 @@ export default function AthleteDashboard({
       dojo: selectedAthlete.dojo || "",
       discipline: selectedAthlete.discipline || "",
       belt: selectedAthlete.belt || "",
-      programRequested: selectedAthlete.programRequested || "",
+      programRequested: selectedAthlete.campaignId || selectedAthlete.programRequested || "",
       athleteStatus: selectedAthlete.athleteStatus || "",
       bio: selectedAthlete.bio || selectedAthlete.presentation || "",
       photoUrl: selectedAthlete.photoUrl || "",
@@ -521,6 +513,26 @@ export default function AthleteDashboard({
   const familyPercent = percentOf(familyRaised, familyGoal);
   const totalContributions = contributionTotal(contributions);
 
+  const activeCampaignOptions = useMemo(() => {
+    return (campaigns || [])
+      .filter((campaign) => {
+        const status = String(campaign?.status || "").toLowerCase();
+        return (
+          campaign &&
+          status !== "suspendue" &&
+          status !== "suspendu" &&
+          status !== "archivée" &&
+          status !== "archivé" &&
+          status !== "archive"
+        );
+      })
+      .map((campaign) => ({
+        id: campaign.id,
+        title: campaign.title || campaign.name || campaign.id,
+      }));
+  }, [campaigns]);
+
+
   async function handleAthletePhotoUpload(event) {
     const file = event.target.files?.[0];
     if (!file || !selectedAthlete?.id) return;
@@ -570,6 +582,9 @@ export default function AthleteDashboard({
         discipline: form.discipline,
         belt: form.belt,
         programRequested: form.programRequested,
+        campaignId: form.programRequested,
+        campaignTitle:
+          activeCampaignOptions.find((campaign) => campaign.id === form.programRequested)?.title || "",
         athleteStatus: form.athleteStatus,
         bio: form.bio,
         presentation: form.bio,
@@ -577,6 +592,45 @@ export default function AthleteDashboard({
         athleteSocials: form.athleteSocials,
         updatedAt: serverTimestamp(),
       });
+
+      const selectedCampaign = activeCampaignOptions.find(
+        (campaign) => campaign.id === form.programRequested
+      );
+
+      if (selectedCampaign?.id) {
+        const existingForCampaign = selectedAthleteParticipations.find(
+          (participation) => participation.campaignId === selectedCampaign.id
+        );
+
+        if (!existingForCampaign) {
+          const baseParticipationPayload = {
+            athleteId: selectedAthlete.id,
+            athleteName: displayName,
+            familyId: currentUser?.familyId || selectedAthlete.familyId || null,
+            campaignId: selectedCampaign.id,
+            campaignTitle: selectedCampaign.title,
+            fundingMode: "individual",
+            goal: Number(selectedAthlete.goal || 0),
+            raisedShop: 0,
+            raisedOffline: 0,
+            raisedSponsorship: 0,
+            status: "active",
+            isPublic: true,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+
+          if (selectedAthleteParticipations.length === 1) {
+            await updateDoc(doc(db, "campaignParticipations", selectedAthleteParticipations[0].id), {
+              ...baseParticipationPayload,
+              createdAt: selectedAthleteParticipations[0].createdAt || serverTimestamp(),
+            });
+          } else {
+            await addDoc(collection(db, "campaignParticipations"), baseParticipationPayload);
+          }
+        }
+      }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (error) {
@@ -1020,9 +1074,10 @@ export default function AthleteDashboard({
                         <input value={form.belt} onChange={(e) => setForm({ ...form, belt: e.target.value })} placeholder="Ceinture / niveau" className="rounded-2xl border border-zinc-200 p-3" />
                         <select value={form.programRequested} onChange={(e) => setForm({ ...form, programRequested: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
                           <option value="">Programme demandé</option>
-                          {PROGRAMS.map((program) => (
-                            <option key={program} value={program}>{program}</option>
+                          {activeCampaignOptions.map((campaign) => (
+                            <option key={campaign.id} value={campaign.id}>{campaign.title}</option>
                           ))}
+                          <option value="other">Autre</option>
                         </select>
                         <select value={form.athleteStatus} onChange={(e) => setForm({ ...form, athleteStatus: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
                           <option value="">Statut</option>
