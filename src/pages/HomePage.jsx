@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -8,13 +9,17 @@ import {
   Shirt,
   ShoppingBag,
   Store,
+  Target,
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
+
+import { db } from "../firebase";
 import { gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 
-const HERO_IMAGE_URL = "/images/kinkolab-programme-athletes-hero.png";
+const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-programme-athletes-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
 
 function isVisibleCampaign(campaign) {
@@ -55,12 +60,20 @@ function campaignStats(campaign, athletes = [], participations = []) {
   );
 
   if (campaignParticipations.length > 0) {
-    const athleteIds = new Set(campaignParticipations.map((item) => item.athleteId));
+    const athleteIds = new Set(
+      campaignParticipations.map((item) => item.athleteId)
+    );
 
     return {
       athletesCount: Array.from(athleteIds).length,
-      raised: campaignParticipations.reduce((sum, item) => sum + participationRaised(item), 0),
-      goal: campaignParticipations.reduce((sum, item) => sum + Number(item.goal || 0), 0),
+      raised: campaignParticipations.reduce(
+        (sum, item) => sum + participationRaised(item),
+        0
+      ),
+      goal: campaignParticipations.reduce(
+        (sum, item) => sum + Number(item.goal || 0),
+        0
+      ),
     };
   }
 
@@ -70,8 +83,14 @@ function campaignStats(campaign, athletes = [], participations = []) {
 
   return {
     athletesCount: linkedAthletes.length,
-    raised: linkedAthletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0),
-    goal: linkedAthletes.reduce((sum, athlete) => sum + Number(athlete.goal || 0), 0),
+    raised: linkedAthletes.reduce(
+      (sum, athlete) => sum + totalRaised(athlete),
+      0
+    ),
+    goal: linkedAthletes.reduce(
+      (sum, athlete) => sum + Number(athlete.goal || 0),
+      0
+    ),
   };
 }
 
@@ -80,7 +99,9 @@ function Pillar({ icon: Icon, title, text }) {
     <div className="flex gap-4 border-zinc-800 py-5 md:border-r md:px-6 md:last:border-r-0">
       <Icon size={44} strokeWidth={1.7} style={{ color: gold }} />
       <div>
-        <h3 className="text-lg font-black uppercase leading-tight text-white">{title}</h3>
+        <h3 className="text-lg font-black uppercase leading-tight text-white">
+          {title}
+        </h3>
         <p className="mt-2 text-sm leading-6 text-zinc-300">{text}</p>
       </div>
     </div>
@@ -101,7 +122,10 @@ function StepCard({ number, icon: Icon, title, children }) {
         <Icon size={42} strokeWidth={1.5} style={{ color: gold }} />
       </div>
 
-      <h3 className="mt-5 text-sm font-black uppercase tracking-[0.12em]" style={{ color: gold }}>
+      <h3
+        className="mt-5 text-sm font-black uppercase tracking-[0.12em]"
+        style={{ color: gold }}
+      >
         {title}
       </h3>
 
@@ -112,14 +136,19 @@ function StepCard({ number, icon: Icon, title, children }) {
 
 function CampaignCard({ campaign, athletes, participations, onOpenCampaign }) {
   const stats = campaignStats(campaign, athletes, participations);
-  const percent = stats.goal ? Math.min(Math.round((stats.raised / stats.goal) * 100), 100) : 0;
+  const percent = stats.goal
+    ? Math.min(Math.round((stats.raised / stats.goal) * 100), 100)
+    : 0;
 
   return (
     <article className="overflow-hidden border border-yellow-700/70 bg-black text-white">
       <div className="grid min-h-[420px] md:grid-cols-[0.95fr_1.05fr]">
         <div className="flex flex-col justify-between p-7">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.25em]" style={{ color: gold }}>
+            <p
+              className="text-xs font-black uppercase tracking-[0.25em]"
+              style={{ color: gold }}
+            >
               {campaign.type === "continuous" ? "Fonds annuel" : "Événement"}
             </p>
 
@@ -137,16 +166,22 @@ function CampaignCard({ campaign, athletes, participations, onOpenCampaign }) {
             <div className="mt-7 grid grid-cols-2 gap-4 border-y border-yellow-700/40 py-5">
               <div>
                 <p className="text-2xl font-black">{stats.athletesCount}</p>
-                <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-zinc-400">Athlètes</p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-zinc-400">
+                  Athlètes
+                </p>
               </div>
 
               <div>
                 <p className="text-2xl font-black">{money(stats.raised)}</p>
-                <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-zinc-400">Amassés</p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-zinc-400">
+                  Amassés
+                </p>
               </div>
             </div>
 
-            <p className="mt-5 font-black">Objectif estimé : {money(stats.goal)}</p>
+            <p className="mt-5 font-black">
+              Objectif estimé : {money(stats.goal)}
+            </p>
 
             <div className="mt-4">
               <ProgressBar value={percent} />
@@ -165,7 +200,10 @@ function CampaignCard({ campaign, athletes, participations, onOpenCampaign }) {
         <div className="flex items-center justify-center bg-[#f4eadb] p-8 text-center text-zinc-950">
           <div>
             <p className="text-5xl font-black">{money(stats.raised)}</p>
-            <p className="mt-4 text-sm font-black uppercase tracking-[0.2em]" style={{ color: "#c9a345" }}>
+            <p
+              className="mt-4 text-sm font-black uppercase tracking-[0.2em]"
+              style={{ color: "#c9a345" }}
+            >
               Amassés
             </p>
             <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-zinc-600">
@@ -182,9 +220,40 @@ export default function HomePage({
   athletes = [],
   campaigns = [],
   participations = [],
+  openAthletes,
   openCampaigns,
   openSignup,
+  onOpenAthlete,
 }) {
+  const [homepageSettings, setHomepageSettings] = useState({
+    heroImageUrl: DEFAULT_HERO_IMAGE_URL,
+  });
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "siteSettings", "homepage"),
+      (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.data();
+
+        setHomepageSettings((current) => ({
+          ...current,
+          ...data,
+          heroImageUrl: data.heroImageUrl || current.heroImageUrl,
+        }));
+      },
+      (error) => {
+        console.error("Erreur chargement paramètres homepage:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const heroImageUrl =
+    homepageSettings.heroImageUrl || DEFAULT_HERO_IMAGE_URL;
+
   const visibleCampaigns = (campaigns || []).filter(isVisibleCampaign);
   const visibleAthletes = (athletes || []).filter(isVisibleAthlete);
 
@@ -193,7 +262,11 @@ export default function HomePage({
     0
   );
 
-  const fallbackRaised = visibleAthletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0);
+  const fallbackRaised = visibleAthletes.reduce(
+    (sum, athlete) => sum + totalRaised(athlete),
+    0
+  );
+
   const raised = totalRaisedFromParticipations || fallbackRaised;
 
   return (
@@ -201,7 +274,7 @@ export default function HomePage({
       <section
         className="relative min-h-[680px] overflow-hidden bg-black"
         style={{
-          backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.82) 36%, rgba(0,0,0,0.18) 100%), url(${HERO_IMAGE_URL})`,
+          backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.82) 36%, rgba(0,0,0,0.18) 100%), url(${heroImageUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center right",
         }}
@@ -212,14 +285,20 @@ export default function HomePage({
               <p className="text-2xl font-black uppercase tracking-wide">
                 Kinko<span style={{ color: gold }}>Lab</span>
               </p>
-              <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: gold }}>
+              <p
+                className="text-xs font-black uppercase tracking-[0.35em]"
+                style={{ color: gold }}
+              >
                 Supporters
               </p>
             </div>
 
             <h1 className="text-5xl font-black uppercase leading-[0.95] md:text-8xl">
               KinkoLab
-              <span className="mt-2 block text-5xl italic md:text-7xl" style={{ color: gold }}>
+              <span
+                className="mt-2 block text-5xl italic md:text-7xl"
+                style={{ color: gold }}
+              >
                 Programme Athlètes
               </span>
             </h1>
@@ -252,17 +331,23 @@ export default function HomePage({
             <div className="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
               <div className="border border-zinc-800 bg-black/60 p-4">
                 <p className="text-3xl font-black">{visibleAthletes.length}</p>
-                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">Athlètes</p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">
+                  Athlètes
+                </p>
               </div>
 
               <div className="border border-zinc-800 bg-black/60 p-4">
                 <p className="text-3xl font-black">{visibleCampaigns.length}</p>
-                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">Campagnes</p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">
+                  Campagnes
+                </p>
               </div>
 
               <div className="border border-zinc-800 bg-black/60 p-4">
                 <p className="text-3xl font-black">{money(raised)}</p>
-                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">Fonds suivis</p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-400">
+                  Fonds suivis
+                </p>
               </div>
             </div>
           </div>
@@ -271,10 +356,26 @@ export default function HomePage({
 
       <section className="border-y border-zinc-900 bg-black">
         <div className="mx-auto grid max-w-7xl px-4 md:grid-cols-4 md:px-8">
-          <Pillar icon={Shirt} title="Des hoodies de qualité" text="Une campagne simple : des hoodies supporters pensés pour les familles, amis, dojos et partenaires." />
-          <Pillar icon={HeartHandshake} title="Un impact concret" text={`Chaque hoodie vendu attribue ${money(HOODIE_SUPPORT_AMOUNT)} à l’athlète ou à la famille sélectionné(e).`} />
-          <Pillar icon={UsersRound} title="Transparent et équitable" text="Les fonds sont suivis clairement dans le portail, par campagne, athlète et famille." />
-          <Pillar icon={Leaf} title="Fier d’être canadien" text="Ensemble, soutenons des athlètes d’ici sur les scènes nationales et internationales." />
+          <Pillar
+            icon={Shirt}
+            title="Des hoodies de qualité"
+            text="Une campagne simple : des hoodies supporters pensés pour les familles, amis, dojos et partenaires."
+          />
+          <Pillar
+            icon={HeartHandshake}
+            title="Un impact concret"
+            text={`Chaque hoodie vendu attribue ${money(HOODIE_SUPPORT_AMOUNT)} à l’athlète ou à la famille sélectionné(e).`}
+          />
+          <Pillar
+            icon={UsersRound}
+            title="Transparent et équitable"
+            text="Les fonds sont suivis clairement dans le portail, par campagne, athlète et famille."
+          />
+          <Pillar
+            icon={Leaf}
+            title="Fier d’être canadien"
+            text="Ensemble, soutenons des athlètes d’ici sur les scènes nationales et internationales."
+          />
         </div>
       </section>
 
@@ -306,59 +407,146 @@ export default function HomePage({
 
       <section id="fonctionnement" className="bg-black px-4 py-20 md:px-8">
         <div className="mx-auto max-w-7xl">
-          <p className="text-6xl font-black uppercase text-zinc-900 md:text-7xl">Comment fonctionne</p>
-          <h2 className="-mt-4 text-4xl font-black uppercase italic md:text-5xl" style={{ color: gold }}>
+          <p className="text-6xl font-black uppercase text-zinc-900 md:text-7xl">
+            Comment fonctionne
+          </p>
+          <h2
+            className="-mt-4 text-4xl font-black uppercase italic md:text-5xl"
+            style={{ color: gold }}
+          >
             le programme supporters ?
           </h2>
 
           <div className="mt-14 grid gap-0 md:grid-cols-3 lg:grid-cols-6">
-            <StepCard number="1" icon={BadgeCheck} title="Ouverture des campagnes">KinkoLab ouvre des campagnes de soutien pour certaines compétitions ou projets sportifs majeurs.</StepCard>
-            <StepCard number="2" icon={ReceiptText} title="Inscription des athlètes">Les athlètes ou leur famille déposent une demande. L’acceptation n’est pas automatique.</StepCard>
-            <StepCard number="3" icon={Store} title="Hoodie supporter">Pour le moment, le programme repose sur un hoodie supporter non personnalisé lié à une campagne.</StepCard>
-            <StepCard number="4" icon={ShoppingBag} title="Achat des supporters">Le supporter achète un hoodie et sélectionne l’athlète ou la famille qu’il souhaite soutenir.</StepCard>
-            <StepCard number="5" icon={WalletCards} title="Attribution des fonds">Chaque vente attribue clairement {money(HOODIE_SUPPORT_AMOUNT)} au profil sélectionné.</StepCard>
-            <StepCard number="6" icon={CircleDollarSign} title="Aide aux athlètes">Les montants suivis servent à soutenir les objectifs sportifs, selon les règles et ressources disponibles.</StepCard>
+            <StepCard number="1" icon={BadgeCheck} title="Ouverture des campagnes">
+              KinkoLab ouvre des campagnes de soutien pour certaines compétitions ou projets sportifs majeurs.
+            </StepCard>
+
+            <StepCard number="2" icon={ReceiptText} title="Inscription des athlètes">
+              Les athlètes ou leur famille déposent une demande. L’acceptation n’est pas automatique.
+            </StepCard>
+
+            <StepCard number="3" icon={Store} title="Hoodie supporter">
+              Pour le moment, le programme repose sur un hoodie supporter non personnalisé lié à une campagne.
+            </StepCard>
+
+            <StepCard number="4" icon={ShoppingBag} title="Achat des supporters">
+              Le supporter achète un hoodie et sélectionne l’athlète ou la famille qu’il souhaite soutenir.
+            </StepCard>
+
+            <StepCard number="5" icon={WalletCards} title="Attribution des fonds">
+              Chaque vente attribue clairement {money(HOODIE_SUPPORT_AMOUNT)} au profil sélectionné.
+            </StepCard>
+
+            <StepCard number="6" icon={CircleDollarSign} title="Aide aux athlètes">
+              Les montants suivis servent à soutenir les objectifs sportifs, selon les règles et ressources disponibles.
+            </StepCard>
           </div>
 
           <div className="mt-14 grid gap-8 lg:grid-cols-2">
             <div className="overflow-hidden rounded-lg bg-[#f4eadb] text-zinc-950">
-              <div className="mx-auto w-fit px-12 py-4 text-center font-black uppercase italic text-black" style={{ background: gold }}>
+              <div
+                className="mx-auto w-fit px-12 py-4 text-center font-black uppercase italic text-black"
+                style={{ background: gold }}
+              >
                 Produit actuel
               </div>
+
               <div className="grid gap-6 p-8 text-center md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <div><h3 className="text-2xl font-black uppercase">Hoodie supporter</h3><p className="mt-4 leading-7">Un hoodie officiel associé à une campagne, vendu aux familles, amis, dojos et partenaires.</p></div>
-                <div className="text-5xl font-black" style={{ color: gold }}>+</div>
-                <div><h3 className="text-2xl font-black uppercase">Soutien ciblé</h3><p className="mt-4 leading-7">Au moment de l’achat, le supporter choisit l’athlète ou la famille soutenu(e).</p></div>
+                <div>
+                  <h3 className="text-2xl font-black uppercase">Hoodie supporter</h3>
+                  <p className="mt-4 leading-7">
+                    Un hoodie officiel associé à une campagne, vendu aux familles, amis, dojos et partenaires.
+                  </p>
+                </div>
+
+                <div className="text-5xl font-black" style={{ color: gold }}>
+                  +
+                </div>
+
+                <div>
+                  <h3 className="text-2xl font-black uppercase">Soutien ciblé</h3>
+                  <p className="mt-4 leading-7">
+                    Au moment de l’achat, le supporter choisit l’athlète ou la famille soutenu(e).
+                  </p>
+                </div>
               </div>
+
               <div className="grid bg-[#d1aa4a] text-center text-sm font-black uppercase text-black md:grid-cols-2">
                 <div className="p-5">Produit non personnalisé pour le moment</div>
                 <div className="p-5">Personnalisation possible plus tard</div>
               </div>
-              <p className="p-6 text-sm leading-6 text-zinc-600">Les produits personnalisés pourront être ajoutés dans une prochaine phase. Pour le lancement, le modèle reste volontairement simple : un hoodie supporter, une attribution claire de {money(HOODIE_SUPPORT_AMOUNT)} par vente.</p>
+
+              <p className="p-6 text-sm leading-6 text-zinc-600">
+                Les produits personnalisés pourront être ajoutés dans une prochaine phase. Pour le lancement, le modèle reste volontairement simple : un hoodie supporter, une attribution claire de {money(HOODIE_SUPPORT_AMOUNT)} par vente.
+              </p>
             </div>
 
             <div className="overflow-hidden rounded-lg bg-[#f4eadb] text-zinc-950">
-              <div className="mx-auto w-fit px-12 py-4 text-center font-black uppercase italic text-black" style={{ background: gold }}>
+              <div
+                className="mx-auto w-fit px-12 py-4 text-center font-black uppercase italic text-black"
+                style={{ background: gold }}
+              >
                 Exemple de répartition
               </div>
+
               <div className="grid gap-6 p-8 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <div className="rounded-lg border border-yellow-700/30 bg-[#fff8ea] p-6 text-center"><h3 className="text-xl font-black uppercase">Ventes de hoodies</h3><p className="mt-4 text-2xl font-black">{money(HOODIE_SUPPORT_AMOUNT)}</p><p className="mt-3 text-sm leading-6 text-zinc-600">attribués par hoodie vendu.</p></div>
-                <div className="text-center text-5xl font-black" style={{ color: gold }}>+</div>
-                <div className="rounded-lg border border-yellow-700/30 bg-[#fff8ea] p-6 text-center"><h3 className="text-xl font-black uppercase">Profil sélectionné</h3><p className="mt-4 font-black">Athlète ou famille</p><p className="mt-3 text-sm leading-6 text-zinc-600">Le montant est suivi dans le portail de financement.</p></div>
+                <div className="rounded-lg border border-yellow-700/30 bg-[#fff8ea] p-6 text-center">
+                  <h3 className="text-xl font-black uppercase">Ventes de hoodies</h3>
+                  <p className="mt-4 text-2xl font-black">
+                    {money(HOODIE_SUPPORT_AMOUNT)}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-zinc-600">
+                    attribués par hoodie vendu.
+                  </p>
+                </div>
+
+                <div className="text-center text-5xl font-black" style={{ color: gold }}>
+                  +
+                </div>
+
+                <div className="rounded-lg border border-yellow-700/30 bg-[#fff8ea] p-6 text-center">
+                  <h3 className="text-xl font-black uppercase">Profil sélectionné</h3>
+                  <p className="mt-4 font-black">Athlète ou famille</p>
+                  <p className="mt-3 text-sm leading-6 text-zinc-600">
+                    Le montant est suivi dans le portail de financement.
+                  </p>
+                </div>
               </div>
-              <div className="p-8 text-center"><p className="text-4xl font-black">{money(raised)}</p><p className="mt-2 text-sm font-black uppercase tracking-[0.2em]" style={{ color: gold }}>suivis dans le portail</p></div>
+
+              <div className="p-8 text-center">
+                <p className="text-4xl font-black">{money(raised)}</p>
+                <p
+                  className="mt-2 text-sm font-black uppercase tracking-[0.2em]"
+                  style={{ color: gold }}
+                >
+                  suivis dans le portail
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="mt-12 grid gap-6 border border-yellow-700/70 p-6 md:grid-cols-4 md:items-center">
-            <div><h3 className="text-2xl font-black uppercase" style={{ color: gold }}>Transparence totale</h3><p className="mt-3 text-sm leading-6 text-zinc-300">Nous visons un suivi clair des montants amassés, des règles applicables et des aides attribuées.</p></div>
+            <div>
+              <h3
+                className="text-2xl font-black uppercase"
+                style={{ color: gold }}
+              >
+                Transparence totale
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Nous visons un suivi clair des montants amassés, des règles applicables et des aides attribuées.
+              </p>
+            </div>
+
             <div className="font-black uppercase">Règles claires et publiques</div>
             <div className="font-black uppercase">Suivi des fonds</div>
             <div className="font-black uppercase">Impact réel pour les athlètes</div>
           </div>
 
           <div className="mt-10 border-l-4 border-yellow-600 bg-zinc-950 p-6 text-sm leading-7 text-zinc-300">
-            <strong style={{ color: gold }}>Note importante :</strong> Le Programme Athlètes KinkoLab est un programme privé de soutien associé à la vente de produits supporters. Les achats effectués sont des achats de produits, et non des dons de bienfaisance. Les montants affichés ou amassés ne garantissent pas automatiquement un versement direct à l’athlète. Les aides peuvent être attribuées selon les règles, modalités, ventes réalisées, coûts applicables et ressources disponibles du programme.
+            <strong style={{ color: gold }}>Note importante :</strong>{" "}
+            Le Programme Athlètes KinkoLab est un programme privé de soutien associé à la vente de produits supporters. Les achats effectués sont des achats de produits, et non des dons de bienfaisance. Les montants affichés ou amassés ne garantissent pas automatiquement un versement direct à l’athlète. Les aides peuvent être attribuées selon les règles, modalités, ventes réalisées, coûts applicables et ressources disponibles du programme.
           </div>
         </div>
       </section>
@@ -366,11 +554,25 @@ export default function HomePage({
       <section className="bg-[#f4eadb] px-4 py-16 text-zinc-950 md:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.25em]" style={{ color: "#b48b2c" }}>Rejoindre le programme</p>
-            <h2 className="mt-3 text-4xl font-black uppercase">Un athlète ou une famille veut participer ?</h2>
-            <p className="mt-4 max-w-3xl leading-7 text-zinc-700">Déposez une demande pour créer une page athlète, rejoindre une campagne active et centraliser votre visibilité, vos nouvelles, vos événements et votre financement.</p>
+            <p
+              className="text-sm font-black uppercase tracking-[0.25em]"
+              style={{ color: "#b48b2c" }}
+            >
+              Rejoindre le programme
+            </p>
+            <h2 className="mt-3 text-4xl font-black uppercase">
+              Un athlète ou une famille veut participer ?
+            </h2>
+            <p className="mt-4 max-w-3xl leading-7 text-zinc-700">
+              Déposez une demande pour créer une page athlète, rejoindre une campagne active et centraliser votre visibilité, vos nouvelles, vos événements et votre financement.
+            </p>
           </div>
-          <button onClick={openSignup} className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-4 font-black uppercase text-black" style={{ background: gold }}>
+
+          <button
+            onClick={openSignup}
+            className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-4 font-black uppercase text-black"
+            style={{ background: gold }}
+          >
             Soumettre une candidature <ArrowRight size={18} />
           </button>
         </div>
