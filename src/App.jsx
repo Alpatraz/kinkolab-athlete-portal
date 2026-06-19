@@ -203,18 +203,15 @@ export default function App() {
   }, []);
 
   const campaigns = useMemo(() => {
-    const map = new Map();
+  if (firebaseCampaigns.length > 0) {
+    return firebaseCampaigns;
+  }
 
-    campaignsSeed.forEach((campaign) => {
-      map.set(campaign.id, { ...campaign, source: "seed" });
-    });
-
-    firebaseCampaigns.forEach((campaign) => {
-      map.set(campaign.id, { ...campaign, source: "firestore" });
-    });
-
-    return Array.from(map.values());
-  }, [firebaseCampaigns]);
+  return campaignsSeed.map((campaign) => ({
+    ...campaign,
+    source: "seed",
+  }));
+}, [firebaseCampaigns]);
 
   const publicAthletes = useMemo(() => {
     return athletes.filter(isPublicAthlete);
