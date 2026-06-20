@@ -1,6 +1,6 @@
-import { Search, UserRound, Target, MapPin } from "lucide-react";
+import { Search, UserRound, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
-import { campaignTitle, gold, money, progressOf, totalRaised } from "../utils/format";
+import { campaignTitle, gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 
 function isVisibleAthlete(athlete) {
@@ -12,13 +12,41 @@ function isVisibleAthlete(athlete) {
   );
 }
 
+function contributionAmount(contribution) {
+  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
+}
+
 export default function AthletesPage({
   athletes = [],
   campaigns = [],
+  contributions = [],
   onOpenAthlete,
   onOpenCampaign,
 }) {
   const [search, setSearch] = useState("");
+
+  function raisedForAthlete(athlete) {
+    const shopTotal = (contributions || [])
+      .filter((contribution) => {
+        const directAthlete = contribution.athleteId === athlete.id;
+
+        const familyContribution =
+          athlete.familyId &&
+          contribution.fundingMode === "family" &&
+          contribution.familyId === athlete.familyId;
+
+        return directAthlete || familyContribution;
+      })
+      .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+
+    return Math.max(totalRaised(athlete), shopTotal);
+  }
+
+  function progressForAthlete(athlete, raised) {
+    const goal = Number(athlete.goal || 0);
+    if (!goal) return 0;
+    return Math.min(Math.round((raised / goal) * 100), 100);
+  }
 
   const visibleAthletes = useMemo(() => {
     return (athletes || [])
@@ -47,10 +75,7 @@ export default function AthletesPage({
     <main className="min-h-screen bg-black p-4 text-white md:p-8">
       <div className="mx-auto max-w-7xl">
         <section className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-10">
-          <p
-            className="text-sm font-bold uppercase tracking-[0.3em]"
-            style={{ color: gold }}
-          >
+          <p className="text-sm font-bold uppercase tracking-[0.3em]" style={{ color: gold }}>
             Athlètes
           </p>
 
@@ -81,22 +106,15 @@ export default function AthletesPage({
           )}
 
           {visibleAthletes.map((athlete) => {
-            const raised = totalRaised(athlete);
-            const progress = progressOf(athlete);
+            const raised = raisedForAthlete(athlete);
+            const progress = progressForAthlete(athlete, raised);
             const campaignName = campaignTitle(campaigns || [], athlete.campaignId);
 
             return (
-              <article
-                key={athlete.id}
-                className="overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 shadow-xl"
-              >
+              <article key={athlete.id} className="overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 shadow-xl">
                 <div className="h-56 bg-gradient-to-br from-zinc-900 to-black">
                   {athlete.photoUrl ? (
-                    <img
-                      src={athlete.photoUrl}
-                      alt={athlete.name || "Athlète"}
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={athlete.photoUrl} alt={athlete.name || "Athlète"} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-7xl">
                       {athlete.avatar || "🥋"}
@@ -117,10 +135,7 @@ export default function AthletesPage({
                       </p>
                     </div>
 
-                    <div
-                      className="flex h-12 w-12 items-center justify-center rounded-2xl text-black"
-                      style={{ background: gold }}
-                    >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-black" style={{ background: gold }}>
                       <UserRound size={24} />
                     </div>
                   </div>
@@ -145,18 +160,14 @@ export default function AthletesPage({
                   </div>
 
                   <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">
-                    {athlete.bio ||
-                      athlete.fundingPurpose ||
-                      "Cet athlète prépare sa campagne de financement avec KinkoLab."}
+                    {athlete.bio || athlete.fundingPurpose || "Cet athlète prépare sa campagne de financement avec KinkoLab."}
                   </p>
 
                   <div className="mt-5 rounded-2xl bg-black p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-xs uppercase text-zinc-500">Fonds suivis</p>
-                        <p className="mt-1 text-2xl font-black text-white">
-                          {money(raised)}
-                        </p>
+                        <p className="mt-1 text-2xl font-black text-white">{money(raised)}</p>
                       </div>
 
                       <div className="text-right">
