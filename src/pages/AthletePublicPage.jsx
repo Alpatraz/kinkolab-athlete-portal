@@ -243,6 +243,16 @@ function ContributionCard({ contribution }) {
   );
 }
 
+function isInactiveStatus(status) {
+  return ["suspendue", "suspendu", "archivée", "archivé", "archive"].includes(
+    String(status || "").toLowerCase()
+  );
+}
+
+function uniqueById(items = []) {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
 
 export default function AthletePublicPage({
   athlete,
@@ -281,79 +291,53 @@ export default function AthletePublicPage({
   const steps = safeAthlete.steps || [];
   const supportSteps = safeAthlete.supportSteps || [];
 
-  const athleteParticipations = (participations || []).filter(
-    (participation) =>
-      participation.athleteId === safeAthlete.id &&
-      participation.status !== "suspendue" &&
-      participation.status !== "archivée"
+  function isFamilyParticipation(participation) {
+    return Boolean(
+      participation &&
+        safeAthlete.familyId &&
+        participation.familyId === safeAthlete.familyId
+    );
+  }
+
+  const athleteParticipations = uniqueById(
+    (participations || []).filter((participation) => {
+      if (!participation || isInactiveStatus(participation.status)) return false;
+
+      const directAthlete = participation.athleteId === safeAthlete.id;
+      const sameFamily = isFamilyParticipation(participation);
+
+      return directAthlete || sameFamily;
+    })
   );
 
-  const familyParticipations = athleteParticipations.filter(
-    (participation) => participation.fundingMode === "family"
+  const familyParticipations = athleteParticipations.filter((participation) =>
+    isFamilyParticipation(participation)
   );
 
   const primaryFamilyParticipation = familyParticipations[0] || null;
 
   useEffect(() => {
-  if (!safeAthlete?.id) return;
+    if (!safeAthlete?.id) return;
 
-  const unsubscribes = [];
+    const unsubscribes = [];
 
-  const byAthleteQuery = query(
-    collection(db, "contributions"),
-    where("athleteId", "==", safeAthlete.id)
-  );
-
-  const byAthleteUnsubscribe = onSnapshot(byAthleteQuery, (snapshot) => {
-    const athleteData = snapshot.docs.map((document) => ({
-      id: document.id,
-      ...document.data(),
-    }));
-
-    setContributions((current) => {
-      const familyOnly = current.filter(
-        (item) => item.familyId && item.familyId === safeAthlete.familyId
-      );
-
-      const merged = [...athleteData, ...familyOnly];
-      const unique = Array.from(
-        new Map(merged.map((item) => [item.id, item])).values()
-      );
-
-      unique.sort((a, b) => {
-        const dateA =
-          a.createdAt?.seconds ||
-          (a.orderCreatedAt ? Date.parse(a.orderCreatedAt) / 1000 : 0);
-        const dateB =
-          b.createdAt?.seconds ||
-          (b.orderCreatedAt ? Date.parse(b.orderCreatedAt) / 1000 : 0);
-        return dateB - dateA;
-      });
-
-      return unique;
-    });
-  });
-
-  unsubscribes.push(byAthleteUnsubscribe);
-
-  if (safeAthlete.familyId) {
-    const byFamilyQuery = query(
+    const byAthleteQuery = query(
       collection(db, "contributions"),
-      where("familyId", "==", safeAthlete.familyId)
+      where("athleteId", "==", safeAthlete.id)
     );
 
-    const byFamilyUnsubscribe = onSnapshot(byFamilyQuery, (snapshot) => {
-      const familyData = snapshot.docs.map((document) => ({
+    const byAthleteUnsubscribe = onSnapshot(byAthleteQuery, (snapshot) => {
+      const athleteData = snapshot.docs.map((document) => ({
         id: document.id,
         ...document.data(),
       }));
 
       setContributions((current) => {
-        const athleteOnly = current.filter(
-          (item) => item.athleteId === safeAthlete.id
+        const familyOnly = current.filter(
+          (item) => item.familyId && item.familyId === safeAthlete.familyId
         );
 
-        const merged = [...athleteOnly, ...familyData];
+        const merged = [...athleteData, ...familyOnly];
         const unique = Array.from(
           new Map(merged.map((item) => [item.id, item])).values()
         );
@@ -372,56 +356,108 @@ export default function AthletePublicPage({
       });
     });
 
-    unsubscribes.push(byFamilyUnsubscribe);
-  }
+    unsubscribes.push(byAthleteUnsubscribe);
 
-  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-}, [safeAthlete?.id, safeAthlete?.familyId]);
+    if (safeAthlete.familyId) {
+      const byFamilyQuery = query(
+        collection(db, "contributions"),
+        where("familyId", "==", safeAthlete.familyId)
+      );
+
+      const byFamilyUnsubscribe = onSnapshot(byFamilyQuery, (snapshot) => {
+        const familyData = snapshot.docs.map((document) => ({
+          id: document.id,
+          ...document.data(),
+        }));
+
+        setContributions((current) => {
+          const athleteOnly = current.filter(
+            (item) => item.athleteId === safeAthlete.id
+          );
+
+          const merged = [...athleteOnly, ...familyData];
+          const unique = Array.from(
+            new Map(merged.map((item) => [item.id, item])).values()
+          );
+
+          unique.sort((a, b) => {
+            const dateA =
+              a.createdAt?.seconds ||
+              (a.orderCreatedAt ? Date.parse(a.orderCreatedAt) / 1000 : 0);
+            const dateB =
+              b.createdAt?.seconds ||
+              (b.orderCreatedAt ? Date.parse(b.orderCreatedAt) / 1000 : 0);
+            return dateB - dateA;
+          });
+
+          return unique;
+        });
+      });
+
+      unsubscribes.push(byFamilyUnsubscribe);
+    }
+
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+  }, [safeAthlete?.id, safeAthlete?.familyId]);
 
   function participationRaised(participation) {
     if (!participation) return 0;
 
-    if (
-      participation.fundingMode === "family" &&
-      participation.fundingGroupId
-    ) {
-      return (participations || [])
-        .filter(
-          (item) =>
-            item.fundingGroupId === participation.fundingGroupId &&
-            item.status !== "suspendue" &&
-            item.status !== "archivée"
-        )
-        .reduce(
-          (sum, item) =>
-            sum +
-            Number(item.raisedShop || 0) +
-            Number(item.raisedOffline || 0) +
-            Number(item.raisedSponsorship || 0),
-          0
-        );
-    }
+    const familyMode = isFamilyParticipation(participation);
 
-    return (
-      Number(participation.raisedShop || 0) +
-      Number(participation.raisedOffline || 0) +
-      Number(participation.raisedSponsorship || 0)
+    const matchingContributions = (contributions || []).filter((contribution) => {
+      const sameCampaign = contribution.campaignId === participation.campaignId;
+      if (!sameCampaign) return false;
+
+      if (familyMode) {
+        const sameFamily =
+          safeAthlete.familyId && contribution.familyId === safeAthlete.familyId;
+
+        const sameFundingGroup =
+          participation.fundingGroupId &&
+          contribution.fundingGroupId === participation.fundingGroupId;
+
+        return sameFamily || sameFundingGroup;
+      }
+
+      return contribution.athleteId === participation.athleteId;
+    });
+
+    const contributionTotal = matchingContributions.reduce(
+      (sum, contribution) => sum + contributionAmount(contribution),
+      0
     );
+
+    const matchingParticipations = familyMode
+      ? (participations || []).filter(
+          (item) =>
+            item.campaignId === participation.campaignId &&
+            item.familyId === safeAthlete.familyId &&
+            !isInactiveStatus(item.status)
+        )
+      : [participation];
+
+    const manualTotal = matchingParticipations.reduce(
+      (sum, item) =>
+        sum +
+        Number(item.raisedOffline || 0) +
+        Number(item.raisedSponsorship || 0),
+      0
+    );
+
+    return contributionTotal + manualTotal;
   }
 
   function participationGoal(participation) {
     if (!participation) return 0;
 
-    if (
-      participation.fundingMode === "family" &&
-      participation.fundingGroupId
-    ) {
+    if (isFamilyParticipation(participation)) {
       return (participations || [])
         .filter(
           (item) =>
-            item.fundingGroupId === participation.fundingGroupId &&
-            item.status !== "suspendue" &&
-            item.status !== "archivée"
+            item.campaignId === participation.campaignId &&
+            item.familyId === safeAthlete.familyId &&
+            !isInactiveStatus(item.status)
         )
         .reduce((sum, item) => sum + Number(item.goal || 0), 0);
     }
@@ -436,22 +472,24 @@ export default function AthletePublicPage({
   }
 
   function familyGroupAthletes(participation) {
-    if (!participation?.fundingGroupId) return [];
+    if (!participation || !safeAthlete.familyId) return [];
 
     const groupParticipations = (participations || []).filter(
       (item) =>
-        item.fundingGroupId === participation.fundingGroupId &&
-        item.status !== "suspendue" &&
-        item.status !== "archivée"
+        item.campaignId === participation.campaignId &&
+        item.familyId === safeAthlete.familyId &&
+        !isInactiveStatus(item.status)
     );
 
-    return groupParticipations
-      .map((item) =>
-        (athletes || []).find(
-          (athleteItem) => athleteItem.id === item.athleteId
+    return uniqueById(
+      groupParticipations
+        .map((item) =>
+          (athletes || []).find(
+            (athleteItem) => athleteItem.id === item.athleteId
+          )
         )
-      )
-      .filter(Boolean);
+        .filter(Boolean)
+    );
   }
 
   function buildParticipationSupportUrl(participation, campaign) {
@@ -465,7 +503,7 @@ export default function AthletePublicPage({
 
     url.searchParams.set("campaignId", participation.campaignId || "");
     url.searchParams.set("participationId", participation.id || "");
-    url.searchParams.set("fundingMode", participation.fundingMode || "individual");
+    url.searchParams.set("fundingMode", isFamilyParticipation(participation) ? "family" : participation.fundingMode || "individual");
     url.searchParams.set("fundingGroupId", participation.fundingGroupId || "");
     url.searchParams.set("athleteId", participation.athleteId || safeAthlete.id || "");
 
@@ -488,7 +526,7 @@ export default function AthletePublicPage({
 
     url.searchParams.set("campaignId", participation.campaignId || "");
     url.searchParams.set("participationId", participation.id || "");
-    url.searchParams.set("fundingMode", participation.fundingMode || "individual");
+    url.searchParams.set("fundingMode", isFamilyParticipation(participation) ? "family" : participation.fundingMode || "individual");
     url.searchParams.set("fundingGroupId", participation.fundingGroupId || "");
     url.searchParams.set("athleteId", participation.athleteId || safeAthlete.id || "");
 
@@ -504,7 +542,7 @@ export default function AthletePublicPage({
     (safeAthlete.name || "l’athlète").split(" ")[0];
 
   function supportButtonLabel(participation, campaign) {
-    if (participation.fundingMode === "family") {
+    if (isFamilyParticipation(participation)) {
       return `Soutenir la famille ${participation.familyName || safeAthlete.familyName || ""} pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
     }
 
@@ -512,7 +550,7 @@ export default function AthletePublicPage({
   }
 
   function sponsorButtonLabel(participation, campaign) {
-    if (participation.fundingMode === "family") {
+    if (isFamilyParticipation(participation)) {
       return `Commanditer la famille pour ${campaign?.title || participation.campaignTitle || "cette campagne"}`;
     }
 
@@ -521,14 +559,13 @@ export default function AthletePublicPage({
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
-  const familyContributionTotal = contributions.reduce(
-  (sum, contribution) => sum + contributionAmount(contribution),
-  0
-);
-
-const legacyRaised = Math.max(totalRaised(safeAthlete), familyContributionTotal);
+  const legacyRaised = totalRaised(safeAthlete);
   const legacySponsorship = Number(safeAthlete.raisedSponsorship || 0);
   const legacyRemaining = Math.max(Number(safeAthlete.goal || 0) - legacyRaised, 0);
+  const legacyProgress =
+    Number(safeAthlete.goal || 0) > 0
+      ? Math.min(Math.round((legacyRaised / Number(safeAthlete.goal || 0)) * 100), 100)
+      : 0;
 
   const mainCampaign = primaryFamilyParticipation
     ? participationCampaign(primaryFamilyParticipation)
@@ -878,7 +915,7 @@ const legacyRaised = Math.max(totalRaised(safeAthlete), familyContributionTotal)
                           className="text-xs font-bold uppercase tracking-[0.2em]"
                           style={{ color: gold }}
                         >
-                          {participation.fundingMode === "family"
+                          {isFamilyParticipation(participation)
                             ? "Fonds commun famille"
                             : "Financement individuel"}
                         </p>
@@ -907,7 +944,7 @@ const legacyRaised = Math.max(totalRaised(safeAthlete), familyContributionTotal)
                       </button>
                     </div>
 
-                    {participation.fundingMode === "family" &&
+                    {isFamilyParticipation(participation) &&
                       familyAthletes.length > 0 && (
                         <div className="mt-5 rounded-2xl bg-zinc-950 p-4">
                           <p
@@ -996,8 +1033,8 @@ const legacyRaised = Math.max(totalRaised(safeAthlete), familyContributionTotal)
                         Attribution du soutien
                       </p>
                       <p className="mt-1 text-sm leading-6 text-zinc-300">
-                        {participation.fundingMode === "family"
-                          ? `Les ventes, dons ou commandites de cette campagne seront attribués au fonds commun ${participation.fundingGroupId}.`
+                        {isFamilyParticipation(participation)
+                          ? `Les ventes, dons ou commandites de cette campagne seront attribués au fonds commun familial ${participation.familyName || safeAthlete.familyName || ""}.`
                           : `Les ventes, dons ou commandites de cette campagne seront attribués à ${safeAthlete.name}.`}
                       </p>
                     </div>
@@ -1092,9 +1129,9 @@ const legacyRaised = Math.max(totalRaised(safeAthlete), familyContributionTotal)
               </div>
 
               <div className="mt-6">
-                <ProgressBar value={progressOf(safeAthlete)} />
+                <ProgressBar value={legacyProgress} />
                 <p className="mt-2 text-sm text-zinc-400">
-                  {progressOf(safeAthlete)} % de l’objectif atteint
+                  {legacyProgress} % de l’objectif atteint
                 </p>
               </div>
 
