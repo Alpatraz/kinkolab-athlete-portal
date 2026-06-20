@@ -325,6 +325,7 @@ export default function AthleteDashboard({
     programRequested: "",
     athleteStatus: "",
     bio: "",
+    fundingPurpose: "",
     photoUrl: "",
     athleteSocials: "",
   });
@@ -424,6 +425,11 @@ export default function AthleteDashboard({
       programRequested: selectedAthlete.campaignId || selectedAthlete.programRequested || "",
       athleteStatus: selectedAthlete.athleteStatus || "",
       bio: selectedAthlete.bio || selectedAthlete.presentation || "",
+      fundingPurpose:
+        selectedAthlete.fundingPurpose ||
+        selectedAthlete.objective ||
+        selectedAthlete.goalText ||
+        "",
       photoUrl: selectedAthlete.photoUrl || "",
       athleteSocials: selectedAthlete.athleteSocials || "",
     });
@@ -588,6 +594,9 @@ export default function AthleteDashboard({
         athleteStatus: form.athleteStatus,
         bio: form.bio,
         presentation: form.bio,
+        fundingPurpose: form.fundingPurpose,
+        objective: form.fundingPurpose,
+        goalText: form.fundingPurpose,
         photoUrl: form.photoUrl,
         athleteSocials: form.athleteSocials,
         updatedAt: serverTimestamp(),
@@ -1087,7 +1096,18 @@ export default function AthleteDashboard({
                         </select>
                       </div>
 
-                      <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Présentation de l’athlète" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                      <textarea
+                        value={form.bio}
+                        onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                        placeholder="Présentation de l’athlète"
+                        className="min-h-32 rounded-2xl border border-zinc-200 p-3"
+                      />
+                      <textarea
+                        value={form.fundingPurpose}
+                        onChange={(e) => setForm({ ...form, fundingPurpose: e.target.value })}
+                        placeholder="Objectif de financement affiché sur la page publique"
+                        className="min-h-32 rounded-2xl border border-zinc-200 p-3"
+                      />
                       <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
                       <button type="button" onClick={saveAthleteProfile} disabled={saving || uploadingPhoto} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
                         <Save size={18} />
