@@ -24,23 +24,18 @@ function cleanStatus(value) {
 }
 
 function isActive(value) {
-  return !["suspendue", "suspendu", "archivée", "archive", "archivé"].includes(
-    cleanStatus(value)
-  );
+  return !["suspendue", "suspendu", "archivée", "archive", "archivé"].includes(cleanStatus(value));
 }
 
 exports.handler = async function handler(event) {
   if (event.httpMethod === "OPTIONS") return corsResponse(200, { ok: true });
-  if (event.httpMethod !== "GET")
-    return corsResponse(405, { error: "Method not allowed" });
+  if (event.httpMethod !== "GET") return corsResponse(405, { error: "Method not allowed" });
 
   initFirebase();
 
   const db = admin.firestore();
   const campaignId = event.queryStringParameters?.campaignId || "";
-  const reservedAmount = Number(
-    event.queryStringParameters?.reservedAmount || 20
-  );
+  const reservedAmount = Number(event.queryStringParameters?.reservedAmount || 20);
 
   if (!campaignId) {
     return corsResponse(200, { campaigns: [], supportOptions: [] });
@@ -73,14 +68,14 @@ exports.handler = async function handler(event) {
     .map((doc) => ({ id: doc.id, ...doc.data() }))
     .filter((p) => isActive(p.status));
 
-  const familyAthleteIds = new Set(
+  const familyIdsInCampaign = new Set(
     participations
-      .filter((p) => p.fundingMode === "family" && p.athleteId)
-      .map((p) => p.athleteId)
+      .filter((p) => p.familyId)
+      .map((p) => p.familyId)
   );
 
   participations.forEach((p) => {
-    if (p.fundingMode === "family" && p.familyId) {
+    if (p.familyId) {
       addFamily({
         type: "family",
         label: `Famille ${p.familyName || p.familyId}`,
@@ -94,12 +89,12 @@ exports.handler = async function handler(event) {
       return;
     }
 
-    if (p.athleteId && !familyAthleteIds.has(p.athleteId)) {
+    if (p.athleteId) {
       addAthlete({
         type: "individual",
         label: p.athleteName || p.athleteId,
         athleteId: p.athleteId,
-        familyId: p.familyId || "",
+        familyId: "",
         campaignId,
         fundingMode: "individual",
         fundingGroupId: p.fundingGroupId || `${p.athleteId}-${campaignId}`,
@@ -113,11 +108,7 @@ exports.handler = async function handler(event) {
   familiesSnap.docs.forEach((doc) => {
     const family = { id: doc.id, ...doc.data() };
     if (!isActive(family.status)) return;
-
-    const familyHasParticipation = participations.some(
-      (p) => p.familyId === family.id
-    );
-    if (!familyHasParticipation) return;
+    if (!familyIdsInCampaign.has(family.id)) return;
 
     addFamily({
       type: "family",
