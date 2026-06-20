@@ -122,6 +122,7 @@ export default function App() {
   const [firebaseCampaigns, setFirebaseCampaigns] = useState([]);
   const [participations, setParticipations] = useState([]);
   const [wallMessages, setWallMessages] = useState([]);
+  const [contributions, setContributions] = useState([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -202,6 +203,22 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+  const unsubscribe = onSnapshot(
+    collection(db, "contributions"),
+    (snapshot) => {
+      setContributions(
+        snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+      );
+    }
+  );
+
+  return () => unsubscribe();
+}, []);
+
   const campaigns = useMemo(() => {
   if (firebaseCampaigns.length > 0) {
     return firebaseCampaigns;
@@ -278,17 +295,18 @@ export default function App() {
         />
 
         <Route
-          path="/athletes"
-          element={
-            <AthletesPage
-              athletes={publicAthletes}
-              campaigns={publicCampaigns}
-              participations={participations}
-              onOpenAthlete={openAthlete}
-              onOpenCampaign={openCampaign}
-            />
-          }
-        />
+  path="/athletes"
+  element={
+    <AthletesPage
+      athletes={publicAthletes}
+      campaigns={publicCampaigns}
+      participations={participations}
+      contributions={contributions}
+      onOpenAthlete={openAthlete}
+      onOpenCampaign={openCampaign}
+    />
+  }
+/>
 
         <Route
           path="/campaigns"
@@ -341,8 +359,6 @@ export default function App() {
   }
 />
         
-        <Route path="/signup" element={<SignupView goBack={goHome} />} />
-
         <Route
           path="/login"
           element={
