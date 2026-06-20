@@ -664,6 +664,10 @@ export default function AthletePublicPage({
                   ? "Cette page présente un fonds commun familial lié à une campagne précise."
                   : `Objectif : ${
                       safeAthlete.fundingPurpose ||
+                      safeAthlete.objective ||
+                      safeAthlete.goalText ||
+                      safeAthlete.bio ||
+                      safeAthlete.presentation ||
                       "financer sa participation à la compétition"
                     }.`}
               </p>
@@ -682,6 +686,20 @@ export default function AthletePublicPage({
                   </span>
                 ))}
               </div>
+
+              {(safeAthlete.bio || safeAthlete.presentation) && (
+                <div className="mt-8 rounded-2xl border border-zinc-800 bg-black p-5">
+                  <p
+                    className="text-xs font-bold uppercase tracking-[0.25em]"
+                    style={{ color: gold }}
+                  >
+                    Présentation
+                  </p>
+                  <p className="mt-3 text-base leading-7 text-zinc-300">
+                    {safeAthlete.bio || safeAthlete.presentation}
+                  </p>
+                </div>
+              )}
 
               <div className="mt-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
                 <p
