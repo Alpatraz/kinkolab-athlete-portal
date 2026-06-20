@@ -44,12 +44,9 @@ function verifyShopifyHmac(event) {
 
 function propertyMap(properties = []) {
   const map = {};
-
   properties.forEach((property) => {
-    if (!property?.name) return;
-    map[property.name] = property.value;
+    if (property?.name) map[property.name] = property.value;
   });
-
   return map;
 }
 
@@ -97,17 +94,11 @@ async function findParticipation(db, { fundingGroupId, athleteId, campaignId, fu
 
 exports.handler = async function handler(event) {
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: "Method not allowed",
-    };
+    return { statusCode: 405, body: "Method not allowed" };
   }
 
   if (!verifyShopifyHmac(event)) {
-    return {
-      statusCode: 401,
-      body: "Invalid Shopify HMAC",
-    };
+    return { statusCode: 401, body: "Invalid Shopify HMAC" };
   }
 
   initFirebase();
@@ -120,30 +111,11 @@ exports.handler = async function handler(event) {
   const financialStatus = order.financial_status || "";
 
   if (!orderId) {
-    return {
-      statusCode: 400,
-      body: "Missing order id",
-    };
+    return { statusCode: 400, body: "Missing order id" };
   }
 
   if (!["paid", "partially_paid"].includes(financialStatus)) {
-    return {
-      statusCode: 200,
-      body: "Order not paid. Ignored.",
-    };
-  }
-
-  const alreadyProcessed = await db
-    .collection("fundTransactions")
-    .where("orderId", "==", orderId)
-    .limit(1)
-    .get();
-
-  if (!alreadyProcessed.empty) {
-    return {
-      statusCode: 200,
-      body: "Order already processed.",
-    };
+    return { statusCode: 200, body: "Order not paid. Ignored." };
   }
 
   let createdTransactions = 0;
@@ -152,21 +124,36 @@ exports.handler = async function handler(event) {
   for (const item of order.line_items || []) {
     const props = propertyMap(item.properties || []);
 
-    const athleteId = props._athleteId || "";
-    const familyId = props._familyId || "";
+    const rawFundingMode = props._fundingMode || "individual";
+    const fundingMode = rawFundingMode === "family" ? "family" : "individual";
+
+    const athleteId = fundingMode === "family" ? "" : props._athleteId || "";
+    const familyId = fundingMode === "family" ? props._familyId || "" : "";
     const campaignId = props._campaignId || "";
-    const fundingMode = props._fundingMode || "individual";
     const fundingGroupId = props._fundingGroupId || "";
     const reservedAmountUnit = toNumber(props._reservedAmount);
 
     const quantity = Number(item.quantity || 1);
     const reservedAmount = reservedAmountUnit * quantity;
+    const lineItemId = String(item.id || "");
 
     if (!campaignId || !fundingGroupId || reservedAmount <= 0) {
       continue;
     }
 
+    const alreadyContribution = await db
+      .collection("contributions")
+      .where("orderId", "==", orderId)
+      .where("lineItemId", "==", lineItemId)
+      .limit(1)
+      .get();
+
+    if (!alreadyContribution.empty) {
+      continue;
+    }
+
     const supportLabel =
+      props["Athlète ou famille soutenu(e)"] ||
       props["Athlète ou famille soutenu"] ||
       props["Supporté"] ||
       "";
@@ -188,7 +175,7 @@ exports.handler = async function handler(event) {
       orderName,
       orderCreatedAt: order.created_at || null,
 
-      lineItemId: String(item.id || ""),
+      lineItemId,
       productId: String(item.product_id || ""),
       variantId: String(item.variant_id || ""),
 
@@ -197,11 +184,25 @@ exports.handler = async function handler(event) {
 
       supportLabel,
 
-      athleteId: athleteId || participation.athleteId || null,
-      athleteName: participation.athleteName || null,
+      athleteId:
+        fundingMode === "family"
+          ? null
+          : athleteId || participation.athleteId || null,
 
-      familyId: familyId || participation.familyId || null,
-      familyName: participation.familyName || null,
+      athleteName:
+        fundingMode === "family"
+          ? null
+          : participation.athleteName || null,
+
+      familyId:
+        fundingMode === "family"
+          ? familyId || participation.familyId || null
+          : null,
+
+      familyName:
+        fundingMode === "family"
+          ? participation.familyName || null
+          : null,
 
       campaignId,
       campaignTitle: participation.campaignTitle || null,
