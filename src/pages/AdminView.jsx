@@ -31,12 +31,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
@@ -94,6 +96,10 @@ function StatusPill({ status }) {
     reserved: "bg-amber-50 text-amber-700 border-amber-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     versé: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    cancelled: "bg-red-50 text-red-700 border-red-200",
+    annulé: "bg-red-50 text-red-700 border-red-200",
+    refunded: "bg-zinc-100 text-zinc-700 border-zinc-300",
+    remboursé: "bg-zinc-100 text-zinc-700 border-zinc-300",
   };
 
   return (
@@ -452,6 +458,21 @@ export default function AdminView({
 
   const athletesWithoutFamily = athletes.filter((athlete) => !athlete.familyId);
 
+  function isFinanciallyActive(contribution) {
+    const status = String(contribution?.status || "reserved").toLowerCase();
+    return !["cancelled", "annulé", "refunded", "remboursé"].includes(status);
+  }
+
+  function isCancelledContribution(contribution) {
+    const status = String(contribution?.status || "").toLowerCase();
+    return status === "cancelled" || status === "annulé";
+  }
+
+  function isRefundedContribution(contribution) {
+    const status = String(contribution?.status || "").toLowerCase();
+    return status === "refunded" || status === "remboursé";
+  }
+
   function contributionAmount(contribution) {
     return Number(contribution.amountReserved || contribution.reservedAmount || 0);
   }
@@ -485,7 +506,21 @@ export default function AdminView({
   }
 
   const financialSummary = useMemo(() => {
-    const reserved = contributions.reduce(
+    const activeContributions = contributions.filter(isFinanciallyActive);
+    const cancelledContributions = contributions.filter(isCancelledContribution);
+    const refundedContributions = contributions.filter(isRefundedContribution);
+
+    const reserved = activeContributions.reduce(
+      (sum, contribution) => sum + contributionAmount(contribution),
+      0
+    );
+
+    const cancelled = cancelledContributions.reduce(
+      (sum, contribution) => sum + contributionAmount(contribution),
+      0
+    );
+
+    const refunded = refundedContributions.reduce(
       (sum, contribution) => sum + contributionAmount(contribution),
       0
     );
@@ -496,9 +531,13 @@ export default function AdminView({
 
     return {
       reserved,
+      cancelled,
+      refunded,
       paid,
       balance: Math.max(reserved - paid, 0),
-      count: contributions.length,
+      count: activeContributions.length,
+      cancelledCount: cancelledContributions.length,
+      refundedCount: refundedContributions.length,
       payoutCount: payouts.length,
     };
   }, [contributions, payouts]);
@@ -506,7 +545,7 @@ export default function AdminView({
   const financeRows = useMemo(() => {
     const rows = new Map();
 
-    contributions.forEach((contribution) => {
+    contributions.filter(isFinanciallyActive).forEach((contribution) => {
       const key =
         contribution.fundingMode === "family"
           ? `family-${contribution.fundingGroupId || contribution.familyId}`
@@ -926,6 +965,66 @@ export default function AdminView({
       await deleteDoc(doc(db, "campaignParticipations", participation.id));
     } catch {
       alert("Impossible de supprimer cette participation.");
+    }
+  }
+
+  async function updateContributionStatus(contribution, status) {
+    const statusLabels = {
+      reserved: "réactiver",
+      cancelled: "annuler",
+      refunded: "marquer comme remboursée",
+    };
+
+    const confirmed = window.confirm(
+      `Confirmer : ${statusLabels[status] || status} la contribution ${
+        contribution.orderName || contribution.orderId || "sélectionnée"
+      } ?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const payload = {
+        status,
+        statusUpdatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (status === "cancelled") {
+        payload.cancelledAt = serverTimestamp();
+        payload.refundedAt = null;
+      }
+
+      if (status === "refunded") {
+        payload.refundedAt = serverTimestamp();
+        payload.cancelledAt = null;
+      }
+
+      if (status === "reserved") {
+        payload.cancelledAt = null;
+        payload.refundedAt = null;
+      }
+
+      await updateDoc(doc(db, "contributions", contribution.id), payload);
+
+      if (contribution.orderId && contribution.lineItemId) {
+        const transactionsSnapshot = await getDocs(
+          query(
+            collection(db, "fundTransactions"),
+            where("orderId", "==", contribution.orderId),
+            where("lineItemId", "==", contribution.lineItemId)
+          )
+        );
+
+        await Promise.all(
+          transactionsSnapshot.docs.map((transactionDoc) =>
+            updateDoc(transactionDoc.ref, payload)
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Erreur modification statut contribution:", error);
+      alert("Impossible de modifier le statut de cette contribution.");
     }
   }
 
@@ -1603,11 +1702,13 @@ export default function AdminView({
                 Suivi des montants réservés automatiquement depuis Shopify et des versements réellement effectués aux athlètes ou familles.
               </p>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-4">
-                <StatCard light icon={DollarSign} label="Réservé" value={money(financialSummary.reserved)} sub="Total contributions" />
+              <div className="mt-5 grid gap-4 md:grid-cols-6">
+                <StatCard light icon={DollarSign} label="Actif" value={money(financialSummary.reserved)} sub="Contributions actives" />
                 <StatCard light icon={CheckCircle2} label="Versé" value={money(financialSummary.paid)} sub="Versements enregistrés" />
                 <StatCard light icon={FolderKanban} label="Solde" value={money(financialSummary.balance)} sub="À verser" />
-                <StatCard light icon={Link2} label="Transactions" value={financialSummary.count} sub="Contributions" />
+                <StatCard light icon={Link2} label="Actives" value={financialSummary.count} sub="Transactions" />
+                <StatCard light icon={XCircle} label="Annulées" value={money(financialSummary.cancelled)} sub={`${financialSummary.cancelledCount} transaction(s)`} />
+                <StatCard light icon={RotateCcw} label="Remboursées" value={money(financialSummary.refunded)} sub={`${financialSummary.refundedCount} transaction(s)`} />
               </div>
             </div>
 
@@ -1734,6 +1835,35 @@ export default function AdminView({
                       <div className="text-right">
                         <p className="text-2xl font-black text-zinc-950">{money(contributionAmount(contribution))}</p>
                         <StatusPill status={contribution.status || "reserved"} />
+
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                          {contribution.status !== "cancelled" && (
+                            <AdminButton
+                              variant="red"
+                              onClick={() => updateContributionStatus(contribution, "cancelled")}
+                            >
+                              <XCircle size={15} /> Annuler
+                            </AdminButton>
+                          )}
+
+                          {contribution.status !== "refunded" && (
+                            <AdminButton
+                              variant="amber"
+                              onClick={() => updateContributionStatus(contribution, "refunded")}
+                            >
+                              <RotateCcw size={15} /> Rembourser
+                            </AdminButton>
+                          )}
+
+                          {contribution.status !== "reserved" && (
+                            <AdminButton
+                              variant="green"
+                              onClick={() => updateContributionStatus(contribution, "reserved")}
+                            >
+                              <CheckCircle2 size={15} /> Réactiver
+                            </AdminButton>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
