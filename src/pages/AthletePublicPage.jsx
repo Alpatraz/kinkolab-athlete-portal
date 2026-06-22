@@ -171,6 +171,19 @@ function contributionAmount(contribution) {
   return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
 }
 
+function isActiveContribution(contribution) {
+  const status = String(
+    contribution?.status || "reserved"
+  ).toLowerCase();
+
+  return ![
+    "cancelled",
+    "annulé",
+    "refunded",
+    "remboursé",
+  ].includes(status);
+}
+
 function contributionDate(contribution) {
   const value = contribution?.createdAt;
 
@@ -406,6 +419,7 @@ export default function AthletePublicPage({
     const familyMode = isFamilyParticipation(participation);
 
     const matchingContributions = (contributions || []).filter((contribution) => {
+  if (!isActiveContribution(contribution)) return false;
       const sameCampaign = contribution.campaignId === participation.campaignId;
       if (!sameCampaign) return false;
 
@@ -590,8 +604,11 @@ export default function AthletePublicPage({
       ? Math.min(Math.round((mainFamilyRaised / mainFamilyGoal) * 100), 100)
       : 0;
 
-  const contributionsTotal = contributions.reduce(
-    (sum, contribution) => sum + contributionAmount(contribution),
+  const contributionsTotal = contributions
+  .filter(isActiveContribution)
+  .reduce(
+    (sum, contribution) =>
+      sum + contributionAmount(contribution),
     0
   );
 
@@ -1082,7 +1099,9 @@ export default function AthletePublicPage({
               </p>
             )}
 
-            {contributions.map((contribution) => (
+            {contributions
+  .filter(isActiveContribution)
+  .map((contribution) => (
               <ContributionCard
                 key={contribution.id}
                 contribution={contribution}
