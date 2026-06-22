@@ -16,6 +16,19 @@ function contributionAmount(contribution) {
   return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
 }
 
+function isActiveContribution(contribution) {
+  const status = String(
+    contribution?.status || "reserved"
+  ).toLowerCase();
+
+  return ![
+    "cancelled",
+    "annulé",
+    "refunded",
+    "remboursé",
+  ].includes(status);
+}
+
 export default function AthletesPage({
   athletes = [],
   campaigns = [],
@@ -26,21 +39,28 @@ export default function AthletesPage({
   const [search, setSearch] = useState("");
 
   function raisedForAthlete(athlete) {
-    const shopTotal = (contributions || [])
-      .filter((contribution) => {
-        const directAthlete = contribution.athleteId === athlete.id;
+  const shopTotal = (contributions || [])
+    .filter((contribution) => {
+      if (!isActiveContribution(contribution)) return false;
 
-        const familyContribution =
-          athlete.familyId &&
-          contribution.fundingMode === "family" &&
-          contribution.familyId === athlete.familyId;
+      const directAthlete =
+        contribution.athleteId === athlete.id;
 
-        return directAthlete || familyContribution;
-      })
-      .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+      const familyContribution =
+        athlete.familyId &&
+        contribution.fundingMode === "family" &&
+        contribution.familyId === athlete.familyId;
 
-    return Math.max(totalRaised(athlete), shopTotal);
-  }
+      return directAthlete || familyContribution;
+    })
+    .reduce(
+      (sum, contribution) =>
+        sum + contributionAmount(contribution),
+      0
+    );
+
+  return Math.max(totalRaised(athlete), shopTotal);
+}
 
   function progressForAthlete(athlete, raised) {
     const goal = Number(athlete.goal || 0);
