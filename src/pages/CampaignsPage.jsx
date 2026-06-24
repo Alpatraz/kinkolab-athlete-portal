@@ -48,6 +48,7 @@ export default function CampaignsPage({
   campaigns = [],
   athletes = [],
   participations = [],
+  contributions = [],
   onOpenCampaign,
   openSignup,
 }) {
@@ -97,12 +98,32 @@ export default function CampaignsPage({
     );
   }
 
+function contributionAmount(contribution) {
+  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
+}
+
+function isActiveContribution(contribution) {
+  const status = String(contribution?.status || "reserved").toLowerCase();
+  return !["cancelled", "annulé", "refunded", "remboursé"].includes(status);
+}
+  
   function campaignRaised(campaignId) {
-    return campaignParticipations(campaignId).reduce(
-      (sum, participation) => sum + participationRaised(participation),
-      0
-    );
-  }
+  const contributionTotal = (contributions || [])
+    .filter((contribution) => {
+      return (
+        isActiveContribution(contribution) &&
+        contribution.campaignId === campaignId
+      );
+    })
+    .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+
+  const participationTotal = campaignParticipations(campaignId).reduce(
+    (sum, participation) => sum + participationRaised(participation),
+    0
+  );
+
+  return Math.max(contributionTotal, participationTotal);
+}
 
   return (
     <main className="min-h-screen bg-black p-4 text-white md:p-8">
