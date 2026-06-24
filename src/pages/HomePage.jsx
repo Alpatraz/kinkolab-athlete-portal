@@ -108,23 +108,6 @@ function campaignStats(campaign, athletes = [], participations = [], contributio
   };
 }
 
-  const linkedAthletes = (athletes || []).filter(
-    (athlete) => athlete.campaignId === campaign.id && isVisibleAthlete(athlete)
-  );
-
-  return {
-    athletesCount: linkedAthletes.length,
-    raised: linkedAthletes.reduce(
-      (sum, athlete) => sum + totalRaised(athlete),
-      0
-    ),
-    goal: linkedAthletes.reduce(
-      (sum, athlete) => sum + Number(athlete.goal || 0),
-      0
-    ),
-  };
-}
-
 function Pillar({ icon: Icon, title, text }) {
   return (
     <div className="flex gap-4 border-zinc-800 py-5 md:border-r md:px-6 md:last:border-r-0">
