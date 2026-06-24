@@ -64,13 +64,14 @@ function CampaignRoute({
 
   return (
     <CampaignDetailPage
-      campaign={campaign}
-      athletes={athletes}
-      participations={participations || []}
-      goBack={() => navigate(-1)}
-      onOpenAthlete={onOpenAthlete}
-      openSignup={openSignup}
-    />
+  campaign={selectedCampaign}
+  athletes={athletes}
+  participations={participations}
+  contributions={contributions}
+  goBack={...}
+  onOpenAthlete={...}
+  openSignup={...}
+/>
   );
 }
 
