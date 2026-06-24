@@ -53,6 +53,7 @@ function CampaignRoute({
   campaigns,
   athletes,
   participations,
+  contributions,
   onOpenAthlete,
   openSignup,
 }) {
@@ -64,14 +65,14 @@ function CampaignRoute({
 
   return (
     <CampaignDetailPage
-  campaign={selectedCampaign}
-  athletes={athletes}
-  participations={participations}
-  contributions={contributions}
-  goBack={() => setCurrentPage("campaigns")}
-  onOpenAthlete={handleOpenAthlete}
-  openSignup={() => setCurrentPage("signup")}
-/>
+      campaign={campaign}
+      athletes={athletes}
+      participations={participations}
+      contributions={contributions}
+      goBack={() => navigate("/campaigns")}
+      onOpenAthlete={onOpenAthlete}
+      openSignup={openSignup}
+    />
   );
 }
 
@@ -329,12 +330,13 @@ export default function App() {
           path="/campaign/:campaignId"
           element={
             <CampaignRoute
-              campaigns={campaigns}
-              athletes={publicAthletes}
-              participations={participations}
-              onOpenAthlete={openAthlete}
-              openSignup={openSignup}
-            />
+  campaigns={campaigns}
+  athletes={publicAthletes}
+  participations={participations}
+  contributions={contributions}
+  onOpenAthlete={openAthlete}
+  openSignup={openSignup}
+/>
           }
         />
 
