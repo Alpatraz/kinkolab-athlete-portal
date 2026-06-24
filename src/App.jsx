@@ -19,6 +19,11 @@ import { campaignsSeed } from "./data/demoData";
 
 import EligibilityCriteriaPage from "./pages/EligibilityCriteriaPage";
 
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
+import EligibilityPage from "./pages/EligibilityPage";
+import TransparencyPage from "./pages/TransparencyPage";
+
 function AthleteRoute({
   athletes,
   campaigns,
