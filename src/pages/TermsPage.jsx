@@ -1,45 +1,63 @@
-import React from 'react';
+import { gold } from "../utils/format";
 
 export default function TermsPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 text-slate-800">
-      <h1 className="text-3xl font-bold mb-2">Conditions Générales d'Utilisation et de Vente</h1>
-      <p className="text-sm text-slate-500 mb-8">Dernière mise à jour : 24 juin 2026</p>
+    <main className="min-h-screen bg-black px-5 py-16 text-white">
+      <div className="mx-auto max-w-4xl rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 shadow-2xl md:p-10">
+        <h1 className="text-4xl font-black md:text-5xl">
+          Conditions Générales d'Utilisation
+        </h1>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">1. Objet du site</h2>
-        <p>
-          Le site <em>://kinkolab.com</em> est la propriété de KinkoLab Inc. Il s'agit d'une plateforme commerciale de vente de vêtements de supporters. Chaque achat permet de financer des bourses ou des contrats de commandite pour les athlètes inscrits à notre programme.
+        <p className="mt-3 text-zinc-400">
+          Dernière mise à jour : 24 juin 2026
         </p>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">2. Nature de la transaction (Pas un don de bienfaisance)</h2>
-        <p className="bg-amber-50 border-l-4 border-amber-500 p-3 my-2 text-sm text-amber-900">
-          <strong>Avis important :</strong> En effectuant un paiement sur notre site, vous achetez un produit de consommation (vêtement). Il ne s'agit <strong>pas</strong> d'un don de bienfaisance. KinkoLab Inc. étant une société par actions privée, aucun reçu officiel aux fins d'impôt ne sera émis.
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          1. Objet du site
+        </h2>
+
+        <p className="mt-4 leading-8 text-zinc-300">
+          KinkoLab est une plateforme de vente de produits supporters destinée
+          à soutenir les athlètes participants au Programme Athlètes.
         </p>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">3. Prix, taxes et paiements</h2>
-        <ul className="list-disc pl-5 space-y-2">
-          <li>Les prix affichés sont en dollars canadiens ($ CAD).</li>
-          <li>Les taxes applicables (TPS/TVQ) s'appliquent sur la totalité du prix d'achat de l'article (ex: 60 $) selon les taux en vigueur au Québec et au Canada au moment de la transaction.</li>
-          <li>Le paiement est exigible en totalité au moment de la commande via notre passerelle sécurisée Stripe.</li>
+        <div className="mt-8 rounded-2xl border border-yellow-700/40 bg-yellow-950/20 p-6">
+          <p className="leading-7 text-yellow-100">
+            <strong>Avis important :</strong> Les achats effectués sur ce site
+            sont des achats de produits commerciaux et non des dons de
+            bienfaisance. Aucun reçu fiscal ne sera émis.
+          </p>
+        </div>
+
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          2. Prix et paiements
+        </h2>
+
+        <ul className="mt-4 list-disc space-y-3 pl-6 text-zinc-300">
+          <li>Prix affichés en dollars canadiens.</li>
+          <li>TPS et TVQ applicables en sus.</li>
+          <li>Paiement sécurisé via Stripe.</li>
         </ul>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">4. Politique de remboursement et annulation</h2>
-        <p>
-          En raison de la nature personnalisée ou exclusive des produits liés aux athlètes et du versement des fonds associés, les ventes sont fermes. En cas de défaut de fabrication du produit, veuillez contacter le support dans les 14 jours suivant la réception pour un échange. Si un remboursement complet est accordé, l'attribution des 20 $ à l'athlète pour cette vente spécifique sera annulée.
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          3. Annulations et remboursements
+        </h2>
+
+        <p className="mt-4 leading-8 text-zinc-300">
+          En cas de remboursement complet d'une commande, les montants associés
+          à l'athlète ou à la famille concernée seront automatiquement retirés
+          du suivi financier affiché sur la plateforme.
         </p>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">5. Droit applicable</h2>
-        <p>Ces conditions sont régies et interprétées conformément aux lois de la province de Québec et aux lois fédérales du Canada qui s'y appliquent.</p>
-      </section>
-    </div>
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          4. Droit applicable
+        </h2>
+
+        <p className="mt-4 leading-8 text-zinc-300">
+          Les présentes conditions sont régies par les lois du Québec et du
+          Canada.
+        </p>
+      </div>
+    </main>
   );
 }
