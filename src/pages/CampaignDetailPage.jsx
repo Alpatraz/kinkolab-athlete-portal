@@ -43,6 +43,7 @@ export default function CampaignDetailPage({
   campaign,
   athletes = [],
   participations = [],
+  contributions = [],
   goBack,
   onOpenAthlete,
   openSignup,
@@ -74,23 +75,32 @@ export default function CampaignDetailPage({
       participation.status !== "suspendu"
   );
 
-  const raisedFromParticipations = campaignParticipations.reduce(
-    (sum, participation) =>
-      sum +
-      Number(participation.raisedShop || 0) +
-      Number(participation.raisedOffline || 0) +
-      Number(participation.raisedSponsorship || 0),
+  const raisedFromContributions = (contributions || [])
+  .filter(
+    (contribution) =>
+      isActiveContribution(contribution) &&
+      contribution.campaignId === campaign.id
+  )
+  .reduce(
+    (sum, contribution) =>
+      sum + contributionAmount(contribution),
     0
   );
+
+const raisedManual = campaignParticipations.reduce(
+  (sum, participation) =>
+    sum +
+    Number(participation.raisedOffline || 0) +
+    Number(participation.raisedSponsorship || 0),
+  0
+);
 
   const goalFromParticipations = campaignParticipations.reduce(
     (sum, participation) => sum + Number(participation.goal || 0),
     0
   );
 
-  const raised =
-    raisedFromParticipations ||
-    linkedAthletes.reduce((sum, athlete) => sum + totalRaised(athlete), 0);
+  const raised = raisedFromContributions + raisedManual;
 
   const goal =
     goalFromParticipations ||
