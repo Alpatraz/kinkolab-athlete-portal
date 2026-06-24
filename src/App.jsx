@@ -284,13 +284,15 @@ export default function App() {
           path="/"
           element={
             <HomePage
-              athletes={publicAthletes}
-              campaigns={publicCampaigns}
-              openAthletes={openAthletes}
-              openCampaigns={openCampaigns}
-              openSignup={openSignup}
-              onOpenAthlete={openAthlete}
-            />
+  athletes={publicAthletes}
+  campaigns={publicCampaigns}
+  participations={participations}
+  contributions={contributions}
+  openAthletes={openAthletes}
+  openCampaigns={openCampaigns}
+  openSignup={openSignup}
+  onOpenAthlete={openAthlete}
+/>
           }
         />
 
@@ -312,12 +314,13 @@ export default function App() {
           path="/campaigns"
           element={
             <CampaignsPage
-              campaigns={publicCampaigns}
-              athletes={publicAthletes}
-              participations={participations}
-              onOpenCampaign={openCampaign}
-              openSignup={openSignup}
-            />
+  campaigns={publicCampaigns}
+  athletes={publicAthletes}
+  participations={participations}
+  contributions={contributions}
+  onOpenCampaign={openCampaign}
+  openSignup={openSignup}
+/>
           }
         />
 
