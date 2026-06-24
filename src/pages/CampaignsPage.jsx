@@ -27,7 +27,6 @@ function campaignDate(campaign) {
 
 function participationRaised(participation) {
   return (
-    Number(participation?.raisedShop || 0) +
     Number(participation?.raisedOffline || 0) +
     Number(participation?.raisedSponsorship || 0)
   );
@@ -42,6 +41,23 @@ function isActiveParticipation(participation) {
     participation.status !== "archivé" &&
     participation.status !== "archive"
   );
+}
+
+function contributionAmount(contribution) {
+  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
+}
+
+function isActiveContribution(contribution) {
+  const status = String(contribution?.status || "reserved").toLowerCase();
+
+  return ![
+    "cancelled",
+    "annulé",
+    "annule",
+    "refunded",
+    "remboursé",
+    "rembourse",
+  ].includes(status);
 }
 
 export default function CampaignsPage({
@@ -98,32 +114,22 @@ export default function CampaignsPage({
     );
   }
 
-function contributionAmount(contribution) {
-  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
-}
-
-function isActiveContribution(contribution) {
-  const status = String(contribution?.status || "reserved").toLowerCase();
-  return !["cancelled", "annulé", "refunded", "remboursé"].includes(status);
-}
-  
   function campaignRaised(campaignId) {
-  const contributionTotal = (contributions || [])
-    .filter((contribution) => {
-      return (
-        isActiveContribution(contribution) &&
-        contribution.campaignId === campaignId
-      );
-    })
-    .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
+    const contributionTotal = (contributions || [])
+      .filter(
+        (contribution) =>
+          isActiveContribution(contribution) &&
+          contribution.campaignId === campaignId
+      )
+      .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
 
-  const participationTotal = campaignParticipations(campaignId).reduce(
-    (sum, participation) => sum + participationRaised(participation),
-    0
-  );
+    const manualTotal = campaignParticipations(campaignId).reduce(
+      (sum, participation) => sum + participationRaised(participation),
+      0
+    );
 
-  return Math.max(contributionTotal, participationTotal);
-}
+    return contributionTotal + manualTotal;
+  }
 
   return (
     <main className="min-h-screen bg-black p-4 text-white md:p-8">
