@@ -1,38 +1,51 @@
-import React from 'react';
+import { gold } from "../utils/format";
 
 export default function EligibilityPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 text-slate-800">
-      <h1 className="text-3xl font-bold mb-2">Admissibilité des Athlètes</h1>
-      <p className="text-sm text-slate-500 mb-8">Critères et encadrement du Programme Athlètes KinkoLab</p>
+    <main className="min-h-screen bg-black px-5 py-16 text-white">
+      <div className="mx-auto max-w-4xl rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 shadow-2xl md:p-10">
+        <h1 className="text-4xl font-black md:text-5xl">
+          Admissibilité Sportive
+        </h1>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">1. Qui peut s'inscrire ?</h2>
-        <p className="mb-2">Le programme est ouvert aux profils suivants résidant au Canada :</p>
-        <ul className="list-disc pl-5 space-y-2">
-          <li>Athlètes amateurs (sports individuels ou collectifs).</li>
-          <li>Athlètes d'élite, espoirs et de niveau universitaire.</li>
-          <li>Les athlètes âgés de moins de 18 ans doivent obligatoirement fournir une autorisation écrite de leur parent ou tuteur légal, qui sera le signataire officiel de l'entente.</li>
-        </ul>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">2. Préservation du statut d'athlète amateur (Règlementation sportive)</h2>
-        <p className="bg-sky-50 border-l-4 border-sky-500 p-4 text-sm text-sky-900 mb-4">
-          <strong>Avis aux athlètes scolaires et universitaires (ex: RSEQ, U Sports, NCAA) :</strong> Recevoir du soutien financier direct peut être soumis à des règles strictes de la part de vos fédérations sportives. KinkoLab Inc. structure l'attribution de ses fonds sous forme de <strong>bourse de soutien ou de contrat de commandite marketing (droits d'image)</strong>. 
+        <p className="mt-8 leading-8 text-zinc-300">
+          Le Programme Athlètes KinkoLab est ouvert aux athlètes canadiens
+          souhaitant financer leur développement sportif.
         </p>
-        <p className="text-sm font-medium">Il est de la responsabilité exclusive de l'athlète ou de sa famille de vérifier auprès de sa fédération ou de son établissement d'enseignement si ce type de partenariat est autorisé afin de ne pas compromettre son éligibilité sportive.</p>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">3. Engagements de l'athlète</h2>
-        <p className="mb-2">Pour conserver son profil actif sur la plateforme et recevoir ses versements, l'athlète s'engage à :</p>
-        <ul className="list-disc pl-5 space-y-2">
-          <li>Fournir des informations exactes sur son parcours et ses besoins de financement.</li>
-          <li>Respecter l'éthique sportive et l'esprit du programme KinkoLab (aucun comportement discriminatoire, violent ou antisportif ne sera toléré).</li>
-          <li>Autoriser KinkoLab à utiliser son nom, son image et sa biographie sportive dans le cadre exclusif de la promotion de ses vêtements supporters.</li>
+        <div className="mt-8 rounded-2xl border border-red-700/40 bg-red-950/20 p-6">
+          <h2 className="text-xl font-black text-red-300">
+            Rappel important
+          </h2>
+
+          <p className="mt-3 leading-8 text-red-100">
+            Il est de la responsabilité exclusive de l'athlète ou de sa famille
+            de vérifier que les sommes reçues dans le cadre du Programme
+            Athlètes respectent les règlements de sa fédération sportive, de son
+            établissement scolaire ou universitaire.
+          </p>
+        </div>
+
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          Qui peut participer ?
+        </h2>
+
+        <ul className="mt-4 list-disc space-y-3 pl-6 text-zinc-300">
+          <li>Athlètes amateurs.</li>
+          <li>Athlètes de niveau provincial, national ou international.</li>
+          <li>Mineurs avec autorisation parentale.</li>
         </ul>
-      </section>
-    </div>
+
+        <h2 className="mt-10 text-2xl font-black" style={{ color: gold }}>
+          Engagements
+        </h2>
+
+        <ul className="mt-4 list-disc space-y-3 pl-6 text-zinc-300">
+          <li>Respecter l'éthique sportive.</li>
+          <li>Fournir des informations exactes.</li>
+          <li>Maintenir une image compatible avec les valeurs de KinkoLab.</li>
+        </ul>
+      </div>
+    </main>
   );
 }
