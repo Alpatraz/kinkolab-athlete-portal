@@ -49,7 +49,16 @@ function participationRaised(participation) {
   );
 }
 
-function campaignStats(campaign, athletes = [], participations = []) {
+function contributionAmount(contribution) {
+  return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
+}
+
+function isActiveContribution(contribution) {
+  const status = String(contribution?.status || "reserved").toLowerCase();
+  return !["cancelled", "annulé", "refunded", "remboursé"].includes(status);
+}
+
+function campaignStats(campaign, athletes = [], participations = [], contributions = []) {
   const campaignParticipations = (participations || []).filter(
     (participation) =>
       participation.campaignId === campaign.id &&
@@ -59,23 +68,45 @@ function campaignStats(campaign, athletes = [], participations = []) {
       participation.status !== "archivé"
   );
 
+  const activeContributions = (contributions || []).filter(
+    (contribution) =>
+      isActiveContribution(contribution) &&
+      contribution.campaignId === campaign.id
+  );
+
+  const contributionRaised = activeContributions.reduce(
+    (sum, contribution) => sum + contributionAmount(contribution),
+    0
+  );
+
   if (campaignParticipations.length > 0) {
     const athleteIds = new Set(
       campaignParticipations.map((item) => item.athleteId)
     );
 
     return {
-      athletesCount: Array.from(athleteIds).length,
-      raised: campaignParticipations.reduce(
-        (sum, item) => sum + participationRaised(item),
-        0
-      ),
+      athletesCount: Array.from(athleteIds).filter(Boolean).length,
+      raised: contributionRaised,
       goal: campaignParticipations.reduce(
         (sum, item) => sum + Number(item.goal || 0),
         0
       ),
     };
   }
+
+  const linkedAthletes = (athletes || []).filter(
+    (athlete) => athlete.campaignId === campaign.id && isVisibleAthlete(athlete)
+  );
+
+  return {
+    athletesCount: linkedAthletes.length,
+    raised: contributionRaised,
+    goal: linkedAthletes.reduce(
+      (sum, athlete) => sum + Number(athlete.goal || 0),
+      0
+    ),
+  };
+}
 
   const linkedAthletes = (athletes || []).filter(
     (athlete) => athlete.campaignId === campaign.id && isVisibleAthlete(athlete)
@@ -134,8 +165,8 @@ function StepCard({ number, icon: Icon, title, children }) {
   );
 }
 
-function CampaignCard({ campaign, athletes, participations, onOpenCampaign }) {
-  const stats = campaignStats(campaign, athletes, participations);
+function CampaignCard({ campaign, athletes, participations, contributions, onOpenCampaign }) {
+  const stats = campaignStats(campaign, athletes, participations, contributions);
   const percent = stats.goal
     ? Math.min(Math.round((stats.raised / stats.goal) * 100), 100)
     : 0;
@@ -220,6 +251,7 @@ export default function HomePage({
   athletes = [],
   campaigns = [],
   participations = [],
+  contributions = [],
   openAthletes,
   openCampaigns,
   openSignup,
@@ -257,18 +289,16 @@ export default function HomePage({
   const visibleCampaigns = (campaigns || []).filter(isVisibleCampaign);
   const visibleAthletes = (athletes || []).filter(isVisibleAthlete);
 
-  const totalRaisedFromParticipations = (participations || []).reduce(
-    (sum, item) => sum + participationRaised(item),
-    0
-  );
+  const totalRaisedFromContributions = (contributions || [])
+  .filter(isActiveContribution)
+  .reduce((sum, contribution) => sum + contributionAmount(contribution), 0);
 
   const fallbackRaised = visibleAthletes.reduce(
     (sum, athlete) => sum + totalRaised(athlete),
     0
   );
 
-  const raised = totalRaisedFromParticipations || fallbackRaised;
-
+const raised = totalRaisedFromContributions || fallbackRaised;
   return (
     <main className="min-h-screen bg-black text-white">
       <section
@@ -394,12 +424,13 @@ export default function HomePage({
 
             {visibleCampaigns.map((campaign) => (
               <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-                athletes={visibleAthletes}
-                participations={participations}
-                onOpenCampaign={openCampaigns}
-              />
+  key={campaign.id}
+  campaign={campaign}
+  athletes={visibleAthletes}
+  participations={participations}
+  contributions={contributions}
+  onOpenCampaign={openCampaigns}
+/>
             ))}
           </div>
         </div>
