@@ -423,9 +423,40 @@ export default function App() {
     />
   }
 />
+
+        <Route
+          path="/privacy"
+          element={<PrivacyPolicyPage goBack={goHome} />}
+        />
+
+        <Route
+          path="/terms"
+          element={<TermsPage goBack={goHome} />}
+        />
+
+        <Route
+          path="/eligibility"
+          element={<EligibilityPage goBack={goHome} />}
+        />
+
+        <Route
+          path="/transparency"
+          element={<TransparencyPage goBack={goHome} />}
+        />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      <Footer
+        goHome={goHome}
+        openAthletes={openAthletes}
+        openCampaigns={openCampaigns}
+        openSignup={openSignup}
+        openPrivacy={() => navigate("/privacy")}
+        openTerms={() => navigate("/terms")}
+        openEligibility={() => navigate("/eligibility")}
+        openTransparency={() => navigate("/transparency")}
+      />
     </div>
   );
 }
