@@ -68,9 +68,9 @@ function CampaignRoute({
   athletes={athletes}
   participations={participations}
   contributions={contributions}
-  goBack={...}
-  onOpenAthlete={...}
-  openSignup={...}
+  goBack={() => setCurrentPage("campaigns")}
+  onOpenAthlete={handleOpenAthlete}
+  openSignup={() => setCurrentPage("signup")}
 />
   );
 }
