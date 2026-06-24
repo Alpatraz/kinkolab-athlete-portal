@@ -366,12 +366,13 @@ const raisedManual = campaignParticipations.reduce(
 
               {linkedAthletes.map((athlete) => (
                 <AthleteCard
-                  key={athlete.id}
-                  athlete={athlete}
-                  campaigns={[campaign]}
-                  onOpen={onOpenAthlete}
-                  onOpenCampaign={() => {}}
-                />
+  key={athlete.id}
+  athlete={athlete}
+  campaigns={[campaign]}
+  contributions={contributions}
+  onOpen={onOpenAthlete}
+  onOpenCampaign={() => {}}
+/>
               ))}
             </div>
           </section>
