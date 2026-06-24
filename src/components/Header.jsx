@@ -101,79 +101,106 @@ export default function Header({
       </div>
 
       {mobileOpen && (
-        <div className="absolute left-0 right-0 top-full border-b border-zinc-800 bg-black/98 px-4 py-4 shadow-2xl lg:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col gap-2">
-            <button
-              onClick={() => closeAndRun(goHome)}
-              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-            >
-              Accueil
-            </button>
-
-            <button
-              onClick={() => closeAndRun(openAthletes)}
-              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-            >
-              Athlètes
-            </button>
-
-            <button
-              onClick={() => closeAndRun(openCampaigns)}
-              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-            >
-              Campagnes
-            </button>
-
-            {currentUser && (
-              <button
-                onClick={() => closeAndRun(openDashboard)}
-                className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-              >
-                Mon espace
-              </button>
-            )}
-
-            <button
-              onClick={() => closeAndRun(openSignup)}
-              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-            >
-              Inscription
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => closeAndRun(openAdmin)}
-                className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
-              >
-                Admin
-              </button>
-            )}
-
-            <div className="mt-2 border-t border-zinc-800 pt-4">
-              {currentUser ? (
-                <button
-                  onClick={() => {
-                    setMobileOpen(false);
-                    setCurrentUser(null);
-                  }}
-                  className="w-full rounded-2xl bg-zinc-900 px-5 py-4 text-left text-base font-black text-white"
-                >
-                  Déconnexion
-                </button>
-              ) : (
-                <button
-                  onClick={() => closeAndRun(openLogin)}
-                  className="flex w-full items-center gap-2 rounded-2xl px-5 py-4 text-left text-base font-black text-black"
-                  style={{ background: gold }}
-                >
-                  <LogIn size={19} />
-                  Connexion
-                </button>
-              )}
-            </div>
-          </nav>
+  <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-xl lg:hidden">
+    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-2xl font-black text-black"
+          style={{ background: gold }}
+        >
+          K
         </div>
+
+        <div>
+          <p className="text-lg font-black tracking-wide text-white">
+            KinkoLab
+          </p>
+          <p className="text-xs text-zinc-400">
+            Programme Athlètes
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => setMobileOpen(false)}
+        className="flex h-14 w-14 items-center justify-center rounded-3xl border border-zinc-800 bg-zinc-950 text-white"
+      >
+        <X size={28} />
+      </button>
+    </div>
+
+    <nav className="p-5 space-y-4">
+      <button
+        onClick={() => closeAndRun(goHome)}
+        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+      >
+        Accueil
+      </button>
+
+      <button
+        onClick={() => closeAndRun(openAthletes)}
+        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+      >
+        Athlètes
+      </button>
+
+      <button
+        onClick={() => closeAndRun(openCampaigns)}
+        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+      >
+        Campagnes
+      </button>
+
+      {currentUser && (
+        <button
+          onClick={() => closeAndRun(openDashboard)}
+          className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        >
+          Mon espace
+        </button>
       )}
+
+      <button
+        onClick={() => closeAndRun(openSignup)}
+        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+      >
+        Inscription
+      </button>
+
+      {isAdmin && (
+        <button
+          onClick={() => closeAndRun(openAdmin)}
+          className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        >
+          Admin
+        </button>
+      )}
+
+      <div className="pt-4">
+        {currentUser ? (
+          <button
+            onClick={() => {
+              setMobileOpen(false);
+              setCurrentUser(null);
+            }}
+            className="w-full rounded-3xl bg-zinc-900 px-6 py-5 text-xl font-black text-white"
+          >
+            Déconnexion
+          </button>
+        ) : (
+          <button
+            onClick={() => closeAndRun(openLogin)}
+            className="flex w-full items-center justify-center gap-3 rounded-3xl px-6 py-5 text-xl font-black text-black shadow-xl"
+            style={{ background: gold }}
+          >
+            <LogIn size={22} />
+            Connexion
+          </button>
+        )}
+      </div>
+    </nav>
+  </div>
+)}
     </header>
   );
 }
