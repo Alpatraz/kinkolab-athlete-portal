@@ -560,7 +560,7 @@ const raised = totalRaisedFromContributions || fallbackRaised;
 
           <div className="mt-10 border-l-4 border-yellow-600 bg-zinc-950 p-6 text-sm leading-7 text-zinc-300">
             <strong style={{ color: gold }}>Note importante :</strong>{" "}
-            Le Programme Athlètes KinkoLab est un programme privé de soutien associé à la vente de produits supporters. Les achats effectués sont des achats de produits, et non des dons de bienfaisance. Les montants affichés ou amassés ne garantissent pas automatiquement un versement direct à l’athlète. Les aides peuvent être attribuées selon les règles, modalités, ventes réalisées, coûts applicables et ressources disponibles du programme.
+            Le Programme Athlètes KinkoLab est un programme privé de soutien associé à la vente de produits supporters. Les achats effectués sont des achats de produits, et non des dons de bienfaisance. Les aides peuvent être attribuées selon les règles, modalités, ventes réalisées, coûts applicables et ressources disponibles du programme.
           </div>
         </div>
       </section>
