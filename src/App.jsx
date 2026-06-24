@@ -13,6 +13,7 @@ import SignupView from "./pages/SignupView";
 import LoginView from "./pages/LoginView";
 import AdminView from "./pages/AdminView";
 import AthleteDashboard from "./pages/AthleteDashboard";
+import Footer from "./components/Footer";
 
 import { auth, db } from "./firebase";
 import { campaignsSeed } from "./data/demoData";
