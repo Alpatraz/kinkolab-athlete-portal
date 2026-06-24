@@ -1,4 +1,5 @@
-import { LogIn } from "lucide-react";
+import { useState } from "react";
+import { LogIn, Menu, X } from "lucide-react";
 import { gold } from "../utils/format";
 
 export default function Header({
@@ -10,14 +11,20 @@ export default function Header({
   openCampaigns,
   openAthletes,
   openAdmin,
-  openDashboard
+  openDashboard,
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = currentUser?.role === "admin";
 
+  function closeAndRun(action) {
+    setMobileOpen(false);
+    action?.();
+  }
+
   return (
-    <header className="sticky top-0 z-30 border-b border-zinc-800 bg-black/90 px-4 py-3 text-white backdrop-blur md:px-8">
+    <header className="sticky top-0 z-50 border-b border-zinc-800 bg-black/95 px-4 py-3 text-white backdrop-blur md:px-8">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-        <button onClick={goHome} className="flex items-center gap-3 text-left">
+        <button onClick={() => closeAndRun(goHome)} className="flex items-center gap-3 text-left">
           <div
             className="flex h-11 w-11 items-center justify-center rounded-2xl font-black text-black"
             style={{ background: gold }}
@@ -31,74 +38,142 @@ export default function Header({
           </div>
         </button>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <button
-            onClick={goHome}
-            className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-          >
+        <nav className="hidden items-center gap-2 lg:flex">
+          <button onClick={goHome} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
             Accueil
           </button>
 
-          <button
-            onClick={openAthletes}
-            className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-          >
+          <button onClick={openAthletes} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
             Athlètes
           </button>
 
-          <button
-            onClick={openCampaigns}
-            className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-          >
+          <button onClick={openCampaigns} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
             Campagnes
           </button>
 
           {currentUser && (
-            <button
-              onClick={openDashboard}
-              className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-            >
+            <button onClick={openDashboard} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
               Mon espace
             </button>
           )}
 
-          <button
-            onClick={openSignup}
-            className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-          >
+          <button onClick={openSignup} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
             Inscription
           </button>
 
           {isAdmin && (
-            <button
-              onClick={openAdmin}
-              className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white"
-            >
+            <button onClick={openAdmin} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
               Admin
             </button>
           )}
-        </div>
+        </nav>
 
         <div className="flex items-center gap-2">
-          {currentUser ? (
-            <button
-              onClick={() => setCurrentUser(null)}
-              className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white hover:bg-zinc-800"
-            >
-              Déconnexion
-            </button>
-          ) : (
-            <button
-              onClick={openLogin}
-              className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-black text-black"
-              style={{ background: gold }}
-            >
-              <LogIn size={17} />
-              Connexion
-            </button>
-          )}
+          <div className="hidden lg:block">
+            {currentUser ? (
+              <button
+                onClick={() => setCurrentUser(null)}
+                className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white hover:bg-zinc-800"
+              >
+                Déconnexion
+              </button>
+            ) : (
+              <button
+                onClick={openLogin}
+                className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-black text-black"
+                style={{ background: gold }}
+              >
+                <LogIn size={17} />
+                Connexion
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 text-white lg:hidden"
+            aria-label="Ouvrir le menu"
+          >
+            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
       </div>
+
+      {mobileOpen && (
+        <div className="absolute left-0 right-0 top-full border-b border-zinc-800 bg-black/98 px-4 py-4 shadow-2xl lg:hidden">
+          <nav className="mx-auto flex max-w-7xl flex-col gap-2">
+            <button
+              onClick={() => closeAndRun(goHome)}
+              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+            >
+              Accueil
+            </button>
+
+            <button
+              onClick={() => closeAndRun(openAthletes)}
+              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+            >
+              Athlètes
+            </button>
+
+            <button
+              onClick={() => closeAndRun(openCampaigns)}
+              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+            >
+              Campagnes
+            </button>
+
+            {currentUser && (
+              <button
+                onClick={() => closeAndRun(openDashboard)}
+                className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+              >
+                Mon espace
+              </button>
+            )}
+
+            <button
+              onClick={() => closeAndRun(openSignup)}
+              className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+            >
+              Inscription
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => closeAndRun(openAdmin)}
+                className="rounded-2xl bg-zinc-950 px-5 py-4 text-left text-base font-black text-white"
+              >
+                Admin
+              </button>
+            )}
+
+            <div className="mt-2 border-t border-zinc-800 pt-4">
+              {currentUser ? (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setCurrentUser(null);
+                  }}
+                  className="w-full rounded-2xl bg-zinc-900 px-5 py-4 text-left text-base font-black text-white"
+                >
+                  Déconnexion
+                </button>
+              ) : (
+                <button
+                  onClick={() => closeAndRun(openLogin)}
+                  className="flex w-full items-center gap-2 rounded-2xl px-5 py-4 text-left text-base font-black text-black"
+                  style={{ background: gold }}
+                >
+                  <LogIn size={19} />
+                  Connexion
+                </button>
+              )}
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
