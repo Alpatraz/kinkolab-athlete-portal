@@ -6,6 +6,29 @@ import AthleteCard from "../components/AthleteCard";
 const DEFAULT_CAMPAIGN_BANNER =
   "/images/kinkolab-campaign-default-banner.png";
 
+function contributionAmount(contribution) {
+  return Number(
+    contribution?.amountReserved ||
+    contribution?.reservedAmount ||
+    0
+  );
+}
+
+function isActiveContribution(contribution) {
+  const status = String(
+    contribution?.status || "reserved"
+  ).toLowerCase();
+
+  return ![
+    "cancelled",
+    "annulé",
+    "annule",
+    "refunded",
+    "remboursé",
+    "rembourse",
+  ].includes(status);
+}
+
 function getCampaignProducts(campaign) {
   if (Array.isArray(campaign?.products)) return campaign.products;
 
