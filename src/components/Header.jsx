@@ -55,7 +55,7 @@ export default function Header({
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-800 bg-black/95 px-4 py-3 text-white backdrop-blur md:px-8">
+    <header data-i18n-managed className="sticky top-0 z-50 border-b border-zinc-800 bg-black/95 px-4 py-3 text-white backdrop-blur md:px-8">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
         <button onClick={() => closeAndRun(goHome)} className="flex items-center gap-3 text-left">
           <div

@@ -29,11 +29,12 @@ function localizeDom(language) {
   const root = document.getElementById("root");
   if (!root) return () => {};
   const translateNode = (node) => {
-    if (node.nodeType === Node.TEXT_NODE && node.parentElement && !node.parentElement.closest("[data-i18n-preserve]")) {
+    if (node.nodeType === Node.TEXT_NODE && node.parentElement && !node.parentElement.closest("[data-i18n-preserve], [data-i18n-managed]")) {
       if (!domOriginals.has(node)) domOriginals.set(node, node.nodeValue);
-      node.nodeValue = language === "en" ? translateExact(domOriginals.get(node)) : domOriginals.get(node);
+      const nextValue = language === "en" ? translateExact(domOriginals.get(node)) : domOriginals.get(node);
+      if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
     }
-    if (node.nodeType === Node.ELEMENT_NODE) {
+    if (node.nodeType === Node.ELEMENT_NODE && !node.closest?.("[data-i18n-managed]")) {
       ["placeholder", "aria-label", "title"].forEach((attribute) => {
         if (!node.hasAttribute(attribute)) return;
         const originalAttribute = `data-i18n-original-${attribute}`;
@@ -50,8 +51,11 @@ function localizeDom(language) {
     while (walker.nextNode()) translateNode(walker.currentNode);
   };
   walk(root);
-  const observer = new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach(walk)));
-  observer.observe(root, { childList: true, subtree: true });
+  const observer = new MutationObserver((records) => records.forEach((record) => {
+    if (record.type === "characterData") walk(record.target);
+    record.addedNodes.forEach(walk);
+  }));
+  observer.observe(root, { childList: true, characterData: true, subtree: true });
   return () => observer.disconnect();
 }
 
@@ -65,6 +69,12 @@ export function LanguageProvider({ children }) {
     document.documentElement.lang = language;
     document.title = language === "en" ? "KinkoLab Athlete Program" : "KinkoLab — Programme Athlètes";
     return localizeDom(language);
+  }, [language]);
+
+  useEffect(() => {
+    const nativeAlert = window.alert.bind(window);
+    window.alert = (message) => nativeAlert(language === "en" && typeof message === "string" ? translateExact(message) : message);
+    return () => { window.alert = nativeAlert; };
   }, [language]);
 
   const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
