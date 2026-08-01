@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, Languages, LogIn, Menu, X } from "lucide-react";
+import { LogIn, Menu, X } from "lucide-react";
 import { gold } from "../utils/format";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -15,37 +15,14 @@ export default function Header({
   openDashboard,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [languageOpen, setLanguageOpen] = useState(false);
   const isAdmin = currentUser?.role === "admin";
   const { language, setLanguage, t } = useLanguage();
 
-  function chooseLanguage(nextLanguage) {
-    setLanguage(nextLanguage);
-    setLanguageOpen(false);
-  }
-
   const LanguageSelector = ({ mobile = false }) => (
-    <div className={`relative ${mobile ? "w-full" : ""}`}>
-      <button
-        type="button"
-        onClick={() => setLanguageOpen((value) => !value)}
-        className={`${mobile ? "w-full justify-between rounded-3xl px-6 py-4 text-lg" : "rounded-2xl px-3 py-2 text-sm"} flex items-center gap-2 border border-zinc-700 bg-zinc-950 font-black text-white hover:border-yellow-500`}
-        aria-label={t("language.selector")}
-        aria-expanded={languageOpen}
-      >
-        <Languages size={18} style={{ color: gold }} />
-        <span>{language === "fr" ? "FR" : "EN"}</span>
-        <ChevronDown size={15} className={languageOpen ? "rotate-180 transition" : "transition"} />
-      </button>
-      {languageOpen && (
-        <div className={`absolute right-0 z-[1000] mt-2 min-w-44 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950 p-1 shadow-2xl ${mobile ? "left-0" : ""}`}>
-          {[["fr", "🇨🇦", t("language.french")], ["en", "🇨🇦", t("language.english")]].map(([code, flag, label]) => (
-            <button key={code} type="button" onClick={() => chooseLanguage(code)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-white hover:bg-zinc-800">
-              <span aria-hidden="true">{flag}</span><span className="flex-1">{label}</span>{language === code && <Check size={16} style={{ color: gold }} />}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className={`${mobile ? "w-full justify-center rounded-3xl px-6 py-4 text-lg" : "rounded-2xl px-3 py-2 text-sm"} flex items-center gap-2 border border-zinc-700 bg-zinc-950 font-black`} aria-label={t("language.selector")}>
+      <button type="button" onClick={() => setLanguage("fr")} className={language === "fr" ? "text-yellow-400" : "text-zinc-400 hover:text-white"} aria-pressed={language === "fr"}>FR</button>
+      <span className="text-zinc-600" aria-hidden="true">/</span>
+      <button type="button" onClick={() => setLanguage("en")} className={language === "en" ? "text-yellow-400" : "text-zinc-400 hover:text-white"} aria-pressed={language === "en"}>EN</button>
     </div>
   );
 
