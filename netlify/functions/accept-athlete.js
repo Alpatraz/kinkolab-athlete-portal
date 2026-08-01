@@ -97,12 +97,16 @@ function buildAthlete(application, uid, familyId) {
     shopifyUrl: "https://kinkolab.com",
     sponsorUrl: "https://kinkolab.com",
 
+    fundingPurposeFr: application.campaignReasonFr || application.campaignReason || "",
+    fundingPurposeEn: application.campaignReasonEn || "",
     fundingPurpose:
-      application.campaignReason ||
+      application.campaignReasonFr || application.campaignReasonEn || application.campaignReason ||
       "financer sa préparation, son déplacement, son hébergement et son équipement",
 
+    bioFr: application.motivationFr || application.motivation || "",
+    bioEn: application.motivationEn || "",
     bio:
-      application.motivation ||
+      application.motivationFr || application.motivationEn || application.motivation ||
       `${athleteName} rejoint le Programme Athlètes KinkoLab.`,
 
     profitNote: `100 % des profits des ventes associées à ${athleteName} sont remis à ${athleteName}.`,

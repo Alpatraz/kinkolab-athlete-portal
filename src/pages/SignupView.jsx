@@ -199,10 +199,10 @@ export default function SignupView({ goBack, openEligibility }) {
     athleteStatus: "Athlète",
     campaignId: "world-2026",
     desiredGoal: "",
-    campaignReason: "",
-    motivation: "",
-    sportGoals: "",
-    targetedCompetitions: "",
+    campaignReasonFr: "", campaignReasonEn: "",
+    motivationFr: "", motivationEn: "",
+    sportGoalsFr: "", sportGoalsEn: "",
+    targetedCompetitionsFr: "", targetedCompetitionsEn: "",
     athleteSocials: "",
     instagram: "",
     facebook: "",
@@ -267,6 +267,10 @@ export default function SignupView({ goBack, openEligibility }) {
 
   async function submitApplication(event) {
     event.preventDefault();
+    if (!(form.motivationFr.trim() || form.motivationEn.trim()) || !(form.campaignReasonFr.trim() || form.campaignReasonEn.trim())) {
+      alert("Présentez-vous et expliquez votre campagne dans au moins une langue.");
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -274,6 +278,10 @@ export default function SignupView({ goBack, openEligibility }) {
         type,
         status: "en_attente",
         ...form,
+        motivation: form.motivationFr || form.motivationEn,
+        campaignReason: form.campaignReasonFr || form.campaignReasonEn,
+        sportGoals: form.sportGoalsFr || form.sportGoalsEn,
+        targetedCompetitions: form.targetedCompetitionsFr || form.targetedCompetitionsEn,
         consents,
         athleteName: `${form.firstName} ${form.lastName}`.trim(),
         campaignTitle: selectedCampaignTitle,
@@ -591,32 +599,58 @@ export default function SignupView({ goBack, openEligibility }) {
             <section className="border border-yellow-700/40 bg-zinc-950/50 p-6 md:p-8">
               <SectionTitle>Présentation</SectionTitle>
 
-              <div className="grid gap-5">
+              <p className="mb-5 text-sm text-zinc-400">Vous pouvez répondre en français, en anglais ou dans les deux langues.</p>
+              <div className="grid gap-5 md:grid-cols-2">
                 <FormTextarea
-                  label="Présentez-vous"
-                  value={form.motivation}
-                  onChange={(value) => update("motivation", value)}
+                  label="Présentez-vous — Français"
+                  value={form.motivationFr}
+                  onChange={(value) => update("motivationFr", value)}
+                  required={false}
                   placeholder="Parlez de votre parcours, de votre discipline et de ce qui vous motive."
                 />
                 <FormTextarea
-                  label="Pourquoi souhaitez-vous rejoindre le programme ?"
-                  value={form.campaignReason}
-                  onChange={(value) => update("campaignReason", value)}
+                  label="Introduce yourself — English"
+                  value={form.motivationEn}
+                  onChange={(value) => update("motivationEn", value)}
+                  required={false}
+                  placeholder="Tell us about your journey, discipline and motivation."
+                />
+                <FormTextarea
+                  label="Pourquoi rejoindre le programme ? — Français"
+                  value={form.campaignReasonFr}
+                  onChange={(value) => update("campaignReasonFr", value)}
+                  required={false}
                   placeholder="Expliquez pourquoi cette campagne est importante pour vous."
                 />
                 <FormTextarea
-                  label="Objectifs sportifs"
-                  value={form.sportGoals}
-                  onChange={(value) => update("sportGoals", value)}
+                  label="Why join the program? — English"
+                  value={form.campaignReasonEn}
+                  onChange={(value) => update("campaignReasonEn", value)}
+                  required={false}
+                  placeholder="Explain why this campaign matters to you."
+                />
+                <FormTextarea
+                  label="Objectifs sportifs — Français"
+                  value={form.sportGoalsFr}
+                  onChange={(value) => update("sportGoalsFr", value)}
+                  required={false}
                   placeholder="Vos objectifs pour la saison ou la compétition visée."
                 />
                 <FormTextarea
-                  label="Compétitions visées"
-                  value={form.targetedCompetitions}
-                  onChange={(value) => update("targetedCompetitions", value)}
+                  label="Athletic goals — English"
+                  value={form.sportGoalsEn}
+                  onChange={(value) => update("sportGoalsEn", value)}
+                  required={false}
+                  placeholder="Your goals for the season or target competition."
+                />
+                <FormTextarea
+                  label="Compétitions visées — Français"
+                  value={form.targetedCompetitionsFr}
+                  onChange={(value) => update("targetedCompetitionsFr", value)}
                   required={false}
                   placeholder="Ex. WKC Spain 2026, WAKO Italie 2026, championnats provinciaux..."
                 />
+                <FormTextarea label="Target competitions — English" value={form.targetedCompetitionsEn} onChange={(value) => update("targetedCompetitionsEn", value)} required={false} placeholder="E.g. WKC Spain 2026, WAKO Italy 2026, provincial championships..." />
               </div>
             </section>
 

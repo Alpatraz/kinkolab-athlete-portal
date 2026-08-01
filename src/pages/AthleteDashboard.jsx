@@ -31,6 +31,7 @@ import { campaignTitle, gold, money } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import { contributionTotal } from "../services/fundTransactions";
 import { uploadAthleteMedia } from "../services/mediaUpload";
+import { bilingualPayload, localizedField } from "../utils/localizedContent";
 
 const PROVINCES = [
   "Alberta",
@@ -324,31 +325,31 @@ export default function AthleteDashboard({
     belt: "",
     programRequested: "",
     athleteStatus: "",
-    bio: "",
-    fundingPurpose: "",
+    bioFr: "", bioEn: "",
+    fundingPurposeFr: "", fundingPurposeEn: "",
     photoUrl: "",
     athleteSocials: "",
   });
 
   const [participationForm, setParticipationForm] = useState({
     goal: "",
-    fundingNeeds: "",
-    campaignReason: "",
-    publicMessage: "",
+    fundingNeedsFr: "", fundingNeedsEn: "",
+    campaignReasonFr: "", campaignReasonEn: "",
+    publicMessageFr: "", publicMessageEn: "",
     isPublic: true,
   });
 
   const [newUpdate, setNewUpdate] = useState({
-    title: "",
-    content: "",
+    titleFr: "", titleEn: "",
+    contentFr: "", contentEn: "",
     type: "Nouvelle",
     mediaUrl: "",
   });
 
   const [newEvent, setNewEvent] = useState({
-    title: "",
+    titleFr: "", titleEn: "",
     date: "",
-    description: "",
+    descriptionFr: "", descriptionEn: "",
     goal: "",
     amountRaised: "",
     participationId: "",
@@ -424,12 +425,10 @@ export default function AthleteDashboard({
       belt: selectedAthlete.belt || "",
       programRequested: selectedAthlete.campaignId || selectedAthlete.programRequested || "",
       athleteStatus: selectedAthlete.athleteStatus || "",
-      bio: selectedAthlete.bio || selectedAthlete.presentation || "",
-      fundingPurpose:
-        selectedAthlete.fundingPurpose ||
-        selectedAthlete.objective ||
-        selectedAthlete.goalText ||
-        "",
+      bioFr: selectedAthlete.bioFr || selectedAthlete.bio || selectedAthlete.presentation || "",
+      bioEn: selectedAthlete.bioEn || "",
+      fundingPurposeFr: selectedAthlete.fundingPurposeFr || selectedAthlete.fundingPurpose || selectedAthlete.objective || selectedAthlete.goalText || "",
+      fundingPurposeEn: selectedAthlete.fundingPurposeEn || "",
       photoUrl: selectedAthlete.photoUrl || "",
       athleteSocials: selectedAthlete.athleteSocials || "",
     });
@@ -494,8 +493,14 @@ export default function AthleteDashboard({
           goal: 0,
           raised: 0,
           fundingNeeds: participation.fundingNeeds || "",
+          fundingNeedsFr: participation.fundingNeedsFr || participation.fundingNeeds || "",
+          fundingNeedsEn: participation.fundingNeedsEn || "",
           campaignReason: participation.campaignReason || "",
+          campaignReasonFr: participation.campaignReasonFr || participation.campaignReason || "",
+          campaignReasonEn: participation.campaignReasonEn || "",
           publicMessage: participation.publicMessage || "",
+          publicMessageFr: participation.publicMessageFr || participation.publicMessage || "",
+          publicMessageEn: participation.publicMessageEn || "",
           isPublic: participation.isPublic !== false,
         });
       }
@@ -508,6 +513,12 @@ export default function AthleteDashboard({
       if (!group.fundingNeeds && participation.fundingNeeds) group.fundingNeeds = participation.fundingNeeds;
       if (!group.campaignReason && participation.campaignReason) group.campaignReason = participation.campaignReason;
       if (!group.publicMessage && participation.publicMessage) group.publicMessage = participation.publicMessage;
+      if (!group.fundingNeedsFr && participation.fundingNeedsFr) group.fundingNeedsFr = participation.fundingNeedsFr;
+      if (!group.fundingNeedsEn && participation.fundingNeedsEn) group.fundingNeedsEn = participation.fundingNeedsEn;
+      if (!group.campaignReasonFr && participation.campaignReasonFr) group.campaignReasonFr = participation.campaignReasonFr;
+      if (!group.campaignReasonEn && participation.campaignReasonEn) group.campaignReasonEn = participation.campaignReasonEn;
+      if (!group.publicMessageFr && participation.publicMessageFr) group.publicMessageFr = participation.publicMessageFr;
+      if (!group.publicMessageEn && participation.publicMessageEn) group.publicMessageEn = participation.publicMessageEn;
     });
 
     return Array.from(map.values());
@@ -592,11 +603,12 @@ export default function AthleteDashboard({
         campaignTitle:
           activeCampaignOptions.find((campaign) => campaign.id === form.programRequested)?.title || "",
         athleteStatus: form.athleteStatus,
-        bio: form.bio,
-        presentation: form.bio,
-        fundingPurpose: form.fundingPurpose,
-        objective: form.fundingPurpose,
-        goalText: form.fundingPurpose,
+        ...bilingualPayload(form, ["bio", "fundingPurpose"]),
+        bio: form.bioFr || form.bioEn,
+        presentation: form.bioFr || form.bioEn,
+        fundingPurpose: form.fundingPurposeFr || form.fundingPurposeEn,
+        objective: form.fundingPurposeFr || form.fundingPurposeEn,
+        goalText: form.fundingPurposeFr || form.fundingPurposeEn,
         photoUrl: form.photoUrl,
         athleteSocials: form.athleteSocials,
         updatedAt: serverTimestamp(),
@@ -654,9 +666,9 @@ export default function AthleteDashboard({
     setEditingParticipationGroup(group);
     setParticipationForm({
       goal: String(group.goal || ""),
-      fundingNeeds: group.fundingNeeds || "",
-      campaignReason: group.campaignReason || "",
-      publicMessage: group.publicMessage || "",
+      fundingNeedsFr: group.fundingNeedsFr || group.fundingNeeds || "", fundingNeedsEn: group.fundingNeedsEn || "",
+      campaignReasonFr: group.campaignReasonFr || group.campaignReason || "", campaignReasonEn: group.campaignReasonEn || "",
+      publicMessageFr: group.publicMessageFr || group.publicMessage || "", publicMessageEn: group.publicMessageEn || "",
       isPublic: group.isPublic !== false,
     });
     setActiveTab("campaigns");
@@ -682,9 +694,10 @@ export default function AthleteDashboard({
 
           return updateDoc(doc(db, "campaignParticipations", participation.id), {
             goal: Math.round(nextGoal),
-            fundingNeeds: participationForm.fundingNeeds,
-            campaignReason: participationForm.campaignReason,
-            publicMessage: participationForm.publicMessage,
+            ...bilingualPayload(participationForm, ["fundingNeeds", "campaignReason", "publicMessage"]),
+            fundingNeeds: participationForm.fundingNeedsFr || participationForm.fundingNeedsEn,
+            campaignReason: participationForm.campaignReasonFr || participationForm.campaignReasonEn,
+            publicMessage: participationForm.publicMessageFr || participationForm.publicMessageEn,
             isPublic: participationForm.isPublic,
             updatedAt: serverTimestamp(),
           });
@@ -703,8 +716,8 @@ export default function AthleteDashboard({
 
   async function publishUpdate() {
     if (!selectedAthlete?.id) return;
-    if (!newUpdate.title.trim() || !newUpdate.content.trim()) {
-      alert("Le titre et le texte sont obligatoires.");
+    if (!(newUpdate.titleFr.trim() || newUpdate.titleEn.trim()) || !(newUpdate.contentFr.trim() || newUpdate.contentEn.trim())) {
+      alert("Ajoutez un titre et un texte dans au moins une langue.");
       return;
     }
 
@@ -713,8 +726,9 @@ export default function AthleteDashboard({
         athleteId: selectedAthlete.id,
         athleteName: selectedAthlete.name,
         familyId: currentUser?.familyId || null,
-        title: newUpdate.title,
-        content: newUpdate.content,
+        ...bilingualPayload(newUpdate, ["title", "content"]),
+        title: newUpdate.titleFr || newUpdate.titleEn,
+        content: newUpdate.contentFr || newUpdate.contentEn,
         type: newUpdate.type,
         mediaUrl: newUpdate.mediaUrl,
         status: "en_attente",
@@ -722,7 +736,7 @@ export default function AthleteDashboard({
         date: new Date().toISOString().slice(0, 10),
       });
 
-      setNewUpdate({ title: "", content: "", type: "Nouvelle", mediaUrl: "" });
+      setNewUpdate({ titleFr: "", titleEn: "", contentFr: "", contentEn: "", type: "Nouvelle", mediaUrl: "" });
       alert("Nouvelle soumise pour validation.");
     } catch (error) {
       console.error("Erreur ajout nouvelle:", error);
@@ -732,8 +746,8 @@ export default function AthleteDashboard({
 
   async function createFundingEvent() {
     if (!selectedAthlete?.id) return;
-    if (!newEvent.title.trim()) {
-      alert("Le titre de l’événement est obligatoire.");
+    if (!(newEvent.titleFr.trim() || newEvent.titleEn.trim())) {
+      alert("Ajoutez le titre de l’événement dans au moins une langue.");
       return;
     }
 
@@ -754,9 +768,10 @@ export default function AthleteDashboard({
           campaignTitle(campaigns, linkedParticipation?.campaignId) ||
           null,
         participationId: linkedParticipation?.id || null,
-        title: newEvent.title,
+        ...bilingualPayload(newEvent, ["title", "description"]),
+        title: newEvent.titleFr || newEvent.titleEn,
         date: newEvent.date,
-        description: newEvent.description,
+        description: newEvent.descriptionFr || newEvent.descriptionEn,
         goal: Number(newEvent.goal || 0),
         raised: amountRaised,
         amountRaised,
@@ -780,22 +795,22 @@ export default function AthleteDashboard({
             campaignTitle(campaigns, linkedParticipation.campaignId),
           participationId: linkedParticipation.id,
           source: "Événement",
-          productName: newEvent.title,
+          productName: newEvent.titleFr || newEvent.titleEn,
           contributorName: "Événement de financement",
           customerName: "Événement de financement",
           amountReserved: amountRaised,
           reservedAmount: amountRaised,
           currency: "CAD",
-          note: newEvent.description || "Résultat financier d’un événement",
+          note: newEvent.descriptionFr || newEvent.descriptionEn || "Résultat financier d’un événement",
           displayDate: newEvent.date || new Date().toISOString().slice(0, 10),
           createdAt: serverTimestamp(),
         });
       }
 
       setNewEvent({
-        title: "",
+        titleFr: "", titleEn: "",
         date: "",
-        description: "",
+        descriptionFr: "", descriptionEn: "",
         goal: "",
         amountRaised: "",
         participationId: "",
@@ -1096,18 +1111,13 @@ export default function AthleteDashboard({
                         </select>
                       </div>
 
-                      <textarea
-                        value={form.bio}
-                        onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                        placeholder="Présentation de l’athlète"
-                        className="min-h-32 rounded-2xl border border-zinc-200 p-3"
-                      />
-                      <textarea
-                        value={form.fundingPurpose}
-                        onChange={(e) => setForm({ ...form, fundingPurpose: e.target.value })}
-                        placeholder="Objectif de financement affiché sur la page publique"
-                        className="min-h-32 rounded-2xl border border-zinc-200 p-3"
-                      />
+                      <p className="text-sm font-bold text-zinc-600">Écrivez dans une langue ou dans les deux. La version disponible servira automatiquement de repli.</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <textarea value={form.bioFr} onChange={(e) => setForm({ ...form, bioFr: e.target.value })} placeholder="Présentation — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={form.bioEn} onChange={(e) => setForm({ ...form, bioEn: e.target.value })} placeholder="Introduction — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={form.fundingPurposeFr} onChange={(e) => setForm({ ...form, fundingPurposeFr: e.target.value })} placeholder="Objectif de financement — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={form.fundingPurposeEn} onChange={(e) => setForm({ ...form, fundingPurposeEn: e.target.value })} placeholder="Funding purpose — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                      </div>
                       <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
                       <button type="button" onClick={saveAthleteProfile} disabled={saving || uploadingPhoto} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
                         <Save size={18} />
@@ -1161,9 +1171,14 @@ export default function AthleteDashboard({
 
                     <div className="mt-5 grid gap-4">
                       <input type="number" value={participationForm.goal} onChange={(e) => setParticipationForm({ ...participationForm, goal: e.target.value })} placeholder="Objectif financier" className="rounded-2xl border border-zinc-200 p-3" />
-                      <textarea value={participationForm.fundingNeeds} onChange={(e) => setParticipationForm({ ...participationForm, fundingNeeds: e.target.value })} placeholder="Besoins de financement : transport, hébergement, inscription, équipement..." className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                      <textarea value={participationForm.campaignReason} onChange={(e) => setParticipationForm({ ...participationForm, campaignReason: e.target.value })} placeholder="Pourquoi cette campagne est importante pour l’athlète ?" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                      <textarea value={participationForm.publicMessage} onChange={(e) => setParticipationForm({ ...participationForm, publicMessage: e.target.value })} placeholder="Message public affiché sur la campagne" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <textarea value={participationForm.fundingNeedsFr} onChange={(e) => setParticipationForm({ ...participationForm, fundingNeedsFr: e.target.value })} placeholder="Besoins de financement — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={participationForm.fundingNeedsEn} onChange={(e) => setParticipationForm({ ...participationForm, fundingNeedsEn: e.target.value })} placeholder="Funding needs — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={participationForm.campaignReasonFr} onChange={(e) => setParticipationForm({ ...participationForm, campaignReasonFr: e.target.value })} placeholder="Importance de la campagne — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={participationForm.campaignReasonEn} onChange={(e) => setParticipationForm({ ...participationForm, campaignReasonEn: e.target.value })} placeholder="Why this campaign matters — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={participationForm.publicMessageFr} onChange={(e) => setParticipationForm({ ...participationForm, publicMessageFr: e.target.value })} placeholder="Message public — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <textarea value={participationForm.publicMessageEn} onChange={(e) => setParticipationForm({ ...participationForm, publicMessageEn: e.target.value })} placeholder="Public message — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                      </div>
                       <label className="flex items-center gap-3 rounded-2xl bg-zinc-100 p-4 text-sm font-black text-zinc-700">
                         <input type="checkbox" checked={participationForm.isPublic} onChange={(e) => setParticipationForm({ ...participationForm, isPublic: e.target.checked })} />
                         Afficher cette participation publiquement
@@ -1295,8 +1310,12 @@ export default function AthleteDashboard({
                         <option key={athlete.id} value={athlete.id}>{athlete.name}</option>
                       ))}
                     </select>
-                    <input value={newUpdate.title} onChange={(e) => setNewUpdate({ ...newUpdate, title: e.target.value })} placeholder="Titre" className="rounded-2xl border border-zinc-200 p-3" />
-                    <textarea value={newUpdate.content} onChange={(e) => setNewUpdate({ ...newUpdate, content: e.target.value })} placeholder="Texte" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input value={newUpdate.titleFr} onChange={(e) => setNewUpdate({ ...newUpdate, titleFr: e.target.value })} placeholder="Titre — Français" lang="fr" className="rounded-2xl border border-zinc-200 p-3" />
+                      <input value={newUpdate.titleEn} onChange={(e) => setNewUpdate({ ...newUpdate, titleEn: e.target.value })} placeholder="Title — English" lang="en" className="rounded-2xl border border-zinc-200 p-3" />
+                      <textarea value={newUpdate.contentFr} onChange={(e) => setNewUpdate({ ...newUpdate, contentFr: e.target.value })} placeholder="Texte — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                      <textarea value={newUpdate.contentEn} onChange={(e) => setNewUpdate({ ...newUpdate, contentEn: e.target.value })} placeholder="Content — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    </div>
                     <input value={newUpdate.mediaUrl} onChange={(e) => setNewUpdate({ ...newUpdate, mediaUrl: e.target.value })} placeholder="URL image ou média" className="rounded-2xl border border-zinc-200 p-3" />
                     <button type="button" onClick={publishUpdate} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
                       <Plus size={18} />
@@ -1311,10 +1330,10 @@ export default function AthleteDashboard({
                     {updates.map((item) => (
                       <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">{item.title}</p>
+                          <p className="font-black text-zinc-950">{localizedField(item, "title", "fr")}</p>
                           <StatusBadge status={item.status || "en_attente"} />
                         </div>
-                        <p className="mt-1 text-sm text-zinc-600">{item.content}</p>
+                        <p className="mt-1 text-sm text-zinc-600">{localizedField(item, "content", "fr")}</p>
                         {item.mediaUrl && <p className="mt-2 text-xs text-zinc-500">Média : {item.mediaUrl}</p>}
                       </div>
                     ))}
@@ -1348,9 +1367,15 @@ export default function AthleteDashboard({
                         </option>
                       ))}
                     </select>
-                    <input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Titre de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input value={newEvent.titleFr} onChange={(e) => setNewEvent({ ...newEvent, titleFr: e.target.value })} placeholder="Titre de l’événement — Français" lang="fr" className="rounded-2xl border border-zinc-200 p-3" />
+                      <input value={newEvent.titleEn} onChange={(e) => setNewEvent({ ...newEvent, titleEn: e.target.value })} placeholder="Event title — English" lang="en" className="rounded-2xl border border-zinc-200 p-3" />
+                    </div>
                     <input type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
-                    <textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Description" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <textarea value={newEvent.descriptionFr} onChange={(e) => setNewEvent({ ...newEvent, descriptionFr: e.target.value })} placeholder="Description — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                      <textarea value={newEvent.descriptionEn} onChange={(e) => setNewEvent({ ...newEvent, descriptionEn: e.target.value })} placeholder="Description — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                    </div>
                     <input type="number" value={newEvent.goal} onChange={(e) => setNewEvent({ ...newEvent, goal: e.target.value })} placeholder="Objectif de l’événement" className="rounded-2xl border border-zinc-200 p-3" />
                     <input type="number" value={newEvent.amountRaised} onChange={(e) => setNewEvent({ ...newEvent, amountRaised: e.target.value })} placeholder="Montant réellement récolté" className="rounded-2xl border border-zinc-200 p-3" />
                     <button type="button" onClick={createFundingEvent} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white">
@@ -1366,10 +1391,10 @@ export default function AthleteDashboard({
                     {fundingEvents.map((item) => (
                       <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-black text-zinc-950">{item.title}</p>
+                          <p className="font-black text-zinc-950">{localizedField(item, "title", "fr")}</p>
                           <StatusBadge status={item.status || "en_attente"} />
                         </div>
-                        <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
+                        <p className="mt-1 text-sm text-zinc-600">{localizedField(item, "description", "fr")}</p>
                         <p className="mt-2 text-sm text-zinc-500">Date : {item.date || "À confirmer"}</p>
                         <p className="mt-1 text-sm text-zinc-500">Objectif : {money(item.goal || 0)}</p>
                         <p className="mt-1 text-sm font-black text-emerald-700">Récolté : {money(item.raised || item.amountRaised || 0)}</p>

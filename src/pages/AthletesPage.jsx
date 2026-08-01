@@ -2,6 +2,8 @@ import { Search, UserRound, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 import { campaignTitle, gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
+import { useLanguage } from "../context/LanguageContext";
+import { localizedField } from "../utils/localizedContent";
 
 function isVisibleAthlete(athlete) {
   return (
@@ -36,6 +38,7 @@ export default function AthletesPage({
   onOpenAthlete,
   onOpenCampaign,
 }) {
+  const { language } = useLanguage();
   const [search, setSearch] = useState("");
 
   function raisedForAthlete(athlete) {
@@ -180,7 +183,7 @@ export default function AthletesPage({
                   </div>
 
                   <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">
-                    {athlete.bio || athlete.fundingPurpose || "Cet athlète prépare sa campagne de financement avec KinkoLab."}
+                    {localizedField(athlete, "bio", language, ["presentation"]) || localizedField(athlete, "fundingPurpose", language, ["objective", "goalText"]) || "Cet athlète prépare sa campagne de financement avec KinkoLab."}
                   </p>
 
                   <div className="mt-5 rounded-2xl bg-black p-4">

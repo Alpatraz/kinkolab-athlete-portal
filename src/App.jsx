@@ -30,6 +30,7 @@ function AthleteRoute({
   campaigns,
   participations,
   updates,
+  fundraisingEvents,
   wallMessages,
   setWallMessages,
   onOpenCampaign,
@@ -47,6 +48,7 @@ function AthleteRoute({
       campaigns={campaigns}
       participations={participations || []}
       updates={updates || []}
+      fundraisingEvents={fundraisingEvents || []}
       wallMessages={wallMessages || []}
       setWallMessages={setWallMessages}
       goBack={() => navigate(-1)}
@@ -131,6 +133,8 @@ export default function App() {
   const [participations, setParticipations] = useState([]);
   const [wallMessages, setWallMessages] = useState([]);
   const [contributions, setContributions] = useState([]);
+  const [athleteUpdates, setAthleteUpdates] = useState([]);
+  const [fundraisingEvents, setFundraisingEvents] = useState([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -226,6 +230,14 @@ export default function App() {
 
   return () => unsubscribe();
 }, []);
+
+  useEffect(() => onSnapshot(collection(db, "athleteUpdates"), (snapshot) => {
+    setAthleteUpdates(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+  }), []);
+
+  useEffect(() => onSnapshot(collection(db, "fundraisingEvents"), (snapshot) => {
+    setFundraisingEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+  }), []);
 
   const campaigns = useMemo(() => {
   if (firebaseCampaigns.length > 0) {
@@ -353,7 +365,8 @@ export default function App() {
               athletes={athletes}
               campaigns={campaigns}
               participations={participations}
-              updates={[]}
+              updates={athleteUpdates.filter((item) => item.status === "approuvé" || item.status === "approved")}
+              fundraisingEvents={fundraisingEvents.filter((item) => item.status === "approuvé" || item.status === "approved")}
               wallMessages={wallMessages || []}
               setWallMessages={setWallMessages}
               onOpenCampaign={openCampaign}

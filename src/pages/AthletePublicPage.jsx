@@ -24,6 +24,8 @@ import { cn, gold, money, progressOf, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
+import { useLanguage } from "../context/LanguageContext";
+import { hasLocalizedField, localizedField } from "../utils/localizedContent";
 
 function SectionTitle({ icon: Icon, kicker, title, children }) {
   return (
@@ -273,12 +275,16 @@ export default function AthletePublicPage({
   campaigns = [],
   participations = [],
   updates = [],
+  fundraisingEvents: publicFundingEvents = [],
   wallMessages = [],
   setWallMessages,
   goBack,
   onOpenCampaign,
 }) {
   const safeAthlete = athlete || {};
+  const { language } = useLanguage();
+  const athleteBio = localizedField(safeAthlete, "bio", language, ["presentation"]);
+  const athleteFundingPurpose = localizedField(safeAthlete, "fundingPurpose", language, ["objective", "goalText"]);
 
   const approvedUpdates = (updates || []).filter(
     (item) => item?.athleteId === safeAthlete.id
@@ -300,7 +306,9 @@ export default function AthletePublicPage({
 
   const needs = safeAthlete.needs || [];
   const sponsors = safeAthlete.sponsors || [];
-  const fundingEvents = safeAthlete.fundingEvents || [];
+  const fundingEvents = publicFundingEvents.filter((item) => item.athleteId === safeAthlete.id).length
+    ? publicFundingEvents.filter((item) => item.athleteId === safeAthlete.id)
+    : safeAthlete.fundingEvents || [];
   const steps = safeAthlete.steps || [];
   const supportSteps = safeAthlete.supportSteps || [];
 
@@ -762,11 +770,8 @@ export default function AthletePublicPage({
                 {primaryFamilyParticipation
                   ? "Cette page présente un fonds commun familial lié à une campagne précise."
                   : `Objectif : ${
-                      safeAthlete.fundingPurpose ||
-                      safeAthlete.objective ||
-                      safeAthlete.goalText ||
-                      safeAthlete.bio ||
-                      safeAthlete.presentation ||
+                      athleteFundingPurpose ||
+                      athleteBio ||
                       "financer sa participation à la compétition"
                     }.`}
               </p>
@@ -786,7 +791,7 @@ export default function AthletePublicPage({
                 ))}
               </div>
 
-              {(safeAthlete.bio || safeAthlete.presentation) && (
+              {hasLocalizedField(safeAthlete, "bio", ["presentation"]) && (
                 <div className="mt-8 rounded-2xl border border-zinc-800 bg-black p-5">
                   <p
                     className="text-xs font-bold uppercase tracking-[0.25em]"
@@ -795,7 +800,7 @@ export default function AthletePublicPage({
                     Présentation
                   </p>
                   <p className="mt-3 text-base leading-7 text-zinc-300">
-                    {safeAthlete.bio || safeAthlete.presentation}
+                    {athleteBio}
                   </p>
                 </div>
               )}
@@ -1302,16 +1307,16 @@ export default function AthletePublicPage({
                   )}
                 </div>
 
-                <h3 className="mt-2 text-xl font-black">{item.title}</h3>
+                <h3 className="mt-2 text-xl font-black">{localizedField(item, "title", language)}</h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  {item.content}
+                  {localizedField(item, "content", language)}
                 </p>
 
                 {item.mediaUrl && (
                   <div className="mt-4 overflow-hidden rounded-2xl">
                     <img
                       src={item.mediaUrl}
-                      alt={item.title}
+                      alt={localizedField(item, "title", language)}
                       className="w-full object-cover"
                     />
                   </div>
@@ -1342,7 +1347,7 @@ export default function AthletePublicPage({
 
             {fundingEvents.map((event) => (
               <div
-                key={`${event.date}-${event.title}`}
+                key={`${event.date}-${event.id || localizedField(event, "title", language)}`}
                 className="rounded-2xl bg-black p-5"
               >
                 <p
@@ -1351,9 +1356,9 @@ export default function AthletePublicPage({
                 >
                   {event.date}
                 </p>
-                <h3 className="mt-2 text-xl font-black">{event.title}</h3>
+                <h3 className="mt-2 text-xl font-black">{localizedField(event, "title", language)}</h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  {event.description}
+                  {localizedField(event, "description", language)}
                 </p>
                 {event.goal && (
                   <p className="mt-3 text-sm font-bold text-zinc-300">
