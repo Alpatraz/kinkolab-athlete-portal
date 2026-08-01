@@ -1,5 +1,3 @@
-import { gold } from "../utils/format";
-
 export default function Footer({
   goHome,
   openAthletes,
@@ -16,14 +14,10 @@ export default function Footer({
         <div className="grid gap-10 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl font-black text-black"
-                style={{ background: gold }}
-              >
-                K
-              </div>
               <div>
-                <p className="font-black text-white">KinkoLab</p>
+                <div className="flex h-10 w-fit items-center rounded-xl bg-white px-3">
+                  <img src="/images/kinko-logo.png" alt="Kinko" className="h-6 w-auto" />
+                </div>
                 <p className="text-xs text-zinc-500">Programme Athlètes</p>
               </div>
             </div>

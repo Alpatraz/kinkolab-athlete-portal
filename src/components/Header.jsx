@@ -35,15 +35,10 @@ export default function Header({
     <header data-i18n-managed className="sticky top-0 z-50 border-b border-zinc-800 bg-black/95 px-4 py-3 text-white backdrop-blur md:px-8">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
         <button onClick={() => closeAndRun(goHome)} className="flex items-center gap-3 text-left">
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-2xl font-black text-black"
-            style={{ background: gold }}
-          >
-            K
-          </div>
-
           <div>
-            <p className="text-lg font-black tracking-wide">KinkoLab</p>
+            <div className="flex h-11 items-center rounded-xl bg-white px-3">
+              <img src="/images/kinko-logo.png" alt="Kinko" className="h-7 w-auto" />
+            </div>
             <p className="text-xs text-zinc-400">{t("brand.program")}</p>
           </div>
         </button>
@@ -115,17 +110,10 @@ export default function Header({
   <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-xl lg:hidden">
     <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
       <div className="flex items-center gap-3">
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-2xl font-black text-black"
-          style={{ background: gold }}
-        >
-          K
-        </div>
-
         <div>
-          <p className="text-lg font-black tracking-wide text-white">
-            KinkoLab
-          </p>
+          <div className="flex h-11 items-center rounded-xl bg-white px-3">
+            <img src="/images/kinko-logo.png" alt="Kinko" className="h-7 w-auto" />
+          </div>
           <p className="text-xs text-zinc-400">
             {t("brand.program")}
           </p>
