@@ -113,6 +113,7 @@ export default function CampaignDetailPage({
     about: "About the event",
     details: "Event details",
     dates: "Dates",
+    campaignPeriod: "Fundraising period",
     location: "Location",
     venue: "Venue",
     audience: "Who this campaign is for",
@@ -130,6 +131,7 @@ export default function CampaignDetailPage({
     about: "Comprendre l’événement",
     details: "Informations sur l’événement",
     dates: "Dates",
+    campaignPeriod: "Période de campagne",
     location: "Lieu",
     venue: "Site de compétition",
     audience: "Qui est concerné",
@@ -152,9 +154,12 @@ export default function CampaignDetailPage({
   const disciplines = localizedField(campaign, "disciplines", language);
   const country = language === "en" ? campaign.countryEn || campaign.country : campaign.country;
   const location = [campaign.city, country].filter(Boolean).join(", ");
-  const dates = campaign.startDate && campaign.endDate
+  const dates = campaign.eventStartDate && campaign.eventEndDate
+    ? `${campaign.eventStartDate} — ${campaign.eventEndDate}`
+    : campaign.eventDate || campaign.eventStartDate || "—";
+  const campaignPeriod = campaign.startDate && campaign.endDate
     ? `${campaign.startDate} — ${campaign.endDate}`
-    : campaign.eventDate || campaign.startDate || "—";
+    : campaign.startDate || "";
   const galleryImages = listFromField(campaign.galleryImageUrls)
     .map(safeExternalUrl)
     .filter(Boolean);
@@ -322,6 +327,7 @@ const raisedManual = campaignParticipations.reduce(
               <h2 className="text-2xl font-black">{pageCopy.details}</h2>
               <dl className="mt-6 space-y-5">
                 <CampaignFact icon={CalendarDays} label={pageCopy.dates} value={dates} />
+                {campaignPeriod && <CampaignFact icon={CalendarDays} label={pageCopy.campaignPeriod} value={campaignPeriod} />}
                 <CampaignFact icon={MapPin} label={pageCopy.location} value={location || "—"} />
                 <CampaignFact icon={Building2} label={pageCopy.venue} value={campaign.venueName || "—"} />
                 <CampaignFact icon={Medal} label={pageCopy.disciplines} value={disciplines || "—"} />

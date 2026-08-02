@@ -207,6 +207,8 @@ const emptyCampaign = {
   startDate: "",
   endDate: "",
   eventDate: "",
+  eventStartDate: "",
+  eventEndDate: "",
   goal: "",
   shopifyUrl: "",
   sponsorUrl: "",
@@ -756,6 +758,8 @@ export default function AdminView({
       startDate: campaign.startDate || "",
       endDate: campaign.endDate || "",
       eventDate: campaign.eventDate || "",
+      eventStartDate: campaign.eventStartDate || campaign.eventDate || "",
+      eventEndDate: campaign.eventEndDate || "",
       goal: campaign.goal || "",
       shopifyUrl: campaign.shopifyUrl || "",
       sponsorUrl: campaign.sponsorUrl || "",
@@ -1214,6 +1218,21 @@ export default function AdminView({
             type="date"
             value={campaignState.eventDate}
             onChange={(value) => setCampaignState({ ...campaignState, eventDate: value })}
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput
+            label="Début de l’événement"
+            type="date"
+            value={campaignState.eventStartDate}
+            onChange={(value) => setCampaignState({ ...campaignState, eventStartDate: value })}
+          />
+          <TextInput
+            label="Fin de l’événement"
+            type="date"
+            value={campaignState.eventEndDate}
+            onChange={(value) => setCampaignState({ ...campaignState, eventEndDate: value })}
           />
         </div>
 

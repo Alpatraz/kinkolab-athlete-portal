@@ -1,9 +1,13 @@
 const WKC_SPAIN_2026 = {
   titleEn: "WKC Spain 2026",
+  descriptionFr:
+    "Campagne de financement destinée aux athlètes qualifiés qui se rendront en Espagne pour les Championnats du monde WKC 2026.",
   descriptionEn:
     "A fundraising campaign supporting qualified athletes travelling to Spain for the 2026 WKC World Championships.",
   startDate: "2026-10-24",
   endDate: "2026-10-30",
+  eventStartDate: "2026-10-24",
+  eventEndDate: "2026-10-30",
   country: "Espagne",
   countryEn: "Spain",
   city: "Chiclana de la Frontera, Cádiz",
