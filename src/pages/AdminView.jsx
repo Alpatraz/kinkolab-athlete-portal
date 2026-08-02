@@ -517,6 +517,9 @@ export default function AdminView({
   const [adminUsers, setAdminUsers] = useState([]);
   const [newAdmin, setNewAdmin] = useState({ name: "", email: "", language: "fr" });
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const [adminOwnership, setAdminOwnership] = useState({ ownerUid: "", currentUid: "", canManage: false });
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [transferOwnerUid, setTransferOwnerUid] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -941,7 +944,11 @@ export default function AdminView({
 
   async function loadAdminUsers() {
     setAdminUsersLoading(true);
-    try { const data = await adminUsersRequest(); setAdminUsers(data.admins || []); }
+    try {
+      const data = await adminUsersRequest();
+      setAdminUsers(data.admins || []);
+      setAdminOwnership({ ownerUid: data.ownerUid || "", currentUid: data.currentUid || "", canManage: Boolean(data.canManage) });
+    }
     catch (error) { alert(error.message); }
     finally { setAdminUsersLoading(false); }
   }
@@ -958,6 +965,47 @@ export default function AdminView({
       if (adminToInvite === newAdmin) setNewAdmin({ name: "", email: "", language: "fr" });
       await loadAdminUsers();
       alert(result.invitationSent ? "Administrateur créé et invitation envoyée." : result.error);
+    } catch (error) { alert(error.message); }
+    finally { setAdminUsersLoading(false); }
+  }
+
+  async function saveAdminChanges() {
+    if (!editingAdmin?.name?.trim() || !editingAdmin?.email?.trim()) { alert("Le nom et le courriel sont obligatoires."); return; }
+    setAdminUsersLoading(true);
+    try {
+      await adminUsersRequest({ method: "PATCH", body: JSON.stringify({ uid: editingAdmin.uid, name: editingAdmin.name, email: editingAdmin.email, language: editingAdmin.preferredLanguage || "fr" }) });
+      setEditingAdmin(null);
+      await loadAdminUsers();
+      alert("Administrateur modifié.");
+    } catch (error) { alert(error.message); }
+    finally { setAdminUsersLoading(false); }
+  }
+
+  async function deleteAdmin(item) {
+    if (item.isOwner) { alert("Transférez d’abord la propriété à un autre administrateur."); return; }
+    if (!window.confirm(`Supprimer définitivement le compte administrateur de ${item.name || item.email} ?`)) return;
+    setAdminUsersLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch(`/api/admin-users?uid=${encodeURIComponent(item.uid)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossible de supprimer cet administrateur.");
+      await loadAdminUsers();
+      alert("Administrateur supprimé.");
+    } catch (error) { alert(error.message); }
+    finally { setAdminUsersLoading(false); }
+  }
+
+  async function transferOwnership() {
+    if (!transferOwnerUid) { alert("Choisissez le nouvel administrateur propriétaire."); return; }
+    const target = adminUsers.find((item) => item.uid === transferOwnerUid);
+    if (!window.confirm(`Transférer définitivement la propriété à ${target?.name || target?.email} ?`)) return;
+    setAdminUsersLoading(true);
+    try {
+      await adminUsersRequest({ method: "PATCH", body: JSON.stringify({ action: "transfer_owner", uid: transferOwnerUid }) });
+      setTransferOwnerUid("");
+      await loadAdminUsers();
+      alert("La propriété a été transférée. Le nouveau propriétaire contrôle maintenant la gestion des administrateurs.");
     } catch (error) { alert(error.message); }
     finally { setAdminUsersLoading(false); }
   }
@@ -2789,7 +2837,8 @@ export default function AdminView({
             <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
               <div className="flex items-center gap-3"><Shield style={{ color: gold }} /><h2 className="text-2xl font-black text-zinc-950">Inviter un administrateur</h2></div>
               <p className="mt-2 text-sm leading-6 text-zinc-600">La personne recevra un lien sécurisé pour choisir son mot de passe. Aucun mot de passe ne sera affiché ou transmis manuellement.</p>
-              <div className="mt-6 space-y-4">
+              {!adminOwnership.canManage && <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">Seul le propriétaire du compte peut inviter ou gérer les administrateurs.</p>}
+              <div className={`mt-6 space-y-4 ${!adminOwnership.canManage ? "pointer-events-none opacity-50" : ""}`}>
                 <TextInput label="Nom complet" value={newAdmin.name} onChange={(value) => setNewAdmin({ ...newAdmin, name: value })} />
                 <TextInput label="Adresse courriel" type="email" value={newAdmin.email} onChange={(value) => setNewAdmin({ ...newAdmin, email: value })} />
                 <SelectInput label="Langue de l’invitation" value={newAdmin.language} onChange={(value) => setNewAdmin({ ...newAdmin, language: value })}><option value="fr">Français</option><option value="en">English</option></SelectInput>
@@ -2803,13 +2852,30 @@ export default function AdminView({
                 {adminUsers.map((item) => <div key={item.uid} className="rounded-2xl border border-zinc-200 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div><p className="font-black text-zinc-950">{item.name || "Administrateur"}</p><p className="mt-1 text-sm text-zinc-600">{item.email}</p></div>
-                    {item.invitationStatus && <StatusPill status={item.invitationStatus} />}
+                    <div className="flex flex-wrap gap-2">{item.isOwner && <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-black uppercase text-amber-800">Propriétaire</span>}{item.invitationStatus && <StatusPill status={item.invitationStatus} />}</div>
                   </div>
                   {item.invitationStatus === "failed" && <p className="mt-3 text-xs text-red-700">Le compte existe, mais l’invitation n’a pas été envoyée.</p>}
-                  <AdminButton className="mt-3" variant="light" disabled={adminUsersLoading} onClick={() => inviteAdmin({ name: item.name || "Administrateur", email: item.email, language: item.preferredLanguage || "fr" })}><Send size={15} /> Renvoyer l’invitation</AdminButton>
+                  {editingAdmin?.uid === item.uid ? <div className="mt-4 space-y-3 rounded-2xl bg-zinc-50 p-4">
+                    <TextInput label="Nom complet" value={editingAdmin.name} onChange={(value) => setEditingAdmin({ ...editingAdmin, name: value })} />
+                    <TextInput label="Adresse courriel" type="email" value={editingAdmin.email} onChange={(value) => setEditingAdmin({ ...editingAdmin, email: value })} />
+                    <SelectInput label="Langue" value={editingAdmin.preferredLanguage || "fr"} onChange={(value) => setEditingAdmin({ ...editingAdmin, preferredLanguage: value })}><option value="fr">Français</option><option value="en">English</option></SelectInput>
+                    <div className="flex flex-wrap gap-2"><AdminButton disabled={adminUsersLoading} onClick={saveAdminChanges}><Save size={15} /> Enregistrer</AdminButton><AdminButton variant="light" onClick={() => setEditingAdmin(null)}>Annuler</AdminButton></div>
+                  </div> : adminOwnership.canManage && !item.isOwner && <div className="mt-4 flex flex-wrap gap-2">
+                    <AdminButton variant="light" disabled={adminUsersLoading} onClick={() => setEditingAdmin({ ...item })}><PencilLine size={15} /> Modifier</AdminButton>
+                    <AdminButton variant="light" disabled={adminUsersLoading} onClick={() => inviteAdmin({ name: item.name || "Administrateur", email: item.email, language: item.preferredLanguage || "fr" })}><Send size={15} /> Renvoyer l’invitation</AdminButton>
+                    <AdminButton variant="red" disabled={adminUsersLoading} onClick={() => deleteAdmin(item)}><Trash2 size={15} /> Supprimer</AdminButton>
+                  </div>}
                 </div>)}
                 {!adminUsersLoading && !adminUsers.length && <p className="text-zinc-500">Aucun administrateur trouvé.</p>}
               </div>
+              {adminOwnership.canManage && adminUsers.length > 1 && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="font-black text-amber-950">Transférer la propriété</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800">Après le transfert, seul le nouveau propriétaire pourra gérer les administrateurs. Votre compte pourra ensuite être supprimé par cette personne.</p>
+                <div className="mt-3 space-y-3">
+                  <SelectInput label="Nouveau propriétaire" value={transferOwnerUid} onChange={setTransferOwnerUid}><option value="">Choisir un administrateur</option>{adminUsers.filter((item) => !item.isOwner).map((item) => <option key={item.uid} value={item.uid}>{item.name || item.email}</option>)}</SelectInput>
+                  <AdminButton variant="amber" disabled={adminUsersLoading || !transferOwnerUid} onClick={transferOwnership}><Shield size={15} /> Transférer la propriété</AdminButton>
+                </div>
+              </div>}
             </section>
           </div>
         )}

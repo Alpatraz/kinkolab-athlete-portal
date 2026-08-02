@@ -19,6 +19,23 @@ async function requireAdmin(req: Request) {
   return decoded;
 }
 
+async function getOwnership(db: admin.firestore.Firestore, admins: admin.firestore.QueryDocumentSnapshot[], currentUid: string) {
+  const ownershipRef = db.collection("settings").doc("adminOwnership");
+  const ownership = await ownershipRef.get();
+  const configuredUid = ownership.data()?.ownerUid;
+  if (configuredUid && admins.some((item) => item.id === configuredUid)) return { ownerUid: configuredUid, ownershipRef };
+
+  const candidates = [...admins].sort((a, b) => {
+    const aData = a.data();
+    const bData = b.data();
+    if (Boolean(aData.invitedBy) !== Boolean(bData.invitedBy)) return aData.invitedBy ? 1 : -1;
+    return (aData.createdAt?.toMillis?.() || Number.MAX_SAFE_INTEGER) - (bData.createdAt?.toMillis?.() || Number.MAX_SAFE_INTEGER);
+  });
+  const ownerUid = candidates[0]?.id || currentUid;
+  await ownershipRef.set({ ownerUid, initializedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  return { ownerUid, ownershipRef };
+}
+
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character] || character));
 }
@@ -45,10 +62,48 @@ export default async (req: Request) => {
     getAdminApp();
     const currentAdmin = await requireAdmin(req);
     const db = admin.firestore();
+    const adminSnapshot = await db.collection("users").where("role", "==", "admin").get();
+    const { ownerUid, ownershipRef } = await getOwnership(db, adminSnapshot.docs, currentAdmin.uid);
+    const isOwner = currentAdmin.uid === ownerUid;
     if (req.method === "GET") {
-      const snapshot = await db.collection("users").where("role", "==", "admin").get();
-      return Response.json({ admins: snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() })) });
+      return Response.json({ admins: adminSnapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data(), isOwner: doc.id === ownerUid })), ownerUid, currentUid: currentAdmin.uid, canManage: isOwner });
     }
+    if (!isOwner) return Response.json({ error: "Seul le propriétaire peut gérer les administrateurs." }, { status: 403 });
+
+    if (req.method === "PATCH") {
+      const { action, uid, name, email, language = "fr" } = await req.json();
+      if (!uid) return Response.json({ error: "Administrator id is required" }, { status: 400 });
+      const targetRef = db.collection("users").doc(uid);
+      const target = await targetRef.get();
+      if (!target.exists || target.data()?.role !== "admin") return Response.json({ error: "Administrateur introuvable." }, { status: 404 });
+      if (action === "transfer_owner") {
+        if (uid === ownerUid) return Response.json({ error: "Cette personne est déjà propriétaire." }, { status: 400 });
+        await ownershipRef.set({ ownerUid: uid, previousOwnerUid: ownerUid, transferredBy: currentAdmin.uid, transferredAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        return Response.json({ transferred: true, ownerUid: uid });
+      }
+      if (uid === ownerUid) return Response.json({ error: "Le compte propriétaire doit d’abord transférer la propriété avant de pouvoir être modifié." }, { status: 409 });
+      if (!name || !email) return Response.json({ error: "Name and email are required" }, { status: 400 });
+      const normalizedEmail = String(email).trim().toLowerCase();
+      try {
+        await admin.auth().updateUser(uid, { email: normalizedEmail, displayName: String(name).trim() });
+      } catch (error: any) {
+        if (error.code === "auth/email-already-exists") return Response.json({ error: "Cette adresse courriel est déjà utilisée." }, { status: 409 });
+        throw error;
+      }
+      await targetRef.set({ email: normalizedEmail, name: String(name).trim(), preferredLanguage: language, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return Response.json({ updated: true, uid });
+    }
+
+    if (req.method === "DELETE") {
+      const uid = new URL(req.url).searchParams.get("uid") || "";
+      if (!uid) return Response.json({ error: "Administrator id is required" }, { status: 400 });
+      if (uid === ownerUid) return Response.json({ error: "Transférez d’abord la propriété avant de supprimer ce compte." }, { status: 409 });
+      const target = await db.collection("users").doc(uid).get();
+      if (!target.exists || target.data()?.role !== "admin") return Response.json({ error: "Administrateur introuvable." }, { status: 404 });
+      await Promise.all([admin.auth().deleteUser(uid), target.ref.delete()]);
+      return Response.json({ deleted: true, uid });
+    }
+
     if (req.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405 });
     const { email, name, language = "fr" } = await req.json();
     if (!email || !name) return Response.json({ error: "Name and email are required" }, { status: 400 });
@@ -85,4 +140,4 @@ export default async (req: Request) => {
   }
 };
 
-export const config: Config = { path: "/api/admin-users", method: ["GET", "POST"] };
+export const config: Config = { path: "/api/admin-users", method: ["GET", "POST", "PATCH", "DELETE"] };
