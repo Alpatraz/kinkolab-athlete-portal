@@ -60,6 +60,7 @@ import {
 } from "../utils/format";
 
 import StatCard from "../components/StatCard";
+import { DEFAULT_DISCIPLINES, normalizeDisciplines } from "../config/programOptions";
 
 function slugify(value) {
   return String(value || "")
@@ -520,6 +521,8 @@ export default function AdminView({
   const [adminOwnership, setAdminOwnership] = useState({ ownerUid: "", currentUid: "", canManage: false });
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [transferOwnerUid, setTransferOwnerUid] = useState("");
+  const [programDisciplines, setProgramDisciplines] = useState(DEFAULT_DISCIPLINES);
+  const [programSettingsSaving, setProgramSettingsSaving] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -541,6 +544,12 @@ export default function AdminView({
     fundingMode: "individual",
     goal: "",
   });
+
+  useEffect(() => onSnapshot(
+    doc(db, "siteSettings", "programOptions"),
+    (snapshot) => setProgramDisciplines(normalizeDisciplines(snapshot.data()?.disciplines)),
+    (error) => console.error("Erreur chargement paramètres du programme:", error)
+  ), []);
 
   const [newPayout, setNewPayout] = useState({
     targetKey: "",
@@ -886,6 +895,7 @@ export default function AdminView({
     ["statistics", "Statistiques"],
     ["communications", "Communications"],
     ["administrateurs", "Administrateurs"],
+    ["settings", "Paramètres"],
     ["messages", "Messages"],
   ];
 
@@ -1008,6 +1018,31 @@ export default function AdminView({
       alert("La propriété a été transférée. Le nouveau propriétaire contrôle maintenant la gestion des administrateurs.");
     } catch (error) { alert(error.message); }
     finally { setAdminUsersLoading(false); }
+  }
+
+  function updateProgramDiscipline(index, field, value) {
+    setProgramDisciplines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  }
+
+  function addProgramDiscipline() {
+    setProgramDisciplines((current) => [...current, { id: `discipline-${Date.now()}`, labelFr: "", labelEn: "" }]);
+  }
+
+  async function saveProgramSettings() {
+    const cleaned = programDisciplines
+      .map((item) => ({ ...item, labelFr: item.labelFr.trim(), labelEn: (item.labelEn || item.labelFr).trim() }))
+      .filter((item) => item.labelFr);
+    if (!cleaned.length) { alert("Conservez au moins une discipline."); return; }
+    setProgramSettingsSaving(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/program-settings", { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ disciplines: cleaned }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossible d’enregistrer les paramètres.");
+      setProgramDisciplines(cleaned);
+      alert("Liste des disciplines enregistrée.");
+    } catch (error) { alert(`Impossible d’enregistrer les disciplines : ${error.message}`); }
+    finally { setProgramSettingsSaving(false); }
   }
 
   async function saveEmailTemplate() {
@@ -2878,6 +2913,40 @@ export default function AdminView({
               </div>}
             </section>
           </div>
+        )}
+
+        {activeTab === "settings" && (
+          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-zinc-950">Paramètres du Programme Athlètes</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">Cette liste alimente automatiquement le formulaire d’inscription et l’espace de gestion des profils. La valeur française demeure la valeur de référence enregistrée dans Firebase.</p>
+              </div>
+              <AdminButton variant="light" onClick={() => setProgramDisciplines(DEFAULT_DISCIPLINES.map((item) => ({ ...item })))}><RotateCcw size={16} /> Valeurs par défaut</AdminButton>
+            </div>
+
+            <div className="mt-7">
+              <div className="mb-3 grid grid-cols-[1fr_1fr_auto] gap-3 px-1 text-xs font-black uppercase text-zinc-500"><span>Discipline — français</span><span>Discipline — anglais</span><span className="sr-only">Actions</span></div>
+              <div className="space-y-3">
+                {programDisciplines.map((discipline, index) => (
+                  <div key={discipline.id} className="grid gap-3 rounded-2xl border border-zinc-200 p-3 md:grid-cols-[1fr_1fr_auto]">
+                    <input value={discipline.labelFr} onChange={(event) => updateProgramDiscipline(index, "labelFr", event.target.value)} placeholder="Ex. Karaté combat" className="rounded-xl border border-zinc-300 px-4 py-3" />
+                    <input value={discipline.labelEn} onChange={(event) => updateProgramDiscipline(index, "labelEn", event.target.value)} placeholder="Ex. Combat karate" className="rounded-xl border border-zinc-300 px-4 py-3" />
+                    <AdminButton variant="red" onClick={() => setProgramDisciplines((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /> Supprimer</AdminButton>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <AdminButton variant="light" onClick={addProgramDiscipline}><Plus size={16} /> Ajouter une discipline</AdminButton>
+                <AdminButton disabled={programSettingsSaving} onClick={saveProgramSettings}><Save size={16} /> {programSettingsSaving ? "Enregistrement…" : "Enregistrer les paramètres"}</AdminButton>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
+              <p className="font-black text-zinc-950">Statuts autorisés</p>
+              <p className="mt-2 text-sm text-zinc-600">Le programme est désormais limité aux statuts <strong>Athlète</strong> et <strong>Coach</strong>. « Parent / famille » et « Assistant coach » ont été retirés des formulaires.</p>
+            </div>
+          </section>
         )}
 
         {activeTab === "messages" && (

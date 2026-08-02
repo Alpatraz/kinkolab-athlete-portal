@@ -32,6 +32,7 @@ import ProgressBar from "../components/ProgressBar";
 import { contributionTotal } from "../services/fundTransactions";
 import { uploadAthleteMedia } from "../services/mediaUpload";
 import { bilingualPayload, localizedField } from "../utils/localizedContent";
+import { DEFAULT_DISCIPLINES, PROGRAM_ROLES, normalizeDisciplines } from "../config/programOptions";
 
 const PROVINCES = [
   "Alberta",
@@ -47,23 +48,6 @@ const PROVINCES = [
   "Terre-Neuve-et-Labrador",
   "Territoires du Nord-Ouest",
   "Yukon",
-];
-
-const DISCIPLINES = [
-  "Karaté combat",
-  "Kata",
-  "Point Fighting",
-  "Light Contact",
-  "Kick Light",
-  "Arts martiaux",
-  "Autre",
-];
-
-const ATHLETE_STATUSES = [
-  "Athlète",
-  "Parent / famille",
-  "Coach",
-  "Assistant coach",
 ];
 
 function sumRaised(participation) {
@@ -298,6 +282,7 @@ export default function AthleteDashboard({
   const [activeTab, setActiveTab] = useState("summary");
   const [family, setFamily] = useState(null);
   const [athletes, setAthletes] = useState([]);
+  const [disciplines, setDisciplines] = useState(DEFAULT_DISCIPLINES);
   const [selectedAthleteId, setSelectedAthleteId] = useState("");
 
   const [updates, setUpdates] = useState([]);
@@ -369,6 +354,12 @@ export default function AthleteDashboard({
   });
 
   const [savingContribution, setSavingContribution] = useState(false);
+
+  useEffect(() => onSnapshot(
+    doc(db, "siteSettings", "programOptions"),
+    (snapshot) => setDisciplines(normalizeDisciplines(snapshot.data()?.disciplines)),
+    (error) => console.error("Erreur chargement disciplines:", error)
+  ), []);
 
   useEffect(() => {
     if (!currentUser?.familyId) return;
@@ -1095,8 +1086,8 @@ export default function AthleteDashboard({
                         </select>
                         <select value={form.discipline} onChange={(e) => setForm({ ...form, discipline: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
                           <option value="">Discipline</option>
-                          {DISCIPLINES.map((discipline) => (
-                            <option key={discipline} value={discipline}>{discipline}</option>
+                          {disciplines.map((discipline) => (
+                            <option key={discipline.id} value={discipline.labelFr}>{discipline.labelFr}</option>
                           ))}
                         </select>
                         <input value={form.dojo} onChange={(e) => setForm({ ...form, dojo: e.target.value })} placeholder="Club / Dojo" className="rounded-2xl border border-zinc-200 p-3" />
@@ -1110,7 +1101,7 @@ export default function AthleteDashboard({
                         </select>
                         <select value={form.athleteStatus} onChange={(e) => setForm({ ...form, athleteStatus: e.target.value })} className="rounded-2xl border border-zinc-200 p-3">
                           <option value="">Statut</option>
-                          {ATHLETE_STATUSES.map((status) => (
+                          {PROGRAM_ROLES.map((status) => (
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>

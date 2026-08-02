@@ -22,6 +22,7 @@ import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
 import { useLanguage } from "../context/LanguageContext";
+import { DEFAULT_DISCIPLINES, PROGRAM_ROLES, normalizeDisciplines } from "../config/programOptions";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-athlete-application-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
@@ -43,23 +44,16 @@ const PROVINCES = [
   "Autre",
 ];
 
-const DISCIPLINES = [
-  "Karaté combat",
-  "Point fighting",
-  "Light contact",
-  "Kick light",
-  "Kata",
-  "Kobudo",
-  "Arts martiaux",
-  "Autre",
-];
-
-const ATHLETE_STATUSES = [
-  "Athlète",
-  "Parent / famille",
-  "Coach",
-  "Assistant coach",
-];
+function minorFromBirthDate(value) {
+  if (!value) return false;
+  const birthDate = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(birthDate.getTime()) || birthDate > new Date()) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const birthdayPassed = today.getMonth() > birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+  if (!birthdayPassed) age -= 1;
+  return age < 18;
+}
 
 function SectionTitle({ children }) {
   return (
@@ -182,6 +176,7 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
   const [pageSettings, setPageSettings] = useState({
     heroImageUrl: DEFAULT_HERO_IMAGE_URL,
   });
+  const [disciplines, setDisciplines] = useState(DEFAULT_DISCIPLINES);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -251,6 +246,18 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => onSnapshot(
+    doc(db, "siteSettings", "programOptions"),
+    (snapshot) => {
+      const nextDisciplines = normalizeDisciplines(snapshot.data()?.disciplines);
+      setDisciplines(nextDisciplines);
+      setForm((current) => nextDisciplines.some((item) => item.labelFr === current.discipline)
+        ? current
+        : { ...current, discipline: nextDisciplines[0]?.labelFr || "" });
+    },
+    (error) => console.error("Erreur chargement disciplines:", error)
+  ), []);
+
   useEffect(() => {
     const requestedCampaign = new URLSearchParams(window.location.search).get("campaign");
     if (requestedCampaign && campaigns.some((campaign) => campaign.id === requestedCampaign)) {
@@ -270,6 +277,7 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
 
   const selectedCampaignTitle = campaignTitle(campaigns, form.campaignId);
   const heroImageUrl = pageSettings.heroImageUrl || DEFAULT_HERO_IMAGE_URL;
+  const isMinor = minorFromBirthDate(form.birthDate);
 
   function handleOpenEligibility() {
     if (typeof openEligibility === "function") {
@@ -293,11 +301,14 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
         type,
         status: "en_attente",
         ...form,
+        parentName: isMinor ? form.parentName : "",
+        parentEmail: isMinor ? form.parentEmail : "",
+        parentPhone: isMinor ? form.parentPhone : "",
         motivation: form.motivationFr || form.motivationEn,
         campaignReason: form.campaignReasonFr || form.campaignReasonEn,
         sportGoals: form.sportGoalsFr || form.sportGoalsEn,
         targetedCompetitions: form.targetedCompetitionsFr || form.targetedCompetitionsEn,
-        consents,
+        consents: { ...consents, legalParent: isMinor ? consents.legalParent : false },
         communicationConsent: {
           operational: true,
           marketing: Boolean(consents.marketingCommunications),
@@ -567,22 +578,12 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
                   onChange={(value) => update("province", value)}
                   options={PROVINCES}
                 />
-                <FormInput
-                  label="Nom du parent / responsable"
-                  value={form.parentName}
-                  onChange={(value) => update("parentName", value)}
-                />
-                <FormInput
-                  label="Courriel du parent"
-                  type="email"
-                  value={form.parentEmail}
-                  onChange={(value) => update("parentEmail", value)}
-                />
-                <FormInput
-                  label="Téléphone du parent"
-                  value={form.parentPhone}
-                  onChange={(value) => update("parentPhone", value)}
-                />
+                {isMinor && <>
+                  <div className="md:col-span-2 border-l-4 border-yellow-600 bg-black p-4 text-sm text-zinc-300">Le participant est mineur. Les coordonnées de son parent ou tuteur légal sont obligatoires.</div>
+                  <FormInput label="Nom du parent / responsable" value={form.parentName} onChange={(value) => update("parentName", value)} />
+                  <FormInput label="Courriel du parent" type="email" value={form.parentEmail} onChange={(value) => update("parentEmail", value)} />
+                  <FormInput label="Téléphone du parent" value={form.parentPhone} onChange={(value) => update("parentPhone", value)} />
+                </>}
               </div>
             </section>
 
@@ -594,7 +595,7 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
                   label="Discipline"
                   value={form.discipline}
                   onChange={(value) => update("discipline", value)}
-                  options={DISCIPLINES}
+                  options={disciplines.map((discipline) => ({ value: discipline.labelFr, label: language === "en" ? discipline.labelEn : discipline.labelFr }))}
                 />
                 <FormInput
                   label="Club / Dojo"
@@ -624,7 +625,7 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
                   label="Statut"
                   value={form.athleteStatus}
                   onChange={(value) => update("athleteStatus", value)}
-                  options={ATHLETE_STATUSES}
+                  options={PROGRAM_ROLES}
                 />
               </div>
             </section>
@@ -632,7 +633,8 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
             <section className="border border-yellow-700/40 bg-zinc-950/50 p-6 md:p-8">
               <SectionTitle>Présentation</SectionTitle>
 
-              <p className="mb-5 text-sm text-zinc-400">Vous pouvez répondre en français, en anglais ou dans les deux langues.</p>
+              <p className="mb-2 text-sm text-zinc-400">Vous pouvez répondre en français, en anglais ou dans les deux langues.</p>
+              <p className="mb-5 max-w-4xl text-sm leading-6 text-zinc-300">{language === "en" ? "The more complete and detailed your presentation is, the more visible your profile will be and the more credible your athletic project will appear to potential supporters." : "Plus votre présentation sera complète et détaillée, plus votre profil sera visible et votre projet sportif paraîtra crédible auprès des personnes susceptibles de vous soutenir."}</p>
               <div className="grid gap-5 md:grid-cols-2">
                 <FormTextarea
                   label="Présentez-vous — Français"
@@ -800,13 +802,13 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
                   ma campagne ou du Programme Athlètes.
                 </ConsentCheckbox>
 
-                <ConsentCheckbox
+                {isMinor && <ConsentCheckbox
                   checked={consents.legalParent}
                   onChange={(value) => updateConsent("legalParent", value)}
                 >
                   Si le participant est mineur, je confirme être le parent ou
                   tuteur légal autorisé.
-                </ConsentCheckbox>
+                </ConsentCheckbox>}
 
                 <ConsentCheckbox
                   checked={consents.revocation}
