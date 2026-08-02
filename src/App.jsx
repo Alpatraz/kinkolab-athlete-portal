@@ -394,6 +394,7 @@ export default function App() {
   path="/signup"
   element={
     <SignupView
+      campaigns={publicCampaigns}
       goBack={goHome}
       openEligibility={() => navigate("/criteres-admissibilite")}
     />

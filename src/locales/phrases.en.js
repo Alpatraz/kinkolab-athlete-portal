@@ -425,6 +425,8 @@ const phrases = {
   "Non handisport": "Not a para athlete", "Préfère ne pas répondre": "Prefer not to answer",
   "Éditions précédentes et résultats": "Previous editions and results", "Résultats": "Results",
   "Voir les résultats officiels": "View official results",
+  "Voir dans le calendrier des compétitions KinkoLab": "View in the KinkoLab competition calendar",
+  "Inscription officielle à la compétition": "Official competition registration",
 };
 
 export default phrases;

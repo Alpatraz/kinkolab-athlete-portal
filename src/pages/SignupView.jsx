@@ -174,7 +174,7 @@ function HeroIcon({ icon: Icon, title, text }) {
   );
 }
 
-export default function SignupView({ goBack, openEligibility }) {
+export default function SignupView({ goBack, openEligibility, campaigns = campaignsSeed }) {
   const { language } = useLanguage();
   const [type, setType] = useState("individuel");
   const [submitted, setSubmitted] = useState(false);
@@ -251,6 +251,15 @@ export default function SignupView({ goBack, openEligibility }) {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const requestedCampaign = new URLSearchParams(window.location.search).get("campaign");
+    if (requestedCampaign && campaigns.some((campaign) => campaign.id === requestedCampaign)) {
+      setForm((current) => ({ ...current, campaignId: requestedCampaign }));
+    } else if (campaigns.length && !campaigns.some((campaign) => campaign.id === form.campaignId)) {
+      setForm((current) => ({ ...current, campaignId: campaigns[0].id }));
+    }
+  }, [campaigns]);
+
   const update = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
@@ -259,7 +268,7 @@ export default function SignupView({ goBack, openEligibility }) {
     setConsents((current) => ({ ...current, [field]: value }));
   };
 
-  const selectedCampaignTitle = campaignTitle(campaignsSeed, form.campaignId);
+  const selectedCampaignTitle = campaignTitle(campaigns, form.campaignId);
   const heroImageUrl = pageSettings.heroImageUrl || DEFAULT_HERO_IMAGE_URL;
 
   function handleOpenEligibility() {
@@ -606,7 +615,7 @@ export default function SignupView({ goBack, openEligibility }) {
                   label="Programme demandé"
                   value={form.campaignId}
                   onChange={(value) => update("campaignId", value)}
-                  options={campaignsSeed.map((campaign) => ({
+                  options={campaigns.map((campaign) => ({
                     value: campaign.id,
                     label: campaign.title,
                   }))}

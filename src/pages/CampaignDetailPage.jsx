@@ -137,6 +137,8 @@ export default function CampaignDetailPage({
     editions: "Previous editions and results",
     results: "Results",
     officialResults: "View official results",
+    calendar: "View in the KinkoLab competition calendar",
+    registration: "Official competition registration",
   } : {
     about: "Comprendre l’événement",
     details: "Informations sur l’événement",
@@ -159,6 +161,8 @@ export default function CampaignDetailPage({
     editions: "Éditions précédentes et résultats",
     results: "Résultats",
     officialResults: "Voir les résultats officiels",
+    calendar: "Voir dans le calendrier des compétitions KinkoLab",
+    registration: "Inscription officielle à la compétition",
   };
 
   useEffect(() => {
@@ -192,6 +196,8 @@ export default function CampaignDetailPage({
     .filter(Boolean);
   const embedUrl = videoEmbedUrl(campaign.videoUrl);
   const socialLinks = [
+    { label: pageCopy.calendar, url: campaign.calendarUrl, icon: CalendarDays },
+    { label: pageCopy.registration, url: campaign.registrationUrl, icon: ExternalLink },
     { label: pageCopy.website, url: campaign.websiteUrl, icon: Globe2 },
     { label: pageCopy.facebook, url: campaign.facebookUrl, icon: ExternalLink },
     { label: pageCopy.instagram, url: campaign.instagramUrl, icon: ExternalLink },
@@ -412,7 +418,7 @@ const raisedManual = campaignParticipations.reduce(
             <section className="mt-10 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-8" data-i18n-managed>
               <div className="flex items-center gap-3"><Trophy style={{ color: gold }} /><h2 className="text-2xl font-black">{pageCopy.editions}</h2></div>
               {seriesEditions.length > 1 && <div className="mt-5 flex flex-wrap gap-3">{seriesEditions.map((edition) => <button key={edition.id} type="button" onClick={() => onOpenCampaign?.(edition.id)} className={`rounded-2xl px-5 py-3 font-black ${edition.id === campaign.id ? "text-black" : "border border-zinc-700 bg-black text-white"}`} style={edition.id === campaign.id ? { background: gold } : undefined}>{edition.year || edition.title}{edition.resultsPublished ? " · ✓" : ""}</button>)}</div>}
-              {campaign.resultsPublished && <div className="mt-7 rounded-2xl border border-yellow-700/40 bg-black p-5"><h3 className="text-xl font-black">{pageCopy.results} {campaign.year}</h3>{resultsSummary && <p className="mt-3 whitespace-pre-line leading-7 text-zinc-300">{resultsSummary}</p>}{safeExternalUrl(campaign.resultsUrl) && <a href={safeExternalUrl(campaign.resultsUrl)} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-3 font-black text-black" style={{ background: gold }}>{pageCopy.officialResults}<ExternalLink size={16} /></a>}</div>}
+              {campaign.resultsPublished && <div id="results" className="mt-7 scroll-mt-28 rounded-2xl border border-yellow-700/40 bg-black p-5"><h3 className="text-xl font-black">{pageCopy.results} {campaign.year}</h3>{resultsSummary && <p className="mt-3 whitespace-pre-line leading-7 text-zinc-300">{resultsSummary}</p>}{safeExternalUrl(campaign.resultsUrl) && <a href={safeExternalUrl(campaign.resultsUrl)} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-3 font-black text-black" style={{ background: gold }}>{pageCopy.officialResults}<ExternalLink size={16} /></a>}</div>}
             </section>
           )}
 

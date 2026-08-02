@@ -340,6 +340,9 @@ const emptyCampaign = {
   resultsSummaryFr: "",
   resultsSummaryEn: "",
   resultsUrl: "",
+  calendarEventId: "",
+  calendarUrl: "https://kinkolab.com/pages/calendrier",
+  registrationUrl: "",
 };
 
 function ProductEditor({ campaignState, setCampaignState, onUploadProductImage }) {
@@ -1188,6 +1191,9 @@ export default function AdminView({
       resultsSummaryFr: campaign.resultsSummaryFr || "",
       resultsSummaryEn: campaign.resultsSummaryEn || "",
       resultsUrl: campaign.resultsUrl || "",
+      calendarEventId: campaign.calendarEventId || "",
+      calendarUrl: campaign.calendarUrl || "https://kinkolab.com/pages/calendrier",
+      registrationUrl: campaign.registrationUrl || "",
       websiteUrl: campaign.websiteUrl || "",
       facebookUrl: campaign.facebookUrl || "",
       instagramUrl: campaign.instagramUrl || "",
@@ -1256,6 +1262,9 @@ export default function AdminView({
       seriesId: campaign.seriesId || slugify(baseTitle),
       seriesTitle: baseTitle,
       year: nextYear,
+      calendarEventId: `${campaign.seriesId || slugify(baseTitle)}-${nextYear}`,
+      calendarUrl: "https://kinkolab.com/pages/calendrier",
+      registrationUrl: "",
       status: "scheduled",
       startDate: "", endDate: "", eventDate: "", eventStartDate: "", eventEndDate: "",
       resultsPublished: false, resultsSummaryFr: "", resultsSummaryEn: "", resultsUrl: "",
@@ -1595,6 +1604,15 @@ export default function AdminView({
             <TextInput label="Permanent series name — English" value={campaignState.seriesTitleEn} onChange={(value) => setCampaignState({ ...campaignState, seriesTitleEn: value })} placeholder="Ex. WKC World Championships" />
           </div>
           <div className="mt-3"><TextInput label="Identifiant de série" value={campaignState.seriesId} onChange={(value) => setCampaignState({ ...campaignState, seriesId: slugify(value) })} placeholder="wkc-world-championships" hint="Toutes les éditions 2025, 2026, 2027 doivent partager le même identifiant." /></div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <p className="mb-3 text-sm font-black uppercase text-zinc-700">Liaison avec le calendrier KinkoLab</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextInput label="Identifiant de l’événement calendrier" value={campaignState.calendarEventId} onChange={(value) => setCampaignState({ ...campaignState, calendarEventId: slugify(value) })} placeholder="wkc-world-2026" hint="Le même identifiant doit être placé sur la fiche Shopify de cette édition." />
+            <TextInput label="Lien vers l’événement / calendrier" value={campaignState.calendarUrl} onChange={(value) => setCampaignState({ ...campaignState, calendarUrl: value })} placeholder="https://kinkolab.com/pages/calendrier#..." />
+          </div>
+          <div className="mt-4"><TextInput label="Lien d’inscription officiel à la compétition" value={campaignState.registrationUrl} onChange={(value) => setCampaignState({ ...campaignState, registrationUrl: value })} placeholder="https://..." hint="Distinct de la candidature au Programme Athlètes." /></div>
         </div>
 
         <TextInput
