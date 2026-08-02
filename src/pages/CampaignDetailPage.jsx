@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -107,6 +108,8 @@ export default function CampaignDetailPage({
   openSignup,
 }) {
   const { language } = useLanguage();
+  const signupButtonRef = useRef(null);
+  const [showStickySignup, setShowStickySignup] = useState(false);
   campaign = withCampaignDefaults(campaign);
 
   const pageCopy = language === "en" ? {
@@ -127,6 +130,7 @@ export default function CampaignDetailPage({
     media: "Images and videos",
     video: "Campaign video",
     gallery: "Photo gallery",
+    joinCampaign: "Apply to this campaign",
   } : {
     about: "Comprendre l’événement",
     details: "Informations sur l’événement",
@@ -145,7 +149,21 @@ export default function CampaignDetailPage({
     media: "Images et vidéos",
     video: "Vidéo de la campagne",
     gallery: "Galerie photos",
+    joinCampaign: "S’inscrire à cette campagne",
   };
+
+  useEffect(() => {
+    const button = signupButtonRef.current;
+    if (!button) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickySignup(!entry.isIntersecting),
+      { threshold: 0.2 }
+    );
+
+    observer.observe(button);
+    return () => observer.disconnect();
+  }, []);
 
   const campaignTitle = localizedField(campaign, "title", language);
   const campaignDescription = localizedField(campaign, "description", language);
@@ -293,6 +311,7 @@ const raisedManual = campaignParticipations.reduce(
             )}
 
             <button
+              ref={signupButtonRef}
               type="button"
               onClick={openSignup}
               className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 px-5 py-3 font-black text-white hover:bg-zinc-900"
@@ -544,6 +563,23 @@ const raisedManual = campaignParticipations.reduce(
           </section>
         </div>
       </section>
+
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 border-t border-yellow-700/50 bg-black/95 p-3 shadow-[0_-12px_35px_rgba(0,0,0,0.65)] backdrop-blur transition duration-200 md:left-auto md:right-6 md:bottom-6 md:w-auto md:rounded-2xl md:border ${showStickySignup ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0 md:translate-y-4"}`}
+        aria-hidden={!showStickySignup}
+        data-i18n-managed
+      >
+        <button
+          type="button"
+          onClick={openSignup}
+          tabIndex={showStickySignup ? 0 : -1}
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 font-black text-black md:w-auto"
+          style={{ background: gold }}
+        >
+          <UserPlus size={19} />
+          {pageCopy.joinCampaign}
+        </button>
+      </div>
     </main>
   );
 }
