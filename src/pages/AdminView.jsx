@@ -470,6 +470,7 @@ export default function AdminView({
   const [emailTemplates, setEmailTemplates] = useState([]);
   const [emailLogs, setEmailLogs] = useState([]);
   const [editingEmailTemplate, setEditingEmailTemplate] = useState(null);
+  const [selectedEmailTemplateKey, setSelectedEmailTemplateKey] = useState("");
   const [emailCenterLoading, setEmailCenterLoading] = useState(false);
   const [emailActionLoading, setEmailActionLoading] = useState(false);
   const [testEmail, setTestEmail] = useState("");
@@ -762,14 +763,24 @@ export default function AdminView({
     setEmailCenterLoading(true);
     try {
       const data = await emailCenterRequest();
-      setEmailTemplates(data.templates || []);
+      const templates = data.templates || [];
+      setEmailTemplates(templates);
       setEmailLogs(data.logs || []);
-      if (!editingEmailTemplate && data.templates?.length) setEditingEmailTemplate(data.templates[0]);
+      if (templates.length) {
+        const selected = templates.find((template) => template.key === selectedEmailTemplateKey) || templates[0];
+        selectEmailTemplate(selected);
+      }
     } catch (error) {
       alert(error.message);
     } finally {
       setEmailCenterLoading(false);
     }
+  }
+
+  function selectEmailTemplate(template) {
+    if (!template) return;
+    setSelectedEmailTemplateKey(template.key);
+    setEditingEmailTemplate(JSON.parse(JSON.stringify(template)));
   }
 
   useEffect(() => {
@@ -841,7 +852,7 @@ export default function AdminView({
 
   function createEmailTemplate() {
     const key = `custom_${Date.now()}`;
-    setEditingEmailTemplate({
+    const template = {
       key,
       name: "Nouveau modèle",
       trigger: "Envoi manuel",
@@ -849,7 +860,9 @@ export default function AdminView({
       design: { ...defaultEmailDesign },
       fr: { subject: "", title: "", body: "Bonjour {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
       en: { subject: "", title: "", body: "Hello {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
-    });
+    };
+    setSelectedEmailTemplateKey(key);
+    setEditingEmailTemplate(template);
   }
 
   function updateEmailContent(language, field, value) {
@@ -2252,10 +2265,10 @@ export default function AdminView({
               <div className="mt-6 max-w-xl">
                 <SelectInput
                   label="Choisir le workflow et son modèle"
-                  value={editingEmailTemplate?.key || ""}
+                  value={selectedEmailTemplateKey}
                   onChange={(key) => {
                     const selected = emailTemplates.find((template) => template.key === key);
-                    if (selected) setEditingEmailTemplate(selected);
+                    if (selected) selectEmailTemplate(selected);
                   }}
                 >
                   <option value="" disabled>Sélectionner…</option>
@@ -2272,14 +2285,14 @@ export default function AdminView({
                     <button
                       key={template.key}
                       type="button"
-                      onClick={() => setEditingEmailTemplate(template)}
-                      className={`w-full rounded-2xl border p-4 text-left ${editingEmailTemplate?.key === template.key ? "border-black bg-zinc-950 text-white" : "border-zinc-200 bg-white text-zinc-950"}`}
+                      onClick={() => selectEmailTemplate(template)}
+                      className={`w-full rounded-2xl border p-4 text-left ${selectedEmailTemplateKey === template.key ? "border-black bg-zinc-950 text-white" : "border-zinc-200 bg-white text-zinc-950"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="font-black">{template.name}</p>
                         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${template.enabled ? "bg-emerald-500" : "bg-zinc-400"}`} />
                       </div>
-                      <p className={`mt-2 text-xs leading-5 ${editingEmailTemplate?.key === template.key ? "text-zinc-300" : "text-zinc-500"}`}>{template.trigger || "Envoi manuel"}</p>
+                      <p className={`mt-2 text-xs leading-5 ${selectedEmailTemplateKey === template.key ? "text-zinc-300" : "text-zinc-500"}`}>{template.trigger || "Envoi manuel"}</p>
                     </button>
                   ))}
                   {editingEmailTemplate && !emailTemplates.some((template) => template.key === editingEmailTemplate.key) && (
@@ -2319,12 +2332,24 @@ export default function AdminView({
                     </div>
 
                     <div className="mt-8 border-t border-zinc-200 pt-8">
-                      <div className="flex items-center gap-3">
-                        <Palette style={{ color: gold }} />
-                        <div>
-                          <h3 className="text-xl font-black text-zinc-950">Design du courriel</h3>
-                          <p className="text-sm text-zinc-500">Les changements apparaissent immédiatement dans l’aperçu.</p>
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <Palette style={{ color: gold }} />
+                          <div>
+                            <h3 className="text-xl font-black text-zinc-950">Design du courriel</h3>
+                            <p className="text-sm text-zinc-500">Les changements apparaissent immédiatement dans l’aperçu.</p>
+                          </div>
                         </div>
+                        <div className="rounded-2xl bg-black px-4 py-3 text-right text-white">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Modèle affiché</p>
+                          <p className="mt-1 font-black">{editingEmailTemplate.name}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        <SelectInput label="Changer le modèle affiché dans l’éditeur de design" value={selectedEmailTemplateKey} onChange={(key) => selectEmailTemplate(emailTemplates.find((template) => template.key === key))}>
+                          {emailTemplates.map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}
+                        </SelectInput>
                       </div>
 
                       <div className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
