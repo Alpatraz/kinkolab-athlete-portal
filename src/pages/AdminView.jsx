@@ -950,14 +950,14 @@ export default function AdminView({
     if (activeTab === "administrateurs" && adminUsers.length === 0) loadAdminUsers();
   }, [activeTab]);
 
-  async function inviteAdmin() {
-    if (!newAdmin.name.trim() || !newAdmin.email.trim()) { alert("Le nom et le courriel sont obligatoires."); return; }
+  async function inviteAdmin(adminToInvite = newAdmin) {
+    if (!adminToInvite.name?.trim() || !adminToInvite.email?.trim()) { alert("Le nom et le courriel sont obligatoires."); return; }
     setAdminUsersLoading(true);
     try {
-      await adminUsersRequest({ method: "POST", body: JSON.stringify(newAdmin) });
-      setNewAdmin({ name: "", email: "", language: "fr" });
+      const result = await adminUsersRequest({ method: "POST", body: JSON.stringify(adminToInvite) });
+      if (adminToInvite === newAdmin) setNewAdmin({ name: "", email: "", language: "fr" });
       await loadAdminUsers();
-      alert("Administrateur créé et invitation envoyée.");
+      alert(result.invitationSent ? "Administrateur créé et invitation envoyée." : result.error);
     } catch (error) { alert(error.message); }
     finally { setAdminUsersLoading(false); }
   }
@@ -2800,7 +2800,14 @@ export default function AdminView({
               <h2 className="text-2xl font-black text-zinc-950">Administrateurs actuels</h2>
               <div className="mt-5 space-y-3">
                 {adminUsersLoading && !adminUsers.length && <p className="text-zinc-500">Chargement…</p>}
-                {adminUsers.map((item) => <div key={item.uid} className="rounded-2xl border border-zinc-200 p-4"><p className="font-black text-zinc-950">{item.name || "Administrateur"}</p><p className="mt-1 text-sm text-zinc-600">{item.email}</p></div>)}
+                {adminUsers.map((item) => <div key={item.uid} className="rounded-2xl border border-zinc-200 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><p className="font-black text-zinc-950">{item.name || "Administrateur"}</p><p className="mt-1 text-sm text-zinc-600">{item.email}</p></div>
+                    {item.invitationStatus && <StatusPill status={item.invitationStatus} />}
+                  </div>
+                  {item.invitationStatus === "failed" && <p className="mt-3 text-xs text-red-700">Le compte existe, mais l’invitation n’a pas été envoyée.</p>}
+                  <AdminButton className="mt-3" variant="light" disabled={adminUsersLoading} onClick={() => inviteAdmin({ name: item.name || "Administrateur", email: item.email, language: item.preferredLanguage || "fr" })}><Send size={15} /> Renvoyer l’invitation</AdminButton>
+                </div>)}
                 {!adminUsersLoading && !adminUsers.length && <p className="text-zinc-500">Aucun administrateur trouvé.</p>}
               </div>
             </section>

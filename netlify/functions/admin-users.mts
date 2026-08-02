@@ -31,11 +31,13 @@ async function sendInvitation(email: string, name: string, setupUrl: string, lan
   const title = english ? "Administrator invitation" : "Invitation administrateur";
   const message = english ? `Hello ${name}, your KinkoLab administrator account is ready. Choose your password securely.` : `Bonjour ${name}, votre compte administrateur KinkoLab est prêt. Choisissez votre mot de passe de façon sécurisée.`;
   const button = english ? "Create my password" : "Créer mon mot de passe";
-  const html = `<!doctype html><html><body style="margin:0;background:#090909;font-family:Arial,sans-serif"><div style="max-width:640px;margin:auto;padding:32px 20px"><div style="border:1px solid #d7b85b55;border-radius:24px;background:#18181b;padding:32px"><h1 style="color:#f4f4f5">${escapeHtml(title)}</h1><p style="color:#d4d4d8;font-size:16px;line-height:1.7">${escapeHtml(message)}</p><p style="margin-top:28px"><a href="${escapeHtml(setupUrl)}" style="display:inline-block;border-radius:12px;background:#d7b85b;color:#000;padding:14px 20px;font-weight:700;text-decoration:none">${button}</a></p></div></div></body></html>`;
+  const loginMessage = english ? "After choosing your password, sign in to the Athlete Portal." : "Après avoir choisi votre mot de passe, connectez-vous au Portail Athlètes.";
+  const loginLabel = english ? "Open the Athlete Portal" : "Ouvrir le Portail Athlètes";
+  const html = `<!doctype html><html><body style="margin:0;background:#090909;font-family:Arial,sans-serif"><div style="max-width:640px;margin:auto;padding:32px 20px"><div style="border:1px solid #d7b85b55;border-radius:24px;background:#18181b;padding:32px"><h1 style="color:#f4f4f5">${escapeHtml(title)}</h1><p style="color:#d4d4d8;font-size:16px;line-height:1.7">${escapeHtml(message)}</p><p style="margin-top:28px"><a href="${escapeHtml(setupUrl)}" style="display:inline-block;border-radius:12px;background:#d7b85b;color:#000;padding:14px 20px;font-weight:700;text-decoration:none">${button}</a></p><p style="margin-top:28px;color:#a1a1aa;font-size:14px;line-height:1.7">${escapeHtml(loginMessage)} <a href="https://athletes.kinkolab.com/login" style="color:#d7b85b">${escapeHtml(loginLabel)}</a></p></div></div></body></html>`;
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: "KinkoLab Athlètes <athletes@kinkolab.com>", reply_to: "athletes@kinkolab.com", to: [email], subject, html }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Resend rejected the invitation");
-  return data.id;
+  return { id: data.id, subject };
 }
 
 export default async (req: Request) => {
@@ -56,10 +58,26 @@ export default async (req: Request) => {
       if (error.code !== "auth/user-not-found") throw error;
       user = await admin.auth().createUser({ email: String(email).trim().toLowerCase(), displayName: name, password: `Kinko-${crypto.randomUUID()}-Aa1!` });
     }
-    await db.collection("users").doc(user.uid).set({ uid: user.uid, email: user.email, name, role: "admin", preferredLanguage: language, invitedBy: currentAdmin.uid, updatedAt: admin.firestore.FieldValue.serverTimestamp(), createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    const setupUrl = await admin.auth().generatePasswordResetLink(user.email!, { url: "https://athletes.kinkolab.com/login" });
-    const resendId = await sendInvitation(user.email!, name, setupUrl, language);
-    return Response.json({ created: true, uid: user.uid, resendId });
+    const userRef = db.collection("users").doc(user.uid);
+    await userRef.set({ uid: user.uid, email: user.email, name, role: "admin", preferredLanguage: language, invitedBy: currentAdmin.uid, invitationStatus: "pending", invitationError: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    try {
+      // Firebase's hosted password page does not require a custom continue URL. This
+      // keeps invitations working even before the portal domain is allowlisted.
+      const setupUrl = await admin.auth().generatePasswordResetLink(user.email!);
+      const invitation = await sendInvitation(user.email!, name, setupUrl, language);
+      await Promise.all([
+        userRef.set({ invitationStatus: "sent", invitationSentAt: admin.firestore.FieldValue.serverTimestamp(), invitationResendId: invitation.id, invitationError: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+        db.collection("emailLogs").add({ type: "admin_invitation", recipient: user.email, language, resendId: invitation.id, subject: invitation.subject, status: "sent", test: false, userId: user.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() }),
+      ]);
+      return Response.json({ created: true, invitationSent: true, uid: user.uid, resendId: invitation.id });
+    } catch (invitationError) {
+      const invitationMessage = invitationError instanceof Error ? invitationError.message : "Invitation email failed";
+      await Promise.all([
+        userRef.set({ invitationStatus: "failed", invitationError: invitationMessage, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+        db.collection("emailLogs").add({ type: "admin_invitation", recipient: user.email, language, status: "failed", error: invitationMessage, test: false, userId: user.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() }),
+      ]);
+      return Response.json({ created: true, invitationSent: false, uid: user.uid, error: `Le compte a été créé, mais le courriel n'a pas pu être envoyé : ${invitationMessage}` }, { status: 207 });
+    }
   } catch (error) {
     console.error("admin-users error", error);
     const message = error instanceof Error ? error.message : "Internal server error";
