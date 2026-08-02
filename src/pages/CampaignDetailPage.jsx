@@ -1,7 +1,28 @@
-import { ArrowLeft, ExternalLink, ShoppingBag, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CalendarDays,
+  ExternalLink,
+  Globe2,
+  Image as ImageIcon,
+  MapPin,
+  Medal,
+  PlayCircle,
+  ShoppingBag,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import AthleteCard from "../components/AthleteCard";
+import { useLanguage } from "../context/LanguageContext";
+import { localizedField } from "../utils/localizedContent";
+import {
+  listFromField,
+  safeExternalUrl,
+  videoEmbedUrl,
+  withCampaignDefaults,
+} from "../utils/campaignDetails";
 
 const DEFAULT_CAMPAIGN_BANNER =
   "/images/kinkolab-campaign-default-banner.png";
@@ -62,6 +83,20 @@ function productReservedAmount(product) {
   return money(Number(value || 0));
 }
 
+function CampaignFact({ icon: Icon, label, value }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black">
+        <Icon size={20} style={{ color: gold }} />
+      </div>
+      <div>
+        <dt className="text-xs font-black uppercase tracking-[0.16em] text-zinc-500">{label}</dt>
+        <dd className="mt-1 leading-6 text-white">{value}</dd>
+      </div>
+    </div>
+  );
+}
+
 export default function CampaignDetailPage({
   campaign,
   athletes = [],
@@ -71,6 +106,65 @@ export default function CampaignDetailPage({
   onOpenAthlete,
   openSignup,
 }) {
+  const { language } = useLanguage();
+  campaign = withCampaignDefaults(campaign);
+
+  const pageCopy = language === "en" ? {
+    about: "About the event",
+    details: "Event details",
+    dates: "Dates",
+    location: "Location",
+    venue: "Venue",
+    audience: "Who this campaign is for",
+    disciplines: "Disciplines",
+    federation: "Federation / organization",
+    usefulLinks: "Official links and social media",
+    website: "Official website",
+    facebook: "Facebook",
+    instagram: "Instagram",
+    youtube: "YouTube",
+    media: "Images and videos",
+    video: "Campaign video",
+    gallery: "Photo gallery",
+  } : {
+    about: "Comprendre l’événement",
+    details: "Informations sur l’événement",
+    dates: "Dates",
+    location: "Lieu",
+    venue: "Site de compétition",
+    audience: "Qui est concerné",
+    disciplines: "Disciplines",
+    federation: "Fédération / organisation",
+    usefulLinks: "Liens officiels et réseaux sociaux",
+    website: "Site officiel",
+    facebook: "Facebook",
+    instagram: "Instagram",
+    youtube: "YouTube",
+    media: "Images et vidéos",
+    video: "Vidéo de la campagne",
+    gallery: "Galerie photos",
+  };
+
+  const campaignTitle = localizedField(campaign, "title", language);
+  const campaignDescription = localizedField(campaign, "description", language);
+  const overview = localizedField(campaign, "overview", language);
+  const audience = localizedField(campaign, "audience", language);
+  const disciplines = localizedField(campaign, "disciplines", language);
+  const country = language === "en" ? campaign.countryEn || campaign.country : campaign.country;
+  const location = [campaign.city, country].filter(Boolean).join(", ");
+  const dates = campaign.startDate && campaign.endDate
+    ? `${campaign.startDate} — ${campaign.endDate}`
+    : campaign.eventDate || campaign.startDate || "—";
+  const galleryImages = listFromField(campaign.galleryImageUrls)
+    .map(safeExternalUrl)
+    .filter(Boolean);
+  const embedUrl = videoEmbedUrl(campaign.videoUrl);
+  const socialLinks = [
+    { label: pageCopy.website, url: campaign.websiteUrl, icon: Globe2 },
+    { label: pageCopy.facebook, url: campaign.facebookUrl, icon: ExternalLink },
+    { label: pageCopy.instagram, url: campaign.instagramUrl, icon: ExternalLink },
+    { label: pageCopy.youtube, url: campaign.youtubeUrl, icon: PlayCircle },
+  ].filter((item) => safeExternalUrl(item.url));
   const linkedAthletes = athletes.filter((athlete) => {
     const directMatch = athlete.campaignId === campaign.id;
 
@@ -172,11 +266,11 @@ const raisedManual = campaignParticipations.reduce(
           </p>
 
           <h1 className="mt-4 max-w-4xl text-5xl font-black uppercase leading-tight md:text-7xl">
-            {campaign.title}
+            {campaignTitle}
           </h1>
 
           <p className="mt-5 max-w-3xl text-lg leading-8 text-zinc-200">
-            {campaign.description}
+            {campaignDescription}
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -207,7 +301,73 @@ const raisedManual = campaignParticipations.reduce(
 
       <section className="px-4 py-10 md:px-8">
         <div className="mx-auto max-w-7xl">
-          <section className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-10">
+          <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]" data-i18n-managed>
+            <article className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-10">
+              <p className="text-sm font-black uppercase tracking-[0.3em]" style={{ color: gold }}>
+                {pageCopy.about}
+              </p>
+              <h2 className="mt-3 text-3xl font-black md:text-4xl">{campaignTitle}</h2>
+              <div className="mt-6 space-y-5 text-lg leading-8 text-zinc-300">
+                <p>{overview || campaignDescription}</p>
+                {audience && (
+                  <div className="rounded-2xl border border-yellow-700/40 bg-yellow-950/20 p-5">
+                    <h3 className="font-black text-white">{pageCopy.audience}</h3>
+                    <p className="mt-2 text-base leading-7 text-yellow-100">{audience}</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <aside className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-8">
+              <h2 className="text-2xl font-black">{pageCopy.details}</h2>
+              <dl className="mt-6 space-y-5">
+                <CampaignFact icon={CalendarDays} label={pageCopy.dates} value={dates} />
+                <CampaignFact icon={MapPin} label={pageCopy.location} value={location || "—"} />
+                <CampaignFact icon={Building2} label={pageCopy.venue} value={campaign.venueName || "—"} />
+                <CampaignFact icon={Medal} label={pageCopy.disciplines} value={disciplines || "—"} />
+                <CampaignFact icon={Users} label={pageCopy.federation} value={campaign.federation || campaign.organizer || "—"} />
+              </dl>
+            </aside>
+          </section>
+
+          {socialLinks.length > 0 && (
+            <section className="mt-8 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-8" data-i18n-managed>
+              <h2 className="text-2xl font-black">{pageCopy.usefulLinks}</h2>
+              <div className="mt-5 flex flex-wrap gap-3">
+                {socialLinks.map(({ label, url, icon: Icon }) => (
+                  <a key={label} href={safeExternalUrl(url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-zinc-700 bg-black px-5 py-3 font-black hover:border-yellow-700">
+                    <Icon size={19} style={{ color: gold }} />
+                    {label}
+                    <ExternalLink size={15} className="text-zinc-500" />
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {(embedUrl || galleryImages.length > 0) && (
+            <section className="mt-10" data-i18n-managed>
+              <p className="text-sm font-black uppercase tracking-[0.3em]" style={{ color: gold }}>{pageCopy.media}</p>
+              {embedUrl && (
+                <div className="mt-5 overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950">
+                  <div className="flex items-center gap-3 border-b border-zinc-800 p-5"><PlayCircle style={{ color: gold }} /><h2 className="text-xl font-black">{pageCopy.video}</h2></div>
+                  <div className="aspect-video">
+                    <iframe className="h-full w-full" src={embedUrl} title={pageCopy.video} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  </div>
+                </div>
+              )}
+              {galleryImages.length > 0 && (
+                <div className="mt-8">
+                  <div className="flex items-center gap-3"><ImageIcon style={{ color: gold }} /><h2 className="text-2xl font-black">{pageCopy.gallery}</h2></div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {galleryImages.map((imageUrl, index) => <img key={imageUrl} src={imageUrl} alt={`${campaignTitle} — ${index + 1}`} loading="lazy" className="h-64 w-full rounded-2xl border border-zinc-800 object-cover" />)}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          <section className="mt-10 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-10">
             <h2 className="text-2xl font-black">Résumé campagne</h2>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">

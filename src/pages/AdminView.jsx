@@ -198,6 +198,7 @@ function emptyProduct() {
 
 const emptyCampaign = {
   title: "",
+  titleEn: "",
   year: "2026",
   type: "event",
   status: "active",
@@ -213,8 +214,24 @@ const emptyCampaign = {
   collectionUrl: "",
   shopifyCollectionUrl: "",
   bannerImageUrl: "",
+  venueName: "",
+  organizer: "",
+  federation: "",
+  disciplinesFr: "",
+  disciplinesEn: "",
+  audienceFr: "",
+  audienceEn: "",
+  overviewFr: "",
+  overviewEn: "",
+  websiteUrl: "",
+  facebookUrl: "",
+  instagramUrl: "",
+  youtubeUrl: "",
+  videoUrl: "",
+  galleryImageUrls: "",
   products: [],
   description: "",
+  descriptionEn: "",
 };
 
 function ProductEditor({ campaignState, setCampaignState, onUploadProductImage }) {
@@ -730,6 +747,7 @@ export default function AdminView({
     setEditingCampaign({
       ...emptyCampaign,
       title: campaign.title || "",
+      titleEn: campaign.titleEn || "",
       year: campaign.year || "2026",
       type: campaign.type || "event",
       status: campaign.status || "active",
@@ -745,8 +763,26 @@ export default function AdminView({
       collectionUrl: campaign.collectionUrl || campaign.shopifyCollectionUrl || "",
       shopifyCollectionUrl: campaign.shopifyCollectionUrl || campaign.collectionUrl || "",
       bannerImageUrl: campaign.bannerImageUrl || "",
+      venueName: campaign.venueName || "",
+      organizer: campaign.organizer || "",
+      federation: campaign.federation || "",
+      disciplinesFr: campaign.disciplinesFr || campaign.disciplines || "",
+      disciplinesEn: campaign.disciplinesEn || "",
+      audienceFr: campaign.audienceFr || campaign.audience || "",
+      audienceEn: campaign.audienceEn || "",
+      overviewFr: campaign.overviewFr || campaign.overview || "",
+      overviewEn: campaign.overviewEn || "",
+      websiteUrl: campaign.websiteUrl || "",
+      facebookUrl: campaign.facebookUrl || "",
+      instagramUrl: campaign.instagramUrl || "",
+      youtubeUrl: campaign.youtubeUrl || "",
+      videoUrl: campaign.videoUrl || "",
+      galleryImageUrls: Array.isArray(campaign.galleryImageUrls)
+        ? campaign.galleryImageUrls.join("\n")
+        : campaign.galleryImageUrls || "",
       products: Array.isArray(campaign.products) ? campaign.products : [],
       description: campaign.description || "",
+      descriptionEn: campaign.descriptionEn || "",
     });
   }
 
@@ -1098,6 +1134,13 @@ export default function AdminView({
         />
 
         <TextInput
+          label="Titre anglais"
+          value={campaignState.titleEn}
+          onChange={(value) => setCampaignState({ ...campaignState, titleEn: value })}
+          placeholder="Ex. WKC Spain 2026"
+        />
+
+        <TextInput
           label="Année"
           value={campaignState.year}
           onChange={(value) => setCampaignState({ ...campaignState, year: value })}
@@ -1118,6 +1161,37 @@ export default function AdminView({
             onChange={(value) => setCampaignState({ ...campaignState, city: value })}
             placeholder="Ex. Cadiz"
           />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput
+            label="Lieu / bâtiment"
+            value={campaignState.venueName}
+            onChange={(value) => setCampaignState({ ...campaignState, venueName: value })}
+            placeholder="Ex. Pabellón Ciudad de Chiclana"
+          />
+          <TextInput
+            label="Organisateur"
+            value={campaignState.organizer}
+            onChange={(value) => setCampaignState({ ...campaignState, organizer: value })}
+            placeholder="Ex. WKC World"
+          />
+        </div>
+
+        <TextInput
+          label="Fédération(s)"
+          value={campaignState.federation}
+          onChange={(value) => setCampaignState({ ...campaignState, federation: value })}
+          placeholder="Ex. World Kickboxing Commission (WKC)"
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextAreaInput label="Disciplines — français" value={campaignState.disciplinesFr} onChange={(value) => setCampaignState({ ...campaignState, disciplinesFr: value })} />
+          <TextAreaInput label="Disciplines — anglais" value={campaignState.disciplinesEn} onChange={(value) => setCampaignState({ ...campaignState, disciplinesEn: value })} />
+          <TextAreaInput label="Qui est concerné — français" value={campaignState.audienceFr} onChange={(value) => setCampaignState({ ...campaignState, audienceFr: value })} />
+          <TextAreaInput label="Who it is for — English" value={campaignState.audienceEn} onChange={(value) => setCampaignState({ ...campaignState, audienceEn: value })} />
+          <TextAreaInput label="Présentation détaillée — français" value={campaignState.overviewFr} onChange={(value) => setCampaignState({ ...campaignState, overviewFr: value })} />
+          <TextAreaInput label="Detailed overview — English" value={campaignState.overviewEn} onChange={(value) => setCampaignState({ ...campaignState, overviewEn: value })} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -1225,11 +1299,40 @@ export default function AdminView({
           placeholder="Lien vers une page ou un formulaire de commandite"
         />
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput label="Site officiel" value={campaignState.websiteUrl} onChange={(value) => setCampaignState({ ...campaignState, websiteUrl: value })} placeholder="https://..." />
+          <TextInput label="Facebook" value={campaignState.facebookUrl} onChange={(value) => setCampaignState({ ...campaignState, facebookUrl: value })} placeholder="https://facebook.com/..." />
+          <TextInput label="Instagram" value={campaignState.instagramUrl} onChange={(value) => setCampaignState({ ...campaignState, instagramUrl: value })} placeholder="https://instagram.com/..." />
+          <TextInput label="YouTube" value={campaignState.youtubeUrl} onChange={(value) => setCampaignState({ ...campaignState, youtubeUrl: value })} placeholder="https://youtube.com/..." />
+        </div>
+
+        <TextInput
+          label="Vidéo à afficher"
+          value={campaignState.videoUrl}
+          onChange={(value) => setCampaignState({ ...campaignState, videoUrl: value })}
+          placeholder="Lien YouTube ou Vimeo"
+        />
+
+        <TextAreaInput
+          label="Galerie d’images"
+          value={campaignState.galleryImageUrls}
+          onChange={(value) => setCampaignState({ ...campaignState, galleryImageUrls: value })}
+          placeholder="Une URL d’image par ligne"
+          hint="Ajoutez une adresse par ligne. Les images apparaîtront dans la galerie publique."
+        />
+
         <TextAreaInput
           label="Description"
           value={campaignState.description}
           onChange={(value) => setCampaignState({ ...campaignState, description: value })}
           placeholder="Description publique de la campagne"
+        />
+
+        <TextAreaInput
+          label="Description anglaise"
+          value={campaignState.descriptionEn}
+          onChange={(value) => setCampaignState({ ...campaignState, descriptionEn: value })}
+          placeholder="Public campaign description in English"
         />
 
         <ProductEditor

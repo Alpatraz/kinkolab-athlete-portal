@@ -221,6 +221,7 @@ export default function SignupView({ goBack, openEligibility }) {
     imageUse: false,
     legalParent: false,
     revocation: false,
+    marketingCommunications: false,
   });
 
   useEffect(() => {
@@ -283,6 +284,12 @@ export default function SignupView({ goBack, openEligibility }) {
         sportGoals: form.sportGoalsFr || form.sportGoalsEn,
         targetedCompetitions: form.targetedCompetitionsFr || form.targetedCompetitionsEn,
         consents,
+        communicationConsent: {
+          operational: true,
+          marketing: Boolean(consents.marketingCommunications),
+          policyVersion: "2026-08-01",
+          recordedAt: new Date().toISOString(),
+        },
         athleteName: `${form.firstName} ${form.lastName}`.trim(),
         campaignTitle: selectedCampaignTitle,
         desiredGoal: Number(form.desiredGoal || 0),
@@ -783,6 +790,24 @@ export default function SignupView({ goBack, openEligibility }) {
                   une participation au programme selon ses règles et valeurs.
                 </ConsentCheckbox>
               </div>
+            </section>
+
+            <section className="border border-zinc-700 bg-zinc-950/50 p-6 md:p-8">
+              <SectionTitle>Communications par courriel</SectionTitle>
+              <p className="mb-5 text-sm leading-7 text-zinc-300">
+                Les courriels nécessaires au traitement de votre candidature et au suivi de votre campagne peuvent inclure l’acceptation, l’avancement, la fermeture de la campagne et le versement des fonds.
+              </p>
+              <label className="flex cursor-pointer items-start gap-4 text-sm leading-6 text-zinc-200">
+                <input
+                  type="checkbox"
+                  checked={consents.marketingCommunications}
+                  onChange={(event) => updateConsent("marketingCommunications", event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-yellow-600"
+                />
+                <span>
+                  J’accepte également de recevoir des nouvelles sur les prochaines campagnes, les nouvelles campagnes ouvertes et les activités ou produits du Programme Athlètes KinkoLab. Ce consentement est facultatif et je peux me désabonner en tout temps.
+                </span>
+              </label>
             </section>
 
             <div className="mt-10 text-center">

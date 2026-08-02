@@ -59,6 +59,7 @@ function AthleteRoute({
 
 function CampaignRoute({
   campaigns,
+  campaignsLoaded,
   athletes,
   participations,
   contributions,
@@ -68,6 +69,10 @@ function CampaignRoute({
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const campaign = campaigns.find((item) => item.id === campaignId);
+
+  if (!campaignsLoaded) {
+    return <main className="min-h-screen bg-black p-8 text-white"><p className="text-xl font-black">Chargement de la campagne...</p></main>;
+  }
 
   if (!campaign) return <Navigate to="/campaigns" replace />;
 
@@ -130,6 +135,7 @@ export default function App() {
 
   const [athletes, setAthletes] = useState([]);
   const [firebaseCampaigns, setFirebaseCampaigns] = useState([]);
+  const [campaignsLoaded, setCampaignsLoaded] = useState(false);
   const [participations, setParticipations] = useState([]);
   const [wallMessages, setWallMessages] = useState([]);
   const [contributions, setContributions] = useState([]);
@@ -194,7 +200,8 @@ export default function App() {
           ...docSnap.data(),
         }))
       );
-    });
+      setCampaignsLoaded(true);
+    }, () => setCampaignsLoaded(true));
 
     return () => unsubscribe();
   }, []);
@@ -349,6 +356,7 @@ export default function App() {
           element={
             <CampaignRoute
   campaigns={campaigns}
+  campaignsLoaded={campaignsLoaded}
   athletes={publicAthletes}
   participations={participations}
   contributions={contributions}

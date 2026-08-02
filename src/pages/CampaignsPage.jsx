@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, MapPin, Search, Users, DollarSign } from "lucide-react";
 import { gold, money } from "../utils/format";
+import { useLanguage } from "../context/LanguageContext";
+import { localizedField } from "../utils/localizedContent";
+import { withCampaignDefaults } from "../utils/campaignDetails";
 
 function isVisibleCampaign(campaign) {
   return (
@@ -68,15 +71,17 @@ export default function CampaignsPage({
   onOpenCampaign,
   openSignup,
 }) {
+  const { language } = useLanguage();
   const [search, setSearch] = useState("");
 
   const visibleCampaigns = useMemo(() => {
     return (campaigns || [])
+      .map(withCampaignDefaults)
       .filter(isVisibleCampaign)
       .filter((campaign) => {
         const text = [
-          campaign.title,
-          campaign.description,
+          localizedField(campaign, "title", language),
+          localizedField(campaign, "description", language),
           campaign.year,
           campaign.country,
           campaign.city,
@@ -89,7 +94,7 @@ export default function CampaignsPage({
 
         return text.includes(search.toLowerCase());
       });
-  }, [campaigns, search]);
+  }, [campaigns, language, search]);
 
   function campaignParticipations(campaignId) {
     return (participations || []).filter(
@@ -200,7 +205,7 @@ export default function CampaignsPage({
                       </p>
 
                       <h2 className="mt-3 text-3xl font-black text-white">
-                        {campaign.title || "Campagne KinkoLab"}
+                        {localizedField(campaign, "title", language) || "Campagne KinkoLab"}
                       </h2>
                     </div>
 
@@ -215,7 +220,7 @@ export default function CampaignsPage({
 
                 <div className="p-6">
                   <p className="min-h-16 text-sm leading-6 text-zinc-400">
-                    {campaign.description ||
+                    {localizedField(campaign, "description", language) ||
                       "Campagne de financement pour soutenir les athlètes des arts martiaux."}
                   </p>
 
