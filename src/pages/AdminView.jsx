@@ -215,6 +215,13 @@ const emailBlockLabels = {
   button: "Bouton",
 };
 
+const workflowOptions = [
+  { key: "application_received", label: "Candidature reçue", trigger: "Après l’envoi du formulaire d’inscription" },
+  { key: "application_accepted", label: "Candidature acceptée", trigger: "Quand un administrateur accepte une candidature" },
+  { key: "application_refused", label: "Candidature refusée", trigger: "Quand un administrateur refuse une candidature" },
+  { key: "payout_paid", label: "Versement effectué", trigger: "Quand un administrateur enregistre un versement" },
+];
+
 function previewVariables(value = "") {
   return String(value)
     .replaceAll("{{name}}", "Alex Tremblay")
@@ -462,6 +469,9 @@ export default function AdminView({
   const [previewLanguage, setPreviewLanguage] = useState("fr");
   const [previewMobile, setPreviewMobile] = useState(false);
   const [draggedEmailBlock, setDraggedEmailBlock] = useState("");
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [newAdmin, setNewAdmin] = useState({ name: "", email: "", language: "fr" });
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -720,6 +730,7 @@ export default function AdminView({
     ["participations", "Participations"],
     ["finances", "Finances"],
     ["communications", "Communications"],
+    ["administrateurs", "Administrateurs"],
     ["messages", "Messages"],
   ];
 
@@ -756,6 +767,38 @@ export default function AdminView({
   useEffect(() => {
     if (activeTab === "communications" && emailTemplates.length === 0) loadEmailCenter();
   }, [activeTab]);
+
+  async function adminUsersRequest(options = {}) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Session administrateur expirée.");
+    const response = await fetch("/api/admin-users", { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Impossible de gérer les administrateurs.");
+    return data;
+  }
+
+  async function loadAdminUsers() {
+    setAdminUsersLoading(true);
+    try { const data = await adminUsersRequest(); setAdminUsers(data.admins || []); }
+    catch (error) { alert(error.message); }
+    finally { setAdminUsersLoading(false); }
+  }
+
+  useEffect(() => {
+    if (activeTab === "administrateurs" && adminUsers.length === 0) loadAdminUsers();
+  }, [activeTab]);
+
+  async function inviteAdmin() {
+    if (!newAdmin.name.trim() || !newAdmin.email.trim()) { alert("Le nom et le courriel sont obligatoires."); return; }
+    setAdminUsersLoading(true);
+    try {
+      await adminUsersRequest({ method: "POST", body: JSON.stringify(newAdmin) });
+      setNewAdmin({ name: "", email: "", language: "fr" });
+      await loadAdminUsers();
+      alert("Administrateur créé et invitation envoyée.");
+    } catch (error) { alert(error.message); }
+    finally { setAdminUsersLoading(false); }
+  }
 
   async function saveEmailTemplate() {
     if (!editingEmailTemplate) return;
@@ -857,7 +900,6 @@ export default function AdminView({
       setAcceptedAccess({
         athleteId: data.athleteId,
         email: data.email,
-        temporaryPassword: data.temporaryPassword,
       });
       sendProgramNotification("application_accepted", application.id).catch((error) =>
         alert(`Candidature acceptée, mais le courriel n’a pas été envoyé : ${error.message}`)
@@ -1600,9 +1642,9 @@ export default function AdminView({
         {acceptedAccess && (
           <section className="mt-8 rounded-[2rem] border border-emerald-300 bg-emerald-50 p-6 shadow-xl">
             <h2 className="text-2xl font-black text-emerald-900">Compte athlète créé</h2>
-            <p className="mt-2 text-sm text-emerald-800">Copie ces accès avant de quitter cette page.</p>
+            <p className="mt-2 text-sm text-emerald-800">Un courriel sécurisé permet maintenant à l’athlète de choisir son propre mot de passe.</p>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl bg-white p-4">
                 <p className="text-xs font-bold uppercase text-zinc-500">Athlete ID</p>
                 <p className="mt-1 font-black text-zinc-950">{acceptedAccess.athleteId}</p>
@@ -1611,25 +1653,11 @@ export default function AdminView({
                 <p className="text-xs font-bold uppercase text-zinc-500">Courriel</p>
                 <p className="mt-1 font-black text-zinc-950">{acceptedAccess.email}</p>
               </div>
-              <div className="rounded-2xl bg-white p-4">
-                <p className="text-xs font-bold uppercase text-zinc-500">Mot de passe temporaire</p>
-                <p className="mt-1 font-black text-zinc-950">{acceptedAccess.temporaryPassword}</p>
-              </div>
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <AdminButton
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `Courriel: ${acceptedAccess.email}\nMot de passe temporaire: ${acceptedAccess.temporaryPassword}`
-                  );
-                }}
-              >
-                Copier les accès
-              </AdminButton>
-
               <AdminButton variant="light" onClick={() => setAcceptedAccess(null)}>
-                J’ai copié les accès
+                Fermer
               </AdminButton>
 
               <AdminButton variant="light" onClick={() => onOpenAthlete(acceptedAccess.athleteId)}>
@@ -2210,7 +2238,22 @@ export default function AdminView({
 
               <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                 <p className="font-black">Variables disponibles</p>
-                <p className="mt-1 font-mono text-xs">{"{{name}} · {{campaign}} · {{amount}} · {{loginUrl}}"}</p>
+                <p className="mt-1 font-mono text-xs">{"{{name}} · {{campaign}} · {{amount}} · {{loginUrl}} · {{accountSetupUrl}}"}</p>
+              </div>
+
+              <div className="mt-6 max-w-xl">
+                <SelectInput
+                  label="Choisir le workflow et son modèle"
+                  value={editingEmailTemplate?.key || ""}
+                  onChange={(key) => {
+                    const selected = emailTemplates.find((template) => template.key === key);
+                    if (selected) setEditingEmailTemplate(selected);
+                  }}
+                >
+                  <option value="" disabled>Sélectionner…</option>
+                  {workflowOptions.map((workflow) => <option key={workflow.key} value={workflow.key}>{workflow.label}</option>)}
+                  {emailTemplates.filter((template) => !workflowOptions.some((workflow) => workflow.key === template.key)).map((template) => <option key={template.key} value={template.key}>{template.name} — manuel</option>)}
+                </SelectInput>
               </div>
 
               {emailCenterLoading && <p className="mt-6 text-zinc-500">Chargement des communications…</p>}
@@ -2242,7 +2285,9 @@ export default function AdminView({
                   <div className="rounded-2xl border border-zinc-200 p-5 md:p-6">
                     <div className="grid gap-4 md:grid-cols-2">
                       <TextInput label="Nom du modèle" value={editingEmailTemplate.name} onChange={(value) => setEditingEmailTemplate({ ...editingEmailTemplate, name: value })} />
-                      <TextInput label="Déclencheur / workflow" value={editingEmailTemplate.trigger} onChange={(value) => setEditingEmailTemplate({ ...editingEmailTemplate, trigger: value })} hint="Les workflows natifs sont déclenchés automatiquement par les actions du portail." />
+                      <AdminField label="Déclencheur / workflow" hint="Ce déclencheur est déterminé par le portail et ne peut pas être modifié accidentellement.">
+                        <div className="rounded-2xl border border-zinc-200 bg-zinc-100 p-3 font-bold text-zinc-700">{workflowOptions.find((workflow) => workflow.key === editingEmailTemplate.key)?.trigger || editingEmailTemplate.trigger || "Envoi manuel"}</div>
+                      </AdminField>
                     </div>
 
                     <label className="mt-4 flex items-center gap-3 rounded-2xl bg-zinc-100 p-4 font-black text-zinc-950">
@@ -2401,6 +2446,29 @@ export default function AdminView({
                     {!emailLogs.length && <tr><td colSpan="5" className="p-5 text-center text-zinc-500">Aucun envoi enregistré.</td></tr>}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === "administrateurs" && (
+          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+            <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
+              <div className="flex items-center gap-3"><Shield style={{ color: gold }} /><h2 className="text-2xl font-black text-zinc-950">Inviter un administrateur</h2></div>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">La personne recevra un lien sécurisé pour choisir son mot de passe. Aucun mot de passe ne sera affiché ou transmis manuellement.</p>
+              <div className="mt-6 space-y-4">
+                <TextInput label="Nom complet" value={newAdmin.name} onChange={(value) => setNewAdmin({ ...newAdmin, name: value })} />
+                <TextInput label="Adresse courriel" type="email" value={newAdmin.email} onChange={(value) => setNewAdmin({ ...newAdmin, email: value })} />
+                <SelectInput label="Langue de l’invitation" value={newAdmin.language} onChange={(value) => setNewAdmin({ ...newAdmin, language: value })}><option value="fr">Français</option><option value="en">English</option></SelectInput>
+                <AdminButton disabled={adminUsersLoading} onClick={inviteAdmin}><UserPlus2 size={17} /> {adminUsersLoading ? "Traitement…" : "Créer et envoyer l’invitation"}</AdminButton>
+              </div>
+            </section>
+            <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
+              <h2 className="text-2xl font-black text-zinc-950">Administrateurs actuels</h2>
+              <div className="mt-5 space-y-3">
+                {adminUsersLoading && !adminUsers.length && <p className="text-zinc-500">Chargement…</p>}
+                {adminUsers.map((item) => <div key={item.uid} className="rounded-2xl border border-zinc-200 p-4"><p className="font-black text-zinc-950">{item.name || "Administrateur"}</p><p className="mt-1 text-sm text-zinc-600">{item.email}</p></div>)}
+                {!adminUsersLoading && !adminUsers.length && <p className="text-zinc-500">Aucun administrateur trouvé.</p>}
               </div>
             </section>
           </div>

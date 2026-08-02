@@ -237,6 +237,9 @@ exports.handler = async function (event) {
     }
 
     const athlete = buildAthlete(application, userRecord.uid, familyId);
+    const accountSetupUrl = await admin.auth().generatePasswordResetLink(email, {
+      url: "https://athletes.kinkolab.com/login",
+    });
 
     await db.collection("athletes").doc(athlete.id).set(athlete, { merge: true });
 
@@ -276,6 +279,7 @@ exports.handler = async function (event) {
       athleteId: athlete.id,
       userId: userRecord.uid,
       familyId,
+      accountSetupUrl,
       acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -287,7 +291,7 @@ exports.handler = async function (event) {
         familyId,
         userId: userRecord.uid,
         email,
-        temporaryPassword,
+        accountSetupEmailSent: false,
       }),
     };
   } catch (error) {

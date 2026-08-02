@@ -18,8 +18,8 @@ const DEFAULT_TEMPLATES: Record<string, any> = {
   },
   application_accepted: {
     key: "application_accepted", name: "Candidature acceptée", trigger: "Quand un administrateur accepte une candidature", enabled: true,
-    fr: { subject: "Votre candidature KinkoLab est acceptée", title: "Bienvenue dans le Programme Athlètes", body: "Bonjour {{name}},\n\nVotre candidature pour {{campaign}} a été acceptée. Votre accès athlète a été créé.", buttonLabel: "Accéder à mon compte", buttonUrl: `${SITE_URL}/login` },
-    en: { subject: "Your KinkoLab application has been accepted", title: "Welcome to the Athlete Program", body: "Hello {{name}},\n\nYour application for {{campaign}} has been accepted. Your athlete access has been created.", buttonLabel: "Access my account", buttonUrl: `${SITE_URL}/login` },
+    fr: { subject: "Votre candidature KinkoLab est acceptée", title: "Bienvenue dans le Programme Athlètes", body: "Bonjour {{name}},\n\nVotre candidature pour {{campaign}} a été acceptée. Votre accès athlète a été créé. Utilisez le bouton ci-dessous pour choisir votre mot de passe.", buttonLabel: "Créer mon mot de passe", buttonUrl: "{{accountSetupUrl}}" },
+    en: { subject: "Your KinkoLab application has been accepted", title: "Welcome to the Athlete Program", body: "Hello {{name}},\n\nYour application for {{campaign}} has been accepted. Your athlete access has been created. Use the button below to choose your password.", buttonLabel: "Create my password", buttonUrl: "{{accountSetupUrl}}" },
   },
   application_refused: {
     key: "application_refused", name: "Candidature refusée", trigger: "Quand un administrateur refuse une candidature", enabled: true,
@@ -126,7 +126,7 @@ async function handleAdminAction(body: any, adminUser: any) {
   if (body.action === "test_template") {
     const { template, email, language = "fr" } = body;
     if (!email || !template) return Response.json({ error: "Template and email are required" }, { status: 400 });
-    const variables = { name: "Athlète test", campaign: "Campagne KinkoLab", amount: "125,00 $", loginUrl: `${SITE_URL}/login` };
+    const variables = { name: "Athlète test", campaign: "Campagne KinkoLab", amount: "125,00 $", loginUrl: `${SITE_URL}/login`, accountSetupUrl: `${SITE_URL}/login` };
     const resendId = await sendEmail(email, renderTemplate(template, language, variables));
     await logEmail({ type: template.key, recipient: email, language, resendId, status: "sent", test: true });
     return Response.json({ sent: true, resendId });
@@ -148,7 +148,7 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
     const application = snapshot.data();
     recipient = application?.parentEmail || application?.email || "";
     language = application?.preferredLanguage || "fr";
-    variables = { name: application?.athleteName || `${application?.firstName || ""} ${application?.lastName || ""}`.trim(), campaign: application?.campaignTitle || "Programme Athlètes KinkoLab", amount: "", loginUrl: `${SITE_URL}/login` };
+    variables = { name: application?.athleteName || `${application?.firstName || ""} ${application?.lastName || ""}`.trim(), campaign: application?.campaignTitle || "Programme Athlètes KinkoLab", amount: "", loginUrl: `${SITE_URL}/login`, accountSetupUrl: application?.accountSetupUrl || `${SITE_URL}/login` };
   } else if (type === "payout_paid") {
     recordRef = db.collection("payouts").doc(recordId);
     const snapshot = await recordRef.get();
@@ -161,7 +161,7 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
     recipient = data.parentEmail || data.contactEmail || data.email || "";
     language = data.preferredLanguage || "fr";
     const amount = new Intl.NumberFormat(language === "en" ? "en-CA" : "fr-CA", { style: "currency", currency: "CAD" }).format(Number(payout?.amount || 0));
-    variables = { name: payout?.beneficiaryLabel || "athlète", campaign: payout?.campaignTitle || "campagne KinkoLab", amount, loginUrl: `${SITE_URL}/login` };
+    variables = { name: payout?.beneficiaryLabel || "athlète", campaign: payout?.campaignTitle || "campagne KinkoLab", amount, loginUrl: `${SITE_URL}/login`, accountSetupUrl: `${SITE_URL}/login` };
   } else return Response.json({ error: "Unsupported notification type" }, { status: 400 });
 
   if (!recipient) return Response.json({ error: "Recipient email not found" }, { status: 400 });
@@ -172,7 +172,12 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
   if (current) return Response.json({ sent: false, alreadySent: true });
   if (type !== "application_received" && !isAdmin) throw new Error("Unauthorized");
 
-  const resendId = await sendEmail(recipient, renderTemplate(template, language, variables));
+  const rendered = renderTemplate(template, language, variables);
+  if (type === "application_accepted" && variables.accountSetupUrl) {
+    rendered.buttonUrl = variables.accountSetupUrl;
+    rendered.buttonLabel = language === "en" ? "Create my password" : "Créer mon mot de passe";
+  }
+  const resendId = await sendEmail(recipient, rendered);
   await recordRef.update({ [`emailNotifications.${type}`]: admin.firestore.FieldValue.serverTimestamp() });
   await logEmail({ type, recordId, recipient, language, resendId, status: "sent", test: false });
   return Response.json({ sent: true, resendId });
