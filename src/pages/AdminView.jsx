@@ -8,17 +8,21 @@ import {
   ExternalLink,
   Eye,
   FolderKanban,
+  GripVertical,
   Image as ImageIcon,
   Link2,
   Mail,
   Megaphone,
+  Monitor,
   PackagePlus,
+  Palette,
   PencilLine,
   Plus,
   RotateCcw,
   Save,
   Send,
   Shield,
+  Smartphone,
   Trash2,
   Upload,
   UserPlus2,
@@ -185,6 +189,57 @@ function SelectInput({ label, value, onChange, children }) {
         {children}
       </select>
     </AdminField>
+  );
+}
+
+const defaultEmailDesign = {
+  backgroundColor: "#090909",
+  cardColor: "#18181b",
+  textColor: "#d4d4d8",
+  headingColor: "#f4f4f5",
+  accentColor: "#d7b85b",
+  buttonTextColor: "#000000",
+  logoUrl: "https://athletes.kinkolab.com/images/kinko-logo.png",
+  heroImageUrl: "",
+  borderRadius: 24,
+  contentWidth: 640,
+  alignment: "left",
+  blocks: ["logo", "image", "title", "body", "button"],
+};
+
+const emailBlockLabels = {
+  logo: "Logo",
+  image: "Image principale",
+  title: "Titre",
+  body: "Texte",
+  button: "Bouton",
+};
+
+function previewVariables(value = "") {
+  return String(value)
+    .replaceAll("{{name}}", "Alex Tremblay")
+    .replaceAll("{{campaign}}", "Championnat mondial 2026")
+    .replaceAll("{{amount}}", "125,00 $")
+    .replaceAll("{{loginUrl}}", "https://athletes.kinkolab.com/login");
+}
+
+function EmailPreview({ template, language = "fr", mobile = false }) {
+  const content = template?.[language] || template?.fr || {};
+  const design = { ...defaultEmailDesign, ...(template?.design || {}) };
+  const blocks = {
+    logo: design.logoUrl ? <img src={design.logoUrl} alt="KinkoLab" className="max-h-16 max-w-[150px] object-contain" /> : null,
+    image: design.heroImageUrl ? <img src={design.heroImageUrl} alt="Aperçu" className="max-h-64 w-full object-cover" style={{ borderRadius: Math.max(0, Number(design.borderRadius) - 8) }} /> : null,
+    title: <h3 className="text-3xl font-black leading-tight" style={{ color: design.headingColor }}>{previewVariables(content.title || "Titre du courriel")}</h3>,
+    body: <div className="whitespace-pre-line text-base leading-7" style={{ color: design.textColor }}>{previewVariables(content.body || "Contenu du courriel")}</div>,
+    button: content.buttonLabel ? <a href={previewVariables(content.buttonUrl || "#")} onClick={(event) => event.preventDefault()} className="inline-block px-5 py-3 font-black no-underline" style={{ backgroundColor: design.accentColor, color: design.buttonTextColor, borderRadius: 12 }}>{previewVariables(content.buttonLabel)}</a> : null,
+  };
+  return (
+    <div className="mx-auto overflow-hidden shadow-2xl transition-all" style={{ width: mobile ? 375 : "100%", maxWidth: design.contentWidth, backgroundColor: design.backgroundColor, padding: mobile ? 16 : 28 }}>
+      <div style={{ backgroundColor: design.cardColor, borderRadius: Number(design.borderRadius), border: `1px solid ${design.accentColor}55`, padding: mobile ? 20 : 32, textAlign: design.alignment }}>
+        <div className="space-y-6">{(design.blocks || defaultEmailDesign.blocks).map((key) => <div key={key}>{blocks[key]}</div>)}</div>
+        <p className="mt-8 border-t pt-5 text-xs opacity-60" style={{ color: design.textColor, borderColor: `${design.accentColor}55` }}>KinkoLab Inc. · Terrebonne, Québec · athletes@kinkolab.com</p>
+      </div>
+    </div>
   );
 }
 
@@ -404,6 +459,9 @@ export default function AdminView({
   const [emailActionLoading, setEmailActionLoading] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testLanguage, setTestLanguage] = useState("fr");
+  const [previewLanguage, setPreviewLanguage] = useState("fr");
+  const [previewMobile, setPreviewMobile] = useState(false);
+  const [draggedEmailBlock, setDraggedEmailBlock] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -737,6 +795,7 @@ export default function AdminView({
       name: "Nouveau modèle",
       trigger: "Envoi manuel",
       enabled: false,
+      design: { ...defaultEmailDesign },
       fr: { subject: "", title: "", body: "Bonjour {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
       en: { subject: "", title: "", body: "Hello {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
     });
@@ -747,6 +806,25 @@ export default function AdminView({
       ...editingEmailTemplate,
       [language]: { ...(editingEmailTemplate?.[language] || {}), [field]: value },
     });
+  }
+
+  function updateEmailDesign(field, value) {
+    setEditingEmailTemplate({
+      ...editingEmailTemplate,
+      design: { ...defaultEmailDesign, ...(editingEmailTemplate?.design || {}), [field]: value },
+    });
+  }
+
+  function moveEmailBlock(targetBlock) {
+    if (!draggedEmailBlock || draggedEmailBlock === targetBlock) return;
+    const current = [...(editingEmailTemplate?.design?.blocks || defaultEmailDesign.blocks)];
+    const from = current.indexOf(draggedEmailBlock);
+    const to = current.indexOf(targetBlock);
+    if (from < 0 || to < 0) return;
+    current.splice(from, 1);
+    current.splice(to, 0, draggedEmailBlock);
+    updateEmailDesign("blocks", current);
+    setDraggedEmailBlock("");
   }
 
   async function updateApplicationCampaign(applicationId, campaignId) {
@@ -2185,6 +2263,94 @@ export default function AdminView({
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-8 border-t border-zinc-200 pt-8">
+                      <div className="flex items-center gap-3">
+                        <Palette style={{ color: gold }} />
+                        <div>
+                          <h3 className="text-xl font-black text-zinc-950">Design du courriel</h3>
+                          <p className="text-sm text-zinc-500">Les changements apparaissent immédiatement dans l’aperçu.</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
+                        <div className="space-y-5">
+                          <div className="rounded-2xl bg-zinc-50 p-4">
+                            <p className="font-black text-zinc-950">Glisser-déposer les blocs</p>
+                            <p className="mt-1 text-xs text-zinc-500">Prends un bloc et déplace-le à la position souhaitée.</p>
+                            <div className="mt-3 space-y-2">
+                              {(editingEmailTemplate.design?.blocks || defaultEmailDesign.blocks).map((block) => (
+                                <div
+                                  key={block}
+                                  draggable
+                                  onDragStart={() => setDraggedEmailBlock(block)}
+                                  onDragOver={(event) => event.preventDefault()}
+                                  onDrop={() => moveEmailBlock(block)}
+                                  className="flex cursor-grab items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 font-bold text-zinc-800 active:cursor-grabbing"
+                                >
+                                  <GripVertical size={18} className="text-zinc-400" /> {emailBlockLabels[block] || block}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 rounded-2xl bg-zinc-50 p-4">
+                            {[
+                              ["backgroundColor", "Arrière-plan"], ["cardColor", "Carte"],
+                              ["headingColor", "Titres"], ["textColor", "Texte"],
+                              ["accentColor", "Accent / bouton"], ["buttonTextColor", "Texte bouton"],
+                            ].map(([field, label]) => (
+                              <label key={field} className="text-xs font-bold text-zinc-600">
+                                {label}
+                                <div className="mt-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-white p-2">
+                                  <input type="color" value={(editingEmailTemplate.design?.[field] || defaultEmailDesign[field])} onChange={(event) => updateEmailDesign(field, event.target.value)} className="h-8 w-10 cursor-pointer border-0 bg-transparent" />
+                                  <span className="font-mono text-[10px]">{editingEmailTemplate.design?.[field] || defaultEmailDesign[field]}</span>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+
+                          <SelectInput label="Alignement" value={editingEmailTemplate.design?.alignment || defaultEmailDesign.alignment} onChange={(value) => updateEmailDesign("alignment", value)}>
+                            <option value="left">À gauche</option><option value="center">Centré</option><option value="right">À droite</option>
+                          </SelectInput>
+                          <div className="grid grid-cols-2 gap-3">
+                            <TextInput label="Coins arrondis" type="number" value={editingEmailTemplate.design?.borderRadius ?? defaultEmailDesign.borderRadius} onChange={(value) => updateEmailDesign("borderRadius", Number(value))} />
+                            <TextInput label="Largeur maximale" type="number" value={editingEmailTemplate.design?.contentWidth ?? defaultEmailDesign.contentWidth} onChange={(value) => updateEmailDesign("contentWidth", Number(value))} />
+                          </div>
+                          <TextInput label="URL du logo" value={editingEmailTemplate.design?.logoUrl ?? defaultEmailDesign.logoUrl} onChange={(value) => updateEmailDesign("logoUrl", value)} />
+                          <TextInput label="URL de l’image principale" value={editingEmailTemplate.design?.heroImageUrl || ""} onChange={(value) => updateEmailDesign("heroImageUrl", value)} placeholder="Optionnel" />
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm font-black text-zinc-950">
+                            <Upload size={16} /> Téléverser une image
+                            <input type="file" accept="image/*" className="hidden" onChange={async (event) => {
+                              const file = event.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                setEmailActionLoading(true);
+                                const url = await uploadAdminImage(file, `email-templates/${editingEmailTemplate.key}`);
+                                updateEmailDesign("heroImageUrl", url);
+                              } catch { alert("Impossible de téléverser cette image."); }
+                              finally { setEmailActionLoading(false); }
+                            }} />
+                          </label>
+                        </div>
+
+                        <div className="min-w-0 rounded-2xl bg-zinc-200 p-4 md:p-6">
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => setPreviewLanguage("fr")} className={`rounded-xl px-3 py-2 text-sm font-black ${previewLanguage === "fr" ? "bg-black text-white" : "bg-white text-black"}`}>FR</button>
+                              <button type="button" onClick={() => setPreviewLanguage("en")} className={`rounded-xl px-3 py-2 text-sm font-black ${previewLanguage === "en" ? "bg-black text-white" : "bg-white text-black"}`}>EN</button>
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="button" aria-label="Aperçu ordinateur" onClick={() => setPreviewMobile(false)} className={`rounded-xl p-2 ${!previewMobile ? "bg-black text-white" : "bg-white text-black"}`}><Monitor size={18} /></button>
+                              <button type="button" aria-label="Aperçu mobile" onClick={() => setPreviewMobile(true)} className={`rounded-xl p-2 ${previewMobile ? "bg-black text-white" : "bg-white text-black"}`}><Smartphone size={18} /></button>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto rounded-xl py-4">
+                            <EmailPreview template={{ ...editingEmailTemplate, design: { ...defaultEmailDesign, ...(editingEmailTemplate.design || {}) } }} language={previewLanguage} mobile={previewMobile} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="mt-6 flex flex-wrap gap-3">

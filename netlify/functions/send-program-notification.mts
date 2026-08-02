@@ -3,6 +3,12 @@ import admin from "firebase-admin";
 
 const SITE_URL = "https://athletes.kinkolab.com";
 const FROM = "KinkoLab Athlètes <athletes@kinkolab.com>";
+const DEFAULT_DESIGN = {
+  backgroundColor: "#090909", cardColor: "#18181b", textColor: "#d4d4d8",
+  headingColor: "#f4f4f5", accentColor: "#d7b85b", buttonTextColor: "#000000",
+  logoUrl: `${SITE_URL}/images/kinko-logo.png`, heroImageUrl: "", borderRadius: 24,
+  contentWidth: 640, alignment: "left", blocks: ["logo", "image", "title", "body", "button"],
+};
 
 const DEFAULT_TEMPLATES: Record<string, any> = {
   application_received: {
@@ -44,9 +50,19 @@ function interpolate(value = "", variables: Record<string, string> = {}) {
   return String(value).replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, key) => variables[key] ?? "");
 }
 
-function emailLayout(title: string, body: string, buttonLabel = "", buttonUrl = "") {
+function emailLayout(title: string, body: string, buttonLabel = "", buttonUrl = "", customDesign: any = {}) {
+  const design = { ...DEFAULT_DESIGN, ...(customDesign || {}) };
   const paragraphs = body.split(/\n\s*\n/).filter(Boolean);
-  return `<!doctype html><html><body style="margin:0;background:#090909;color:#f4f4f5;font-family:Arial,sans-serif"><div style="max-width:640px;margin:auto;padding:32px 20px"><div style="border:1px solid #3f3f46;border-radius:24px;background:#18181b;padding:32px"><p style="color:#d7b85b;font-weight:700;letter-spacing:.12em;text-transform:uppercase">KinkoLab · Programme Athlètes</p><h1 style="font-size:30px;line-height:1.2">${escapeHtml(title)}</h1>${paragraphs.map((paragraph) => `<p style="white-space:pre-line;color:#d4d4d8;font-size:16px;line-height:1.7">${escapeHtml(paragraph)}</p>`).join("")}${buttonLabel && buttonUrl ? `<p style="margin-top:28px"><a href="${escapeHtml(buttonUrl)}" style="display:inline-block;border-radius:12px;background:#d7b85b;color:#000;padding:14px 20px;font-weight:700;text-decoration:none">${escapeHtml(buttonLabel)}</a></p>` : ""}<p style="margin-top:30px;border-top:1px solid #3f3f46;padding-top:20px;color:#71717a;font-size:12px">KinkoLab Inc. · Terrebonne, Québec · athletes@kinkolab.com</p></div></div></body></html>`;
+  const align = ["left", "center", "right"].includes(design.alignment) ? design.alignment : "left";
+  const blocks: Record<string, string> = {
+    logo: design.logoUrl ? `<p style="margin:0 0 24px;text-align:${align}"><img src="${escapeHtml(design.logoUrl)}" alt="KinkoLab" style="display:inline-block;max-width:150px;max-height:72px;object-fit:contain"></p>` : "",
+    image: design.heroImageUrl ? `<img src="${escapeHtml(design.heroImageUrl)}" alt="" style="display:block;width:100%;max-height:300px;object-fit:cover;border-radius:${Math.max(0, Number(design.borderRadius) - 8)}px;margin:0 0 24px">` : "",
+    title: `<h1 style="margin:0 0 20px;color:${design.headingColor};font-size:30px;line-height:1.2;text-align:${align}">${escapeHtml(title)}</h1>`,
+    body: paragraphs.map((paragraph) => `<p style="white-space:pre-line;color:${design.textColor};font-size:16px;line-height:1.7;text-align:${align}">${escapeHtml(paragraph)}</p>`).join(""),
+    button: buttonLabel && buttonUrl ? `<p style="margin-top:28px;text-align:${align}"><a href="${escapeHtml(buttonUrl)}" style="display:inline-block;border-radius:12px;background:${design.accentColor};color:${design.buttonTextColor};padding:14px 20px;font-weight:700;text-decoration:none">${escapeHtml(buttonLabel)}</a></p>` : "",
+  };
+  const order = Array.isArray(design.blocks) ? design.blocks : DEFAULT_DESIGN.blocks;
+  return `<!doctype html><html><body style="margin:0;background:${design.backgroundColor};font-family:Arial,sans-serif"><div style="max-width:${Number(design.contentWidth) || 640}px;margin:auto;padding:32px 20px"><div style="border:1px solid ${design.accentColor}55;border-radius:${Number(design.borderRadius) || 0}px;background:${design.cardColor};padding:32px">${order.map((key: string) => blocks[key] || "").join("")}<p style="margin-top:30px;border-top:1px solid ${design.accentColor}55;padding-top:20px;color:${design.textColor};opacity:.65;font-size:12px;text-align:${align}">KinkoLab Inc. · Terrebonne, Québec · athletes@kinkolab.com</p></div></div></body></html>`;
 }
 
 async function requireAdmin(req: Request) {
@@ -67,7 +83,7 @@ function renderTemplate(template: any, language: string, variables: Record<strin
   const content = template[language === "en" ? "en" : "fr"] || template.fr;
   return {
     subject: interpolate(content.subject, variables), title: interpolate(content.title, variables),
-    body: interpolate(content.body, variables), buttonLabel: interpolate(content.buttonLabel, variables), buttonUrl: interpolate(content.buttonUrl, variables),
+    body: interpolate(content.body, variables), buttonLabel: interpolate(content.buttonLabel, variables), buttonUrl: interpolate(content.buttonUrl, variables), design: { ...DEFAULT_DESIGN, ...(template.design || {}) },
   };
 }
 
@@ -76,7 +92,7 @@ async function sendEmail(to: string, rendered: any) {
   if (!apiKey) throw new Error("RESEND_API_KEY is missing");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, reply_to: "athletes@kinkolab.com", to: [to], subject: rendered.subject, html: emailLayout(rendered.title, rendered.body, rendered.buttonLabel, rendered.buttonUrl) }),
+    body: JSON.stringify({ from: FROM, reply_to: "athletes@kinkolab.com", to: [to], subject: rendered.subject, html: emailLayout(rendered.title, rendered.body, rendered.buttonLabel, rendered.buttonUrl, rendered.design) }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Resend rejected the email");
