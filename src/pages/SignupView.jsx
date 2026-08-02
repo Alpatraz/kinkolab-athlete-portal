@@ -187,6 +187,7 @@ export default function SignupView({ goBack, openEligibility }) {
     firstName: "",
     lastName: "",
     birthDate: "",
+    gender: "",
     email: "",
     phone: "",
     parentName: "",
@@ -528,6 +529,7 @@ export default function SignupView({ goBack, openEligibility }) {
                   value={form.birthDate}
                   onChange={(value) => update("birthDate", value)}
                 />
+                <FormSelect label="Sexe / genre" value={form.gender} onChange={(value) => update("gender", value)} options={["Femme", "Homme", "Non binaire", "Préfère ne pas répondre"]} />
                 <FormInput
                   label="Courriel"
                   type="email"

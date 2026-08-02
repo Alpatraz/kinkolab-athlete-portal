@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import Header from "./components/Header";
@@ -154,6 +154,10 @@ export default function App() {
         const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
         const userData = userSnap.exists() ? userSnap.data() : {};
 
+        await setDoc(doc(db, "users", firebaseUser.uid), { lastLoginAt: serverTimestamp(), inactivityWarningSentAt: null }, { merge: true }).catch((error) => console.warn("Impossible de noter la connexion utilisateur", error));
+        const loginAthleteIds = [...new Set([userData.athleteId, ...(userData.athleteIds || [])].filter(Boolean))];
+        await Promise.all(loginAthleteIds.map((athleteId) => setDoc(doc(db, "athletes", athleteId), { lastLoginAt: serverTimestamp(), inactivityWarningSentAt: null }, { merge: true }).catch((error) => console.warn("Impossible de noter la connexion athlète", error))));
+
         setCurrentUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -262,13 +266,7 @@ export default function App() {
   }, [athletes]);
 
   const publicCampaigns = useMemo(() => {
-    return campaigns.filter(
-      (campaign) =>
-        campaign.status !== "suspendue" &&
-        campaign.status !== "archivée" &&
-        campaign.status !== "archive" &&
-        campaign.status !== "archivé"
-    );
+    return campaigns.filter((campaign) => ["active", "actif", "active"].includes(String(campaign.status || "active").toLowerCase()));
   }, [campaigns]);
 
   const goHome = () => navigate("/");
@@ -355,7 +353,7 @@ export default function App() {
           path="/campaign/:campaignId"
           element={
             <CampaignRoute
-  campaigns={campaigns}
+  campaigns={publicCampaigns}
   campaignsLoaded={campaignsLoaded}
   athletes={publicAthletes}
   participations={participations}
@@ -370,7 +368,7 @@ export default function App() {
           path="/athlete/:athleteId"
           element={
             <AthleteRoute
-              athletes={athletes}
+              athletes={publicAthletes}
               campaigns={campaigns}
               participations={participations}
               updates={athleteUpdates.filter((item) => item.status === "approuvé" || item.status === "approved")}

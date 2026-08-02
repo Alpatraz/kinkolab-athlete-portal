@@ -62,6 +62,7 @@ function buildAthlete(application, uid, familyId) {
     name: athleteName,
     firstName: application.firstName || "",
     lastName: application.lastName || "",
+    gender: application.gender || "",
 
     email: application.email || application.parentEmail || "",
     preferredLanguage: application.preferredLanguage || "fr",
@@ -265,6 +266,7 @@ exports.handler = async function (event) {
         email,
         name: application.parentName || athlete.name,
         role: "athlete",
+        preferredLanguage: application.preferredLanguage || "fr",
         athleteId: athlete.id,
         familyId,
         athleteIds: admin.firestore.FieldValue.arrayUnion(athlete.id),

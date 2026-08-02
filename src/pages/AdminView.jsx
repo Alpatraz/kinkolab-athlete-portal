@@ -92,6 +92,12 @@ function StatusPill({ status }) {
     actif: "bg-emerald-50 text-emerald-700 border-emerald-200",
     accepté: "bg-emerald-50 text-emerald-700 border-emerald-200",
     active: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    scheduled: "bg-blue-50 text-blue-700 border-blue-200",
+    paused: "bg-amber-50 text-amber-700 border-amber-200",
+    completed: "bg-zinc-100 text-zinc-700 border-zinc-300",
+    archived: "bg-zinc-100 text-zinc-700 border-zinc-300",
+    deleted: "bg-red-50 text-red-700 border-red-200",
+    inactive: "bg-zinc-100 text-zinc-700 border-zinc-300",
     suspendu: "bg-amber-50 text-amber-700 border-amber-200",
     suspendue: "bg-amber-50 text-amber-700 border-amber-200",
     terminee: "bg-blue-50 text-blue-700 border-blue-200",
@@ -275,6 +281,7 @@ const emptyCampaign = {
   year: "2026",
   type: "event",
   status: "active",
+  autoSchedule: true,
   country: "",
   city: "",
   startDate: "",
@@ -509,6 +516,8 @@ export default function AdminView({
     method: "virement",
     note: "",
   });
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState("all");
+  const [athleteFilters, setAthleteFilters] = useState({ status: "all", campaign: "all", city: "all", dojo: "all", discipline: "all", gender: "all" });
 
   useEffect(() => {
     const unsubApps = onSnapshot(
@@ -569,6 +578,31 @@ export default function AdminView({
   const pendingApplications = applications.filter(
     (application) => (application.status || "en_attente") === "en_attente"
   );
+
+  const filteredCampaigns = allCampaigns.filter((campaign) => {
+    if (campaignStatusFilter === "all") return true;
+    const status = String(campaign.status || "active").toLowerCase();
+    if (campaignStatusFilter === "deleted") return campaign.deletedAt || status === "deleted" || status === "supprimée";
+    return status === campaignStatusFilter;
+  });
+
+  const athleteFilterOptions = useMemo(() => ({
+    cities: [...new Set(athletes.map((item) => item.city).filter(Boolean))].sort(),
+    dojos: [...new Set(athletes.map((item) => item.dojo).filter(Boolean))].sort(),
+    disciplines: [...new Set(athletes.map((item) => item.discipline).filter(Boolean))].sort(),
+    genders: [...new Set(athletes.map((item) => item.gender || item.sex).filter(Boolean))].sort(),
+  }), [athletes]);
+
+  const filteredAdminAthletes = useMemo(() => athletes.filter((athlete) => {
+    const status = String(athlete.status || "active").toLowerCase();
+    if (athleteFilters.status !== "all" && status !== athleteFilters.status) return false;
+    if (athleteFilters.city !== "all" && athlete.city !== athleteFilters.city) return false;
+    if (athleteFilters.dojo !== "all" && athlete.dojo !== athleteFilters.dojo) return false;
+    if (athleteFilters.discipline !== "all" && athlete.discipline !== athleteFilters.discipline) return false;
+    if (athleteFilters.gender !== "all" && (athlete.gender || athlete.sex) !== athleteFilters.gender) return false;
+    if (athleteFilters.campaign !== "all" && !participations.some((item) => item.athleteId === athlete.id && item.campaignId === athleteFilters.campaign)) return false;
+    return true;
+  }), [athletes, athleteFilters, participations]);
 
   const pendingMessages = wallMessages.filter(
     (message) => message.status === "en_attente"
@@ -953,11 +987,14 @@ export default function AdminView({
 
   async function updateAthleteStatus(athlete, status) {
     try {
-      await updateDoc(doc(db, "athletes", athlete.id), {
-        status,
-        isPublic: status !== "suspendu" && status !== "archivé",
-        updatedAt: serverTimestamp(),
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/athlete-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "update_status", athleteId: athlete.id, status }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Modification impossible");
     } catch {
       alert("Impossible de modifier cet athlète.");
     }
@@ -967,9 +1004,15 @@ export default function AdminView({
     const collectionUrl =
       campaignState.shopifyCollectionUrl || campaignState.collectionUrl || "";
 
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto" }).format(new Date());
+    const scheduledStatus = campaignState.autoSchedule && campaignState.startDate > today
+      ? "scheduled"
+      : campaignState.status || "active";
     return {
       ...campaignState,
       id: campaignId,
+      status: scheduledStatus,
+      autoSchedule: campaignState.autoSchedule !== false,
       goal: Number(campaignState.goal || 0),
       collectionUrl,
       shopifyCollectionUrl: collectionUrl,
@@ -1007,6 +1050,7 @@ export default function AdminView({
       year: campaign.year || "2026",
       type: campaign.type || "event",
       status: campaign.status || "active",
+      autoSchedule: campaign.autoSchedule !== false,
       country: campaign.country || "",
       city: campaign.city || "",
       startDate: campaign.startDate || "",
@@ -1068,6 +1112,8 @@ export default function AdminView({
         {
           ...campaign,
           status,
+          manuallyPaused: status === "paused",
+          deletedAt: status === "deleted" ? serverTimestamp() : campaign.deletedAt || null,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -1075,6 +1121,11 @@ export default function AdminView({
     } catch {
       alert("Impossible de modifier cette campagne.");
     }
+  }
+
+  async function deleteCampaign(campaign) {
+    if (!window.confirm(`Supprimer la campagne « ${campaign.title} » ? Elle restera récupérable dans le filtre Supprimées.`)) return;
+    await updateCampaignStatus(campaign, "deleted");
   }
 
   async function uploadCampaignBanner(campaignState, setCampaignState, file) {
@@ -1479,6 +1530,11 @@ export default function AdminView({
           />
         </div>
 
+        <label className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <input type="checkbox" checked={campaignState.autoSchedule !== false} onChange={(event) => setCampaignState({ ...campaignState, autoSchedule: event.target.checked })} className="mt-1 h-5 w-5" />
+          <span><b className="block text-zinc-950">Automatiser le lancement et la fermeture</b><span className="text-sm text-zinc-500">La campagne démarre à 00:00 à la date de début et se termine à 23:59 à la date de fin, heure du Québec.</span></span>
+        </label>
+
         <div className="grid gap-4 md:grid-cols-2">
           <TextInput
             label="Début de l’événement"
@@ -1810,8 +1866,19 @@ export default function AdminView({
           <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
             <h2 className="text-2xl font-black text-zinc-950">Gestion des athlètes</h2>
 
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <SelectInput label="Statut" value={athleteFilters.status} onChange={(value) => setAthleteFilters({ ...athleteFilters, status: value })}><option value="all">Tous</option>{[...new Set(athletes.map((item) => String(item.status || "active").toLowerCase()))].map((value) => <option key={value} value={value}>{value}</option>)}</SelectInput>
+              <SelectInput label="Campagne" value={athleteFilters.campaign} onChange={(value) => setAthleteFilters({ ...athleteFilters, campaign: value })}><option value="all">Toutes</option>{allCampaigns.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectInput>
+              <SelectInput label="Ville" value={athleteFilters.city} onChange={(value) => setAthleteFilters({ ...athleteFilters, city: value })}><option value="all">Toutes</option>{athleteFilterOptions.cities.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+              <SelectInput label="Dojo" value={athleteFilters.dojo} onChange={(value) => setAthleteFilters({ ...athleteFilters, dojo: value })}><option value="all">Tous</option>{athleteFilterOptions.dojos.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+              <SelectInput label="Sport" value={athleteFilters.discipline} onChange={(value) => setAthleteFilters({ ...athleteFilters, discipline: value })}><option value="all">Tous</option>{athleteFilterOptions.disciplines.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+              <SelectInput label="Sexe / genre" value={athleteFilters.gender} onChange={(value) => setAthleteFilters({ ...athleteFilters, gender: value })}><option value="all">Tous</option>{athleteFilterOptions.genders.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+            </div>
+
+            <p className="mt-4 text-sm font-bold text-zinc-500">{filteredAdminAthletes.length} athlète(s) affiché(s)</p>
+
             <div className="mt-5 space-y-3">
-              {athletes.map((athlete) => (
+              {filteredAdminAthletes.map((athlete) => (
                 <div key={athlete.id} className="rounded-2xl border border-zinc-200 p-5">
                   <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div>
@@ -1819,7 +1886,7 @@ export default function AdminView({
                         {athlete.avatar} {athlete.name}
                       </h3>
                       <p className="text-sm text-zinc-500">
-                        {athlete.dojo} · {campaignTitle(allCampaigns, athlete.campaignId)}
+                        {athlete.city || "Ville non précisée"} · {athlete.dojo || "Dojo non précisé"} · {athlete.discipline || "Sport non précisé"}
                       </p>
                       <div className="mt-2"><StatusPill status={athlete.status || "actif"} /></div>
                     </div>
@@ -1931,8 +1998,20 @@ export default function AdminView({
                 <h2 className="text-2xl font-black text-zinc-950">Campagnes existantes</h2>
               </div>
 
+              <div className="mt-5">
+                <SelectInput label="Filtrer par statut" value={campaignStatusFilter} onChange={setCampaignStatusFilter}>
+                  <option value="all">Toutes les campagnes</option>
+                  <option value="active">Actives</option>
+                  <option value="scheduled">Planifiées</option>
+                  <option value="paused">En pause</option>
+                  <option value="completed">Terminées</option>
+                  <option value="archived">Archivées</option>
+                  <option value="deleted">Supprimées</option>
+                </SelectInput>
+              </div>
+
               <div className="mt-5 space-y-3">
-                {allCampaigns.map((campaign) => (
+                {filteredCampaigns.map((campaign) => (
                   <div key={campaign.id} className="rounded-2xl border border-zinc-200 p-5">
                     {editingCampaignId === campaign.id ? (
                       renderCampaignForm(editingCampaign, setEditingCampaign, true)
@@ -1975,10 +2054,11 @@ export default function AdminView({
                           )}
 
                           <AdminButton variant="light" onClick={() => startEditCampaign(campaign)}>Modifier</AdminButton>
-                          <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>Active</AdminButton>
-                          <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "suspendue")}>Suspendre</AdminButton>
-                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "terminee")}>Terminée</AdminButton>
-                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archivée")}>Archiver</AdminButton>
+                          <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>Activer</AdminButton>
+                          <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "paused")}>Mettre en pause</AdminButton>
+                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "completed")}>Terminer</AdminButton>
+                          <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archived")}>Archiver</AdminButton>
+                          <AdminButton variant="red" onClick={() => deleteCampaign(campaign)}><Trash2 size={15} /> Supprimer</AdminButton>
                         </div>
                       </>
                     )}

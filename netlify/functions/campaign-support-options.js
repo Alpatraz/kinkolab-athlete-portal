@@ -24,7 +24,7 @@ function cleanStatus(value) {
 }
 
 function isActive(value) {
-  return !["suspendue", "suspendu", "archivée", "archive", "archivé"].includes(cleanStatus(value));
+  return ["active", "actif", "accepté"].includes(cleanStatus(value));
 }
 
 exports.handler = async function handler(event) {
