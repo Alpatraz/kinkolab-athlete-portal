@@ -421,6 +421,10 @@ const phrases = {
   "2. Utilisation de vos données": "2. How we use your information", "3. Partage des données avec des tiers": "3. Sharing information with third parties",
   "Responsable de la protection des données": "Privacy Officer", "Vos informations sont strictement utilisées pour :": "Your information is used strictly to:",
   "Identité et contact :": "Identity and contact information:", "Données de paiement :": "Payment information:", "Données de navigation :": "Browsing data:",
+  "Athlète handisport": "Para athlete", "Classification handisport (facultatif)": "Para-sport classification (optional)",
+  "Non handisport": "Not a para athlete", "Préfère ne pas répondre": "Prefer not to answer",
+  "Éditions précédentes et résultats": "Previous editions and results", "Résultats": "Results",
+  "Voir les résultats officiels": "View official results",
 };
 
 export default phrases;

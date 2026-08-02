@@ -188,6 +188,8 @@ export default function SignupView({ goBack, openEligibility }) {
     lastName: "",
     birthDate: "",
     gender: "",
+    isParaAthlete: "non",
+    paraClassification: "",
     email: "",
     phone: "",
     parentName: "",
@@ -530,6 +532,10 @@ export default function SignupView({ goBack, openEligibility }) {
                   onChange={(value) => update("birthDate", value)}
                 />
                 <FormSelect label="Sexe / genre" value={form.gender} onChange={(value) => update("gender", value)} options={["Femme", "Homme", "Non binaire", "Préfère ne pas répondre"]} />
+                <FormSelect label="Athlète handisport" value={form.isParaAthlete} onChange={(value) => update("isParaAthlete", value)} options={["non", "oui", "préfère ne pas répondre"]} />
+                {form.isParaAthlete === "oui" && (
+                  <FormInput label="Classification handisport (facultatif)" value={form.paraClassification} onChange={(value) => update("paraClassification", value)} />
+                )}
                 <FormInput
                   label="Courriel"
                   type="email"

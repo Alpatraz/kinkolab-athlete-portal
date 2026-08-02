@@ -10,6 +10,7 @@ import {
   Medal,
   PlayCircle,
   ShoppingBag,
+  Trophy,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -100,12 +101,14 @@ function CampaignFact({ icon: Icon, label, value }) {
 
 export default function CampaignDetailPage({
   campaign,
+  campaigns = [],
   athletes = [],
   participations = [],
   contributions = [],
   goBack,
   onOpenAthlete,
   openSignup,
+  onOpenCampaign,
 }) {
   const { language } = useLanguage();
   const signupButtonRef = useRef(null);
@@ -131,6 +134,9 @@ export default function CampaignDetailPage({
     video: "Campaign video",
     gallery: "Photo gallery",
     joinCampaign: "Apply to this campaign",
+    editions: "Previous editions and results",
+    results: "Results",
+    officialResults: "View official results",
   } : {
     about: "Comprendre l’événement",
     details: "Informations sur l’événement",
@@ -150,6 +156,9 @@ export default function CampaignDetailPage({
     video: "Vidéo de la campagne",
     gallery: "Galerie photos",
     joinCampaign: "S’inscrire à cette campagne",
+    editions: "Éditions précédentes et résultats",
+    results: "Résultats",
+    officialResults: "Voir les résultats officiels",
   };
 
   useEffect(() => {
@@ -248,6 +257,13 @@ const raisedManual = campaignParticipations.reduce(
 
   const progress = goal ? Math.min(Math.round((raised / goal) * 100), 100) : 0;
   const products = getCampaignProducts(campaign);
+  const seriesId = campaign.seriesId || "";
+  const seriesEditions = campaigns
+    .filter((item) => seriesId && item.seriesId === seriesId)
+    .sort((a, b) => Number(b.year || 0) - Number(a.year || 0));
+  const resultsSummary = language === "en"
+    ? campaign.resultsSummaryEn || campaign.resultsSummaryFr
+    : campaign.resultsSummaryFr || campaign.resultsSummaryEn;
 
   const shopifyUrl =
     campaign.shopifyCollectionUrl ||
@@ -389,6 +405,14 @@ const raisedManual = campaignParticipations.reduce(
                   </div>
                 </div>
               )}
+            </section>
+          )}
+
+          {(seriesEditions.length > 1 || campaign.resultsPublished) && (
+            <section className="mt-10 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-8" data-i18n-managed>
+              <div className="flex items-center gap-3"><Trophy style={{ color: gold }} /><h2 className="text-2xl font-black">{pageCopy.editions}</h2></div>
+              {seriesEditions.length > 1 && <div className="mt-5 flex flex-wrap gap-3">{seriesEditions.map((edition) => <button key={edition.id} type="button" onClick={() => onOpenCampaign?.(edition.id)} className={`rounded-2xl px-5 py-3 font-black ${edition.id === campaign.id ? "text-black" : "border border-zinc-700 bg-black text-white"}`} style={edition.id === campaign.id ? { background: gold } : undefined}>{edition.year || edition.title}{edition.resultsPublished ? " · ✓" : ""}</button>)}</div>}
+              {campaign.resultsPublished && <div className="mt-7 rounded-2xl border border-yellow-700/40 bg-black p-5"><h3 className="text-xl font-black">{pageCopy.results} {campaign.year}</h3>{resultsSummary && <p className="mt-3 whitespace-pre-line leading-7 text-zinc-300">{resultsSummary}</p>}{safeExternalUrl(campaign.resultsUrl) && <a href={safeExternalUrl(campaign.resultsUrl)} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-3 font-black text-black" style={{ background: gold }}>{pageCopy.officialResults}<ExternalLink size={16} /></a>}</div>}
             </section>
           )}
 

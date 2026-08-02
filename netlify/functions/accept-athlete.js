@@ -63,6 +63,8 @@ function buildAthlete(application, uid, familyId) {
     firstName: application.firstName || "",
     lastName: application.lastName || "",
     gender: application.gender || "",
+    isParaAthlete: application.isParaAthlete || "non",
+    paraClassification: application.paraClassification || "",
 
     email: application.email || application.parentEmail || "",
     preferredLanguage: application.preferredLanguage || "fr",

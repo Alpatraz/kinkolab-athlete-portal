@@ -65,6 +65,7 @@ function CampaignRoute({
   contributions,
   onOpenAthlete,
   openSignup,
+  onOpenCampaign,
 }) {
   const { campaignId } = useParams();
   const navigate = useNavigate();
@@ -79,12 +80,14 @@ function CampaignRoute({
   return (
     <CampaignDetailPage
       campaign={campaign}
+      campaigns={campaigns}
       athletes={athletes}
       participations={participations}
       contributions={contributions}
       goBack={() => navigate("/campaigns")}
       onOpenAthlete={onOpenAthlete}
       openSignup={openSignup}
+      onOpenCampaign={onOpenCampaign}
     />
   );
 }
@@ -269,6 +272,12 @@ export default function App() {
     return campaigns.filter((campaign) => ["active", "actif", "active"].includes(String(campaign.status || "active").toLowerCase()));
   }, [campaigns]);
 
+  const viewableCampaigns = useMemo(() => campaigns.filter((campaign) => {
+    const status = String(campaign.status || "active").toLowerCase();
+    return !["deleted", "supprimée", "draft", "brouillon"].includes(status)
+      && (status === "active" || status === "actif" || campaign.resultsPublished === true || ["completed", "archived", "terminée", "archivée"].includes(status));
+  }), [campaigns]);
+
   const goHome = () => navigate("/");
   const openAthletes = () => navigate("/athletes");
   const openCampaigns = () => navigate("/campaigns");
@@ -353,13 +362,14 @@ export default function App() {
           path="/campaign/:campaignId"
           element={
             <CampaignRoute
-  campaigns={publicCampaigns}
+  campaigns={viewableCampaigns}
   campaignsLoaded={campaignsLoaded}
   athletes={publicAthletes}
   participations={participations}
   contributions={contributions}
   onOpenAthlete={openAthlete}
   openSignup={openSignup}
+  onOpenCampaign={openCampaign}
 />
           }
         />

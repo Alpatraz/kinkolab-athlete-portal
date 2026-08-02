@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Archive,
   Ban,
+  BarChart3,
   CheckCircle2,
   DollarSign,
   ExternalLink,
@@ -24,6 +25,7 @@ import {
   Shield,
   Smartphone,
   Trash2,
+  Trophy,
   Upload,
   UserPlus2,
   Users,
@@ -206,6 +208,23 @@ function SelectInput({ label, value, onChange, children }) {
   );
 }
 
+function StatisticsBreakdown({ title, rows = [], total = 0 }) {
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white p-5">
+      <h3 className="text-lg font-black text-zinc-950">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {rows.slice(0, 10).map(([label, count]) => (
+          <div key={label}>
+            <div className="flex justify-between gap-3 text-sm"><span className="truncate font-bold text-zinc-700">{label}</span><b>{count}</b></div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100"><div className="h-full rounded-full" style={{ width: `${total ? Math.max((count / total) * 100, 3) : 0}%`, background: gold }} /></div>
+          </div>
+        ))}
+        {!rows.length && <p className="text-sm text-zinc-400">Aucune donnée pour ces filtres.</p>}
+      </div>
+    </div>
+  );
+}
+
 const defaultEmailDesign = {
   backgroundColor: "#090909",
   cardColor: "#18181b",
@@ -278,6 +297,9 @@ function emptyProduct() {
 const emptyCampaign = {
   title: "",
   titleEn: "",
+  seriesId: "",
+  seriesTitle: "",
+  seriesTitleEn: "",
   year: "2026",
   type: "event",
   status: "active",
@@ -314,6 +336,10 @@ const emptyCampaign = {
   products: [],
   description: "",
   descriptionEn: "",
+  resultsPublished: false,
+  resultsSummaryFr: "",
+  resultsSummaryEn: "",
+  resultsUrl: "",
 };
 
 function ProductEditor({ campaignState, setCampaignState, onUploadProductImage }) {
@@ -517,7 +543,8 @@ export default function AdminView({
     note: "",
   });
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("all");
-  const [athleteFilters, setAthleteFilters] = useState({ status: "all", campaign: "all", city: "all", dojo: "all", discipline: "all", gender: "all" });
+  const [athleteFilters, setAthleteFilters] = useState({ status: "all", campaign: "all", city: "all", dojo: "all", discipline: "all", gender: "all", para: "all" });
+  const [statsFilters, setStatsFilters] = useState({ year: "all", campaign: "all", from: "", to: "", city: "all", dojo: "all", discipline: "all", gender: "all", para: "all" });
 
   useEffect(() => {
     const unsubApps = onSnapshot(
@@ -600,6 +627,7 @@ export default function AdminView({
     if (athleteFilters.dojo !== "all" && athlete.dojo !== athleteFilters.dojo) return false;
     if (athleteFilters.discipline !== "all" && athlete.discipline !== athleteFilters.discipline) return false;
     if (athleteFilters.gender !== "all" && (athlete.gender || athlete.sex) !== athleteFilters.gender) return false;
+    if (athleteFilters.para !== "all" && String(athlete.isParaAthlete || "non") !== athleteFilters.para) return false;
     if (athleteFilters.campaign !== "all" && !participations.some((item) => item.athleteId === athlete.id && item.campaignId === athleteFilters.campaign)) return false;
     return true;
   }), [athletes, athleteFilters, participations]);
@@ -765,6 +793,83 @@ export default function AdminView({
     }));
   }, [contributions, payouts, allCampaigns]);
 
+  const statistics = useMemo(() => {
+    const toDate = (value) => {
+      if (!value) return null;
+      if (value.toDate) return value.toDate();
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const campaignIdsForYear = new Set(allCampaigns
+      .filter((campaign) => statsFilters.year === "all" || String(campaign.year) === statsFilters.year)
+      .map((campaign) => campaign.id));
+    const relevantParticipations = participations.filter((item) => {
+      if (statsFilters.campaign !== "all" && item.campaignId !== statsFilters.campaign) return false;
+      return statsFilters.year === "all" || campaignIdsForYear.has(item.campaignId);
+    });
+    const participantIds = new Set(relevantParticipations.map((item) => item.athleteId));
+    const filteredAthletes = athletes.filter((athlete) => {
+      if ((statsFilters.campaign !== "all" || statsFilters.year !== "all") && !participantIds.has(athlete.id)) return false;
+      if (statsFilters.city !== "all" && athlete.city !== statsFilters.city) return false;
+      if (statsFilters.dojo !== "all" && athlete.dojo !== statsFilters.dojo) return false;
+      if (statsFilters.discipline !== "all" && athlete.discipline !== statsFilters.discipline) return false;
+      if (statsFilters.gender !== "all" && (athlete.gender || athlete.sex) !== statsFilters.gender) return false;
+      if (statsFilters.para !== "all" && String(athlete.isParaAthlete || "non") !== statsFilters.para) return false;
+      return true;
+    });
+    const filteredIds = new Set(filteredAthletes.map((item) => item.id));
+    const filteredContributions = contributions.filter((item) => {
+      if (!isFinanciallyActive(item)) return false;
+      if (statsFilters.campaign !== "all" && item.campaignId !== statsFilters.campaign) return false;
+      if (statsFilters.year !== "all" && !campaignIdsForYear.has(item.campaignId)) return false;
+      if (item.athleteId && !filteredIds.has(item.athleteId)) return false;
+      const date = toDate(item.createdAt || item.orderCreatedAt || item.displayDate);
+      if (statsFilters.from && date && date < new Date(`${statsFilters.from}T00:00:00`)) return false;
+      if (statsFilters.to && date && date > new Date(`${statsFilters.to}T23:59:59`)) return false;
+      return true;
+    });
+    const reference = statsFilters.to ? new Date(`${statsFilters.to}T12:00:00`) : new Date();
+    const ageOf = (birthDate) => {
+      const birth = toDate(birthDate);
+      if (!birth) return null;
+      let age = reference.getFullYear() - birth.getFullYear();
+      if (reference < new Date(reference.getFullYear(), birth.getMonth(), birth.getDate())) age -= 1;
+      return age;
+    };
+    const groups = { enfants: 0, adolescents: 0, adultes: 0, inconnu: 0 };
+    filteredAthletes.forEach((athlete) => {
+      const age = ageOf(athlete.birthDate);
+      if (age === null) groups.inconnu += 1;
+      else if (age < 12) groups.enfants += 1;
+      else if (age < 18) groups.adolescents += 1;
+      else groups.adultes += 1;
+    });
+    const countBy = (field) => Object.entries(filteredAthletes.reduce((acc, athlete) => {
+      const key = typeof field === "function" ? field(athlete) : athlete[field];
+      const label = key || "Non précisé";
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {})).sort((a, b) => b[1] - a[1]);
+    const campaignRows = allCampaigns
+      .filter((campaign) => statsFilters.year === "all" || String(campaign.year) === statsFilters.year)
+      .filter((campaign) => statsFilters.campaign === "all" || campaign.id === statsFilters.campaign)
+      .map((campaign) => {
+        const campaignParticipations = participations.filter((item) => item.campaignId === campaign.id);
+        const campaignContributions = filteredContributions.filter((item) => item.campaignId === campaign.id);
+        const raised = campaignContributions.reduce((sum, item) => sum + contributionAmount(item), 0)
+          + campaignParticipations.reduce((sum, item) => sum + Number(item.raisedOffline || 0) + Number(item.raisedSponsorship || 0), 0);
+        return { id: campaign.id, title: campaign.title, year: campaign.year, athletes: new Set(campaignParticipations.map((item) => item.athleteId)).size, raised, goal: Number(campaign.goal || 0) };
+      }).sort((a, b) => String(b.year).localeCompare(String(a.year)) || b.raised - a.raised);
+    return {
+      athletes: filteredAthletes,
+      contributions: filteredContributions,
+      total: filteredContributions.reduce((sum, item) => sum + contributionAmount(item), 0),
+      groups,
+      para: filteredAthletes.filter((item) => String(item.isParaAthlete).toLowerCase() === "oui" || item.isParaAthlete === true).length,
+      byDiscipline: countBy("discipline"), byCity: countBy("city"), byDojo: countBy("dojo"), byGender: countBy((item) => item.gender || item.sex), campaignRows,
+    };
+  }, [athletes, allCampaigns, participations, contributions, statsFilters]);
+
   const tabs = [
     ["candidatures", "Candidatures"],
     ["athletes", "Athlètes"],
@@ -772,6 +877,7 @@ export default function AdminView({
     ["campaigns", "Campagnes"],
     ["participations", "Participations"],
     ["finances", "Finances"],
+    ["statistics", "Statistiques"],
     ["communications", "Communications"],
     ["administrateurs", "Administrateurs"],
     ["messages", "Messages"],
@@ -1011,6 +1117,7 @@ export default function AdminView({
     return {
       ...campaignState,
       id: campaignId,
+      seriesId: campaignState.seriesId || slugify(campaignState.seriesTitle || campaignState.title),
       status: scheduledStatus,
       autoSchedule: campaignState.autoSchedule !== false,
       goal: Number(campaignState.goal || 0),
@@ -1047,6 +1154,9 @@ export default function AdminView({
       ...emptyCampaign,
       title: campaign.title || "",
       titleEn: campaign.titleEn || "",
+      seriesId: campaign.seriesId || "",
+      seriesTitle: campaign.seriesTitle || "",
+      seriesTitleEn: campaign.seriesTitleEn || "",
       year: campaign.year || "2026",
       type: campaign.type || "event",
       status: campaign.status || "active",
@@ -1074,6 +1184,10 @@ export default function AdminView({
       audienceEn: campaign.audienceEn || "",
       overviewFr: campaign.overviewFr || campaign.overview || "",
       overviewEn: campaign.overviewEn || "",
+      resultsPublished: campaign.resultsPublished === true,
+      resultsSummaryFr: campaign.resultsSummaryFr || "",
+      resultsSummaryEn: campaign.resultsSummaryEn || "",
+      resultsUrl: campaign.resultsUrl || "",
       websiteUrl: campaign.websiteUrl || "",
       facebookUrl: campaign.facebookUrl || "",
       instagramUrl: campaign.instagramUrl || "",
@@ -1126,6 +1240,27 @@ export default function AdminView({
   async function deleteCampaign(campaign) {
     if (!window.confirm(`Supprimer la campagne « ${campaign.title} » ? Elle restera récupérable dans le filtre Supprimées.`)) return;
     await updateCampaignStatus(campaign, "deleted");
+  }
+
+  async function duplicateCampaignEdition(campaign) {
+    const nextYear = String(Number(campaign.year || new Date().getFullYear()) + 1);
+    const baseTitle = campaign.seriesTitle || String(campaign.title || "").replace(/\b20\d{2}\b/g, "").trim();
+    const newTitle = `${baseTitle} ${nextYear}`.trim();
+    const campaignId = slugify(`${newTitle}-${nextYear}`);
+    if (!window.confirm(`Créer l’édition ${nextYear} de « ${baseTitle} » ?`)) return;
+    await setDoc(doc(db, "campaigns", campaignId), {
+      ...campaign,
+      id: campaignId,
+      title: newTitle,
+      titleEn: campaign.seriesTitleEn ? `${campaign.seriesTitleEn} ${nextYear}` : newTitle,
+      seriesId: campaign.seriesId || slugify(baseTitle),
+      seriesTitle: baseTitle,
+      year: nextYear,
+      status: "scheduled",
+      startDate: "", endDate: "", eventDate: "", eventStartDate: "", eventEndDate: "",
+      resultsPublished: false, resultsSummaryFr: "", resultsSummaryEn: "", resultsUrl: "",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(), deletedAt: null,
+    });
   }
 
   async function uploadCampaignBanner(campaignState, setCampaignState, file) {
@@ -1453,6 +1588,15 @@ export default function AdminView({
           placeholder="Ex. WKC Spain 2026"
         />
 
+        <div className="rounded-2xl border border-yellow-700/30 bg-yellow-50 p-4">
+          <p className="mb-3 text-sm font-black uppercase text-yellow-800">Série récurrente et édition annuelle</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextInput label="Nom permanent de la série" value={campaignState.seriesTitle} onChange={(value) => setCampaignState({ ...campaignState, seriesTitle: value, seriesId: campaignState.seriesId || slugify(value) })} placeholder="Ex. Championnats du monde WKC" />
+            <TextInput label="Permanent series name — English" value={campaignState.seriesTitleEn} onChange={(value) => setCampaignState({ ...campaignState, seriesTitleEn: value })} placeholder="Ex. WKC World Championships" />
+          </div>
+          <div className="mt-3"><TextInput label="Identifiant de série" value={campaignState.seriesId} onChange={(value) => setCampaignState({ ...campaignState, seriesId: slugify(value) })} placeholder="wkc-world-championships" hint="Toutes les éditions 2025, 2026, 2027 doivent partager le même identifiant." /></div>
+        </div>
+
         <TextInput
           label="Année"
           value={campaignState.year}
@@ -1668,6 +1812,16 @@ export default function AdminView({
           placeholder="Public campaign description in English"
         />
 
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
+          <div className="flex items-center gap-3"><Trophy size={20} style={{ color: gold }} /><p className="font-black">Résultats de cette édition</p></div>
+          <label className="mt-4 flex items-center gap-3 font-bold"><input type="checkbox" checked={campaignState.resultsPublished === true} onChange={(event) => setCampaignState({ ...campaignState, resultsPublished: event.target.checked })} className="h-5 w-5" /> Publier les résultats sur la page publique</label>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <TextAreaInput label="Résumé des résultats — français" value={campaignState.resultsSummaryFr} onChange={(value) => setCampaignState({ ...campaignState, resultsSummaryFr: value })} placeholder="Classements, médailles, faits saillants…" />
+            <TextAreaInput label="Results summary — English" value={campaignState.resultsSummaryEn} onChange={(value) => setCampaignState({ ...campaignState, resultsSummaryEn: value })} placeholder="Placements, medals, highlights…" />
+          </div>
+          <div className="mt-4"><TextInput label="Lien vers les résultats officiels" value={campaignState.resultsUrl} onChange={(value) => setCampaignState({ ...campaignState, resultsUrl: value })} placeholder="https://..." /></div>
+        </div>
+
         <ProductEditor
           campaignState={campaignState}
           setCampaignState={setCampaignState}
@@ -1866,13 +2020,14 @@ export default function AdminView({
           <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
             <h2 className="text-2xl font-black text-zinc-950">Gestion des athlètes</h2>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
               <SelectInput label="Statut" value={athleteFilters.status} onChange={(value) => setAthleteFilters({ ...athleteFilters, status: value })}><option value="all">Tous</option>{[...new Set(athletes.map((item) => String(item.status || "active").toLowerCase()))].map((value) => <option key={value} value={value}>{value}</option>)}</SelectInput>
               <SelectInput label="Campagne" value={athleteFilters.campaign} onChange={(value) => setAthleteFilters({ ...athleteFilters, campaign: value })}><option value="all">Toutes</option>{allCampaigns.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectInput>
               <SelectInput label="Ville" value={athleteFilters.city} onChange={(value) => setAthleteFilters({ ...athleteFilters, city: value })}><option value="all">Toutes</option>{athleteFilterOptions.cities.map((value) => <option key={value}>{value}</option>)}</SelectInput>
               <SelectInput label="Dojo" value={athleteFilters.dojo} onChange={(value) => setAthleteFilters({ ...athleteFilters, dojo: value })}><option value="all">Tous</option>{athleteFilterOptions.dojos.map((value) => <option key={value}>{value}</option>)}</SelectInput>
               <SelectInput label="Sport" value={athleteFilters.discipline} onChange={(value) => setAthleteFilters({ ...athleteFilters, discipline: value })}><option value="all">Tous</option>{athleteFilterOptions.disciplines.map((value) => <option key={value}>{value}</option>)}</SelectInput>
               <SelectInput label="Sexe / genre" value={athleteFilters.gender} onChange={(value) => setAthleteFilters({ ...athleteFilters, gender: value })}><option value="all">Tous</option>{athleteFilterOptions.genders.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+              <SelectInput label="Handisport" value={athleteFilters.para} onChange={(value) => setAthleteFilters({ ...athleteFilters, para: value })}><option value="all">Tous</option><option value="oui">Oui</option><option value="non">Non</option><option value="préfère ne pas répondre">Non précisé</option></SelectInput>
             </div>
 
             <p className="mt-4 text-sm font-bold text-zinc-500">{filteredAdminAthletes.length} athlète(s) affiché(s)</p>
@@ -1888,6 +2043,7 @@ export default function AdminView({
                       <p className="text-sm text-zinc-500">
                         {athlete.city || "Ville non précisée"} · {athlete.dojo || "Dojo non précisé"} · {athlete.discipline || "Sport non précisé"}
                       </p>
+                      <p className="mt-1 text-xs font-bold text-zinc-500">Handisport : {athlete.isParaAthlete === true || athlete.isParaAthlete === "oui" ? `Oui${athlete.paraClassification ? ` — ${athlete.paraClassification}` : ""}` : athlete.isParaAthlete || "Non"}</p>
                       <div className="mt-2"><StatusPill status={athlete.status || "actif"} /></div>
                     </div>
 
@@ -2054,6 +2210,7 @@ export default function AdminView({
                           )}
 
                           <AdminButton variant="light" onClick={() => startEditCampaign(campaign)}>Modifier</AdminButton>
+                          <AdminButton variant="light" onClick={() => duplicateCampaignEdition(campaign)}>Créer l’édition suivante</AdminButton>
                           <AdminButton variant="green" onClick={() => updateCampaignStatus(campaign, "active")}>Activer</AdminButton>
                           <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "paused")}>Mettre en pause</AdminButton>
                           <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "completed")}>Terminer</AdminButton>
@@ -2065,6 +2222,48 @@ export default function AdminView({
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "statistics" && (
+          <section className="mt-8 space-y-6">
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <div className="flex items-center gap-3"><BarChart3 style={{ color: gold }} /><div><h2 className="text-2xl font-black text-zinc-950">Statistiques du programme</h2><p className="text-sm text-zinc-500">Les mêmes filtres s’appliquent aux indicateurs, répartitions et comparaisons.</p></div></div>
+              <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                <SelectInput label="Année" value={statsFilters.year} onChange={(value) => setStatsFilters({ ...statsFilters, year: value })}><option value="all">Toutes</option>{[...new Set(allCampaigns.map((item) => String(item.year)).filter(Boolean))].sort().reverse().map((value) => <option key={value}>{value}</option>)}</SelectInput>
+                <SelectInput label="Compétition / campagne" value={statsFilters.campaign} onChange={(value) => setStatsFilters({ ...statsFilters, campaign: value })}><option value="all">Toutes</option>{allCampaigns.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectInput>
+                <TextInput label="Du" type="date" value={statsFilters.from} onChange={(value) => setStatsFilters({ ...statsFilters, from: value })} />
+                <TextInput label="Au" type="date" value={statsFilters.to} onChange={(value) => setStatsFilters({ ...statsFilters, to: value })} />
+                <SelectInput label="Handisport" value={statsFilters.para} onChange={(value) => setStatsFilters({ ...statsFilters, para: value })}><option value="all">Tous</option><option value="oui">Oui</option><option value="non">Non</option></SelectInput>
+                <SelectInput label="Ville" value={statsFilters.city} onChange={(value) => setStatsFilters({ ...statsFilters, city: value })}><option value="all">Toutes</option>{athleteFilterOptions.cities.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+                <SelectInput label="Dojo" value={statsFilters.dojo} onChange={(value) => setStatsFilters({ ...statsFilters, dojo: value })}><option value="all">Tous</option>{athleteFilterOptions.dojos.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+                <SelectInput label="Discipline" value={statsFilters.discipline} onChange={(value) => setStatsFilters({ ...statsFilters, discipline: value })}><option value="all">Toutes</option>{athleteFilterOptions.disciplines.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+                <SelectInput label="Sexe / genre" value={statsFilters.gender} onChange={(value) => setStatsFilters({ ...statsFilters, gender: value })}><option value="all">Tous</option>{athleteFilterOptions.genders.map((value) => <option key={value}>{value}</option>)}</SelectInput>
+                <AdminButton variant="light" onClick={() => setStatsFilters({ year: "all", campaign: "all", from: "", to: "", city: "all", dojo: "all", discipline: "all", gender: "all", para: "all" })}><RotateCcw size={16} /> Réinitialiser</AdminButton>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+              <StatCard light icon={Users} label="Athlètes" value={statistics.athletes.length} sub="Profils correspondant" />
+              <StatCard light icon={DollarSign} label="Montant" value={money(statistics.total)} sub={`${statistics.contributions.length} contribution(s)`} />
+              <StatCard light icon={Users} label="Enfants" value={statistics.groups.enfants} sub="Moins de 12 ans" />
+              <StatCard light icon={Users} label="Adolescents" value={statistics.groups.adolescents} sub="12 à 17 ans" />
+              <StatCard light icon={Users} label="Adultes" value={statistics.groups.adultes} sub="18 ans et plus" />
+              <StatCard light icon={Trophy} label="Handisport" value={statistics.para} sub="Athlètes déclarés" />
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+              <StatisticsBreakdown title="Par discipline" rows={statistics.byDiscipline} total={statistics.athletes.length} />
+              <StatisticsBreakdown title="Par ville" rows={statistics.byCity} total={statistics.athletes.length} />
+              <StatisticsBreakdown title="Par dojo" rows={statistics.byDojo} total={statistics.athletes.length} />
+              <StatisticsBreakdown title="Par sexe / genre" rows={statistics.byGender} total={statistics.athletes.length} />
+            </div>
+
+            <div className="overflow-hidden rounded-[2rem] bg-white p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-zinc-950">Comparaison des campagnes et des années</h2>
+              <p className="mt-1 text-sm text-zinc-500">Utilisez le filtre Année ou Compétition pour isoler une période, puis comparez les éditions ci-dessous.</p>
+              <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead><tr className="border-b border-zinc-200 text-zinc-500"><th className="p-3">Campagne</th><th className="p-3">Année</th><th className="p-3">Athlètes</th><th className="p-3">Récolté</th><th className="p-3">Objectif</th><th className="p-3">Progression</th></tr></thead><tbody>{statistics.campaignRows.map((row) => <tr key={row.id} className="border-b border-zinc-100"><td className="p-3 font-black">{row.title}</td><td className="p-3">{row.year}</td><td className="p-3">{row.athletes}</td><td className="p-3 font-bold">{money(row.raised)}</td><td className="p-3">{money(row.goal)}</td><td className="p-3">{row.goal ? `${Math.round((row.raised / row.goal) * 100)} %` : "—"}</td></tr>)}</tbody></table></div>
             </div>
           </section>
         )}

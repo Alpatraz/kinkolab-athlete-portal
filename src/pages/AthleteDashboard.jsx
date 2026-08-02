@@ -317,6 +317,8 @@ export default function AthleteDashboard({
     displayName: "",
     birthDate: "",
     gender: "",
+    isParaAthlete: "non",
+    paraClassification: "",
     email: "",
     phone: "",
     city: "",
@@ -418,6 +420,8 @@ export default function AthleteDashboard({
       displayName: selectedAthlete.displayName || selectedAthlete.name || "",
       birthDate: selectedAthlete.birthDate || "",
       gender: selectedAthlete.gender || "",
+      isParaAthlete: selectedAthlete.isParaAthlete || "non",
+      paraClassification: selectedAthlete.paraClassification || "",
       email: selectedAthlete.email || selectedAthlete.athleteEmail || "",
       phone: selectedAthlete.phone || selectedAthlete.athletePhone || "",
       city: selectedAthlete.city || "",
@@ -592,6 +596,8 @@ export default function AthleteDashboard({
         displayName,
         birthDate: form.birthDate,
         gender: form.gender,
+        isParaAthlete: form.isParaAthlete,
+        paraClassification: form.paraClassification,
         email: form.email,
         athleteEmail: form.email,
         phone: form.phone,
@@ -1076,6 +1082,8 @@ export default function AthleteDashboard({
                         <input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Nom affiché publiquement" className="rounded-2xl border border-zinc-200 p-3 md:col-span-2" />
                         <input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} className="rounded-2xl border border-zinc-200 p-3" />
                         <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="rounded-2xl border border-zinc-200 p-3"><option value="">Sexe / genre</option><option>Femme</option><option>Homme</option><option>Non binaire</option><option>Préfère ne pas répondre</option></select>
+                        <select value={form.isParaAthlete} onChange={(e) => setForm({ ...form, isParaAthlete: e.target.value })} className="rounded-2xl border border-zinc-200 p-3"><option value="non">Non handisport</option><option value="oui">Athlète handisport</option><option value="préfère ne pas répondre">Préfère ne pas répondre</option></select>
+                        {form.isParaAthlete === "oui" && <input value={form.paraClassification} onChange={(e) => setForm({ ...form, paraClassification: e.target.value })} placeholder="Classification handisport (facultatif)" className="rounded-2xl border border-zinc-200 p-3" />}
                         <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Courriel" className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Téléphone" className="rounded-2xl border border-zinc-200 p-3" />
                         <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Ville" className="rounded-2xl border border-zinc-200 p-3" />
