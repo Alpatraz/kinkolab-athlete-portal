@@ -103,6 +103,14 @@ function StatusPill({ status }) {
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     versé: "bg-emerald-50 text-emerald-700 border-emerald-200",
     sent: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    opened: "bg-blue-50 text-blue-700 border-blue-200",
+    clicked: "bg-violet-50 text-violet-700 border-violet-200",
+    bounced: "bg-red-50 text-red-700 border-red-200",
+    failed: "bg-red-50 text-red-700 border-red-200",
+    complained: "bg-red-50 text-red-700 border-red-200",
+    suppressed: "bg-zinc-100 text-zinc-700 border-zinc-300",
+    delivery_delayed: "bg-amber-50 text-amber-700 border-amber-200",
     cancelled: "bg-red-50 text-red-700 border-red-200",
     annulé: "bg-red-50 text-red-700 border-red-200",
     refunded: "bg-zinc-100 text-zinc-700 border-zinc-300",
@@ -2440,7 +2448,10 @@ export default function AdminView({
                         <td className="p-3 font-bold text-zinc-950">{emailTemplates.find((template) => template.key === log.type)?.name || log.type}{log.test ? " (test)" : ""}</td>
                         <td className="p-3 text-zinc-600">{log.recipient}</td>
                         <td className="p-3 uppercase text-zinc-600">{log.language}</td>
-                        <td className="p-3"><StatusPill status={log.status} /></td>
+                        <td className="p-3">
+                          <StatusPill status={log.status} />
+                          {log.events && <p className="mt-2 text-[10px] text-zinc-500">{Object.keys(log.events).join(" · ")}</p>}
+                        </td>
                       </tr>
                     ))}
                     {!emailLogs.length && <tr><td colSpan="5" className="p-5 text-center text-zinc-500">Aucun envoi enregistré.</td></tr>}
