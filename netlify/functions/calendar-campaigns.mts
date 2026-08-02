@@ -10,7 +10,10 @@ function getAdminApp() {
 }
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://kinkolab.com",
+  // This endpoint intentionally exposes public campaign-link metadata only.
+  // Shopify theme previews use changing shopifypreview/admin origins, so a
+  // wildcard is required for the same integration to work before publishing.
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Cache-Control": "public, max-age=300, s-maxage=300",
