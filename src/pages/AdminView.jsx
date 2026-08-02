@@ -10,12 +10,14 @@ import {
   FolderKanban,
   Image as ImageIcon,
   Link2,
+  Mail,
   Megaphone,
   PackagePlus,
   PencilLine,
   Plus,
   RotateCcw,
   Save,
+  Send,
   Shield,
   Trash2,
   Upload,
@@ -96,6 +98,7 @@ function StatusPill({ status }) {
     reserved: "bg-amber-50 text-amber-700 border-amber-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     versé: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    sent: "bg-emerald-50 text-emerald-700 border-emerald-200",
     cancelled: "bg-red-50 text-red-700 border-red-200",
     annulé: "bg-red-50 text-red-700 border-red-200",
     refunded: "bg-zinc-100 text-zinc-700 border-zinc-300",
@@ -394,6 +397,13 @@ export default function AdminView({
   const [participations, setParticipations] = useState([]);
   const [contributions, setContributions] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [emailLogs, setEmailLogs] = useState([]);
+  const [editingEmailTemplate, setEditingEmailTemplate] = useState(null);
+  const [emailCenterLoading, setEmailCenterLoading] = useState(false);
+  const [emailActionLoading, setEmailActionLoading] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testLanguage, setTestLanguage] = useState("fr");
 
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -651,8 +661,93 @@ export default function AdminView({
     ["campaigns", "Campagnes"],
     ["participations", "Participations"],
     ["finances", "Finances"],
+    ["communications", "Communications"],
     ["messages", "Messages"],
   ];
+
+  async function emailCenterRequest(options = {}) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Session administrateur expirée.");
+    const response = await fetch("/api/program-notification", {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Impossible de communiquer avec le centre de courriels.");
+    return data;
+  }
+
+  async function loadEmailCenter() {
+    setEmailCenterLoading(true);
+    try {
+      const data = await emailCenterRequest();
+      setEmailTemplates(data.templates || []);
+      setEmailLogs(data.logs || []);
+      if (!editingEmailTemplate && data.templates?.length) setEditingEmailTemplate(data.templates[0]);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setEmailCenterLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "communications" && emailTemplates.length === 0) loadEmailCenter();
+  }, [activeTab]);
+
+  async function saveEmailTemplate() {
+    if (!editingEmailTemplate) return;
+    setEmailActionLoading(true);
+    try {
+      await emailCenterRequest({ method: "POST", body: JSON.stringify({ action: "save_template", template: editingEmailTemplate }) });
+      await loadEmailCenter();
+      alert("Modèle enregistré.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setEmailActionLoading(false);
+    }
+  }
+
+  async function sendTestEmail() {
+    if (!editingEmailTemplate || !testEmail.trim()) {
+      alert("Entre l’adresse qui doit recevoir le courriel test.");
+      return;
+    }
+    setEmailActionLoading(true);
+    try {
+      await emailCenterRequest({ method: "POST", body: JSON.stringify({ action: "test_template", template: editingEmailTemplate, email: testEmail.trim(), language: testLanguage }) });
+      await loadEmailCenter();
+      alert("Courriel test envoyé.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setEmailActionLoading(false);
+    }
+  }
+
+  function createEmailTemplate() {
+    const key = `custom_${Date.now()}`;
+    setEditingEmailTemplate({
+      key,
+      name: "Nouveau modèle",
+      trigger: "Envoi manuel",
+      enabled: false,
+      fr: { subject: "", title: "", body: "Bonjour {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
+      en: { subject: "", title: "", body: "Hello {{name}},\n\n", buttonLabel: "", buttonUrl: "" },
+    });
+  }
+
+  function updateEmailContent(language, field, value) {
+    setEditingEmailTemplate({
+      ...editingEmailTemplate,
+      [language]: { ...(editingEmailTemplate?.[language] || {}), [field]: value },
+    });
+  }
 
   async function updateApplicationCampaign(applicationId, campaignId) {
     const campaign = allCampaigns.find((item) => item.id === campaignId);
@@ -2015,6 +2110,134 @@ export default function AdminView({
               </div>
             </div>
           </section>
+        )}
+
+        {activeTab === "communications" && (
+          <div className="mt-8 space-y-8">
+            <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Mail style={{ color: gold }} />
+                    <h2 className="text-2xl font-black text-zinc-950">Centre de communications</h2>
+                  </div>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">
+                    Modifie les courriels automatiques en français et en anglais, crée des modèles et consulte les envois.
+                  </p>
+                </div>
+                <AdminButton variant="light" onClick={createEmailTemplate}>
+                  <Plus size={16} /> Nouveau modèle
+                </AdminButton>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-black">Variables disponibles</p>
+                <p className="mt-1 font-mono text-xs">{"{{name}} · {{campaign}} · {{amount}} · {{loginUrl}}"}</p>
+              </div>
+
+              {emailCenterLoading && <p className="mt-6 text-zinc-500">Chargement des communications…</p>}
+
+              <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
+                <div className="space-y-3">
+                  {emailTemplates.map((template) => (
+                    <button
+                      key={template.key}
+                      type="button"
+                      onClick={() => setEditingEmailTemplate(template)}
+                      className={`w-full rounded-2xl border p-4 text-left ${editingEmailTemplate?.key === template.key ? "border-black bg-zinc-950 text-white" : "border-zinc-200 bg-white text-zinc-950"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-black">{template.name}</p>
+                        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${template.enabled ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                      </div>
+                      <p className={`mt-2 text-xs leading-5 ${editingEmailTemplate?.key === template.key ? "text-zinc-300" : "text-zinc-500"}`}>{template.trigger || "Envoi manuel"}</p>
+                    </button>
+                  ))}
+                  {editingEmailTemplate && !emailTemplates.some((template) => template.key === editingEmailTemplate.key) && (
+                    <div className="rounded-2xl border border-dashed border-amber-400 bg-amber-50 p-4">
+                      <p className="font-black text-zinc-950">Nouveau modèle non enregistré</p>
+                    </div>
+                  )}
+                </div>
+
+                {editingEmailTemplate && (
+                  <div className="rounded-2xl border border-zinc-200 p-5 md:p-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <TextInput label="Nom du modèle" value={editingEmailTemplate.name} onChange={(value) => setEditingEmailTemplate({ ...editingEmailTemplate, name: value })} />
+                      <TextInput label="Déclencheur / workflow" value={editingEmailTemplate.trigger} onChange={(value) => setEditingEmailTemplate({ ...editingEmailTemplate, trigger: value })} hint="Les workflows natifs sont déclenchés automatiquement par les actions du portail." />
+                    </div>
+
+                    <label className="mt-4 flex items-center gap-3 rounded-2xl bg-zinc-100 p-4 font-black text-zinc-950">
+                      <input type="checkbox" checked={editingEmailTemplate.enabled !== false} onChange={(event) => setEditingEmailTemplate({ ...editingEmailTemplate, enabled: event.target.checked })} className="h-5 w-5" />
+                      Workflow actif
+                    </label>
+
+                    <div className="mt-6 grid gap-6 xl:grid-cols-2">
+                      {[["fr", "Version française"], ["en", "English version"]].map(([language, label]) => (
+                        <div key={language} className="rounded-2xl bg-zinc-50 p-4">
+                          <h3 className="text-lg font-black text-zinc-950">{label}</h3>
+                          <div className="mt-4 space-y-4">
+                            <TextInput label="Objet" value={editingEmailTemplate[language]?.subject} onChange={(value) => updateEmailContent(language, "subject", value)} />
+                            <TextInput label="Titre" value={editingEmailTemplate[language]?.title} onChange={(value) => updateEmailContent(language, "title", value)} />
+                            <TextAreaInput label="Message" value={editingEmailTemplate[language]?.body} onChange={(value) => updateEmailContent(language, "body", value)} hint="Laisse une ligne vide entre les paragraphes." />
+                            <TextInput label="Texte du bouton" value={editingEmailTemplate[language]?.buttonLabel} onChange={(value) => updateEmailContent(language, "buttonLabel", value)} placeholder="Optionnel" />
+                            <TextInput label="Lien du bouton" value={editingEmailTemplate[language]?.buttonUrl} onChange={(value) => updateEmailContent(language, "buttonUrl", value)} placeholder="https://… ou {{loginUrl}}" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <AdminButton disabled={emailActionLoading} onClick={saveEmailTemplate}>
+                        <Save size={16} /> {emailActionLoading ? "Traitement…" : "Enregistrer"}
+                      </AdminButton>
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4">
+                      <p className="font-black text-zinc-950">Envoyer un test</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_130px_auto] md:items-end">
+                        <TextInput label="Adresse de test" type="email" value={testEmail} onChange={setTestEmail} placeholder="votre@courriel.com" />
+                        <SelectInput label="Langue" value={testLanguage} onChange={setTestLanguage}>
+                          <option value="fr">Français</option>
+                          <option value="en">English</option>
+                        </SelectInput>
+                        <AdminButton variant="amber" disabled={emailActionLoading} onClick={sendTestEmail}>
+                          <Send size={16} /> Envoyer le test
+                        </AdminButton>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] bg-white p-6 shadow-xl md:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black text-zinc-950">Historique des envois</h2>
+                  <p className="mt-1 text-sm text-zinc-500">Les 100 courriels les plus récents, y compris les tests.</p>
+                </div>
+                <AdminButton variant="light" onClick={loadEmailCenter}><RotateCcw size={16} /> Actualiser</AdminButton>
+              </div>
+              <div className="mt-5 overflow-x-auto">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead><tr className="border-b text-xs uppercase text-zinc-500"><th className="p-3">Date</th><th className="p-3">Modèle</th><th className="p-3">Destinataire</th><th className="p-3">Langue</th><th className="p-3">Statut</th></tr></thead>
+                  <tbody>
+                    {emailLogs.map((log) => (
+                      <tr key={log.id} className="border-b border-zinc-100">
+                        <td className="p-3 text-zinc-600">{log.createdAt ? new Date(log.createdAt).toLocaleString("fr-CA") : "—"}</td>
+                        <td className="p-3 font-bold text-zinc-950">{emailTemplates.find((template) => template.key === log.type)?.name || log.type}{log.test ? " (test)" : ""}</td>
+                        <td className="p-3 text-zinc-600">{log.recipient}</td>
+                        <td className="p-3 uppercase text-zinc-600">{log.language}</td>
+                        <td className="p-3"><StatusPill status={log.status} /></td>
+                      </tr>
+                    ))}
+                    {!emailLogs.length && <tr><td colSpan="5" className="p-5 text-center text-zinc-500">Aucun envoi enregistré.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         )}
 
         {activeTab === "messages" && (
