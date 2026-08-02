@@ -42,7 +42,7 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { db, storage } from "../firebase";
+import { auth, db, storage } from "../firebase";
 
 import {
   campaignTitle,
@@ -375,6 +375,18 @@ export default function AdminView({
   goBack,
   onOpenAthlete,
 }) {
+  async function sendProgramNotification(type, recordId) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Session administrateur expirée.");
+    const response = await fetch("/api/program-notification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type, recordId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Impossible d’envoyer le courriel.");
+    return data;
+  }
   const [activeTab, setActiveTab] = useState("candidatures");
   const [applications, setApplications] = useState([]);
   const [families, setFamilies] = useState([]);
@@ -674,6 +686,9 @@ export default function AdminView({
         email: data.email,
         temporaryPassword: data.temporaryPassword,
       });
+      sendProgramNotification("application_accepted", application.id).catch((error) =>
+        alert(`Candidature acceptée, mais le courriel n’a pas été envoyé : ${error.message}`)
+      );
     } catch (error) {
       alert(error.message || "Erreur lors de l’acceptation.");
     } finally {
@@ -690,6 +705,9 @@ export default function AdminView({
         refusedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      sendProgramNotification("application_refused", application.id).catch((error) =>
+        alert(`Candidature refusée, mais le courriel n’a pas été envoyé : ${error.message}`)
+      );
     } catch {
       alert("Erreur lors du refus.");
     } finally {
@@ -1090,7 +1108,7 @@ export default function AdminView({
       if (!confirmed) return;
     }
 
-    await addDoc(collection(db, "payouts"), {
+    const payoutRef = await addDoc(collection(db, "payouts"), {
       targetKey: row.id,
       beneficiaryLabel: row.label,
       beneficiaryType: row.type,
@@ -1106,6 +1124,10 @@ export default function AdminView({
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    sendProgramNotification("payout_paid", payoutRef.id).catch((error) =>
+      alert(`Versement enregistré, mais le courriel n’a pas été envoyé : ${error.message}`)
+    );
 
     setNewPayout({ targetKey: "", amount: "", method: "virement", note: "" });
     alert("Versement enregistré.");

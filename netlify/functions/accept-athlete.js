@@ -64,6 +64,7 @@ function buildAthlete(application, uid, familyId) {
     lastName: application.lastName || "",
 
     email: application.email || application.parentEmail || "",
+    preferredLanguage: application.preferredLanguage || "fr",
     phone: application.phone || "",
 
     parentName: application.parentName || "",
@@ -246,6 +247,7 @@ exports.handler = async function (event) {
         ownerUserId: userRecord.uid,
         contactEmail: email,
         contactName: application.parentName || "",
+        preferredLanguage: application.preferredLanguage || "fr",
         athleteIds: admin.firestore.FieldValue.arrayUnion(athlete.id),
         status: "active",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),

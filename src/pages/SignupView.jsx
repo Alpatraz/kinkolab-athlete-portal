@@ -21,6 +21,7 @@ import {
 import { campaignTitle, cn, gold } from "../utils/format";
 import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
+import { useLanguage } from "../context/LanguageContext";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-athlete-application-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
@@ -174,6 +175,7 @@ function HeroIcon({ icon: Icon, title, text }) {
 }
 
 export default function SignupView({ goBack, openEligibility }) {
+  const { language } = useLanguage();
   const [type, setType] = useState("individuel");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -275,7 +277,7 @@ export default function SignupView({ goBack, openEligibility }) {
     setSubmitting(true);
 
     try {
-      await addDoc(collection(db, "applications"), {
+      const applicationRef = await addDoc(collection(db, "applications"), {
         type,
         status: "en_attente",
         ...form,
@@ -290,6 +292,7 @@ export default function SignupView({ goBack, openEligibility }) {
           policyVersion: "2026-08-01",
           recordedAt: new Date().toISOString(),
         },
+        preferredLanguage: language,
         athleteName: `${form.firstName} ${form.lastName}`.trim(),
         campaignTitle: selectedCampaignTitle,
         desiredGoal: Number(form.desiredGoal || 0),
@@ -297,6 +300,12 @@ export default function SignupView({ goBack, openEligibility }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      fetch("/api/program-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "application_received", recordId: applicationRef.id }),
+      }).catch((error) => console.error("Erreur courriel de confirmation:", error));
 
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
