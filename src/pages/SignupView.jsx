@@ -23,6 +23,7 @@ import { campaignsSeed } from "../data/demoData";
 import { db } from "../firebase";
 import { useLanguage } from "../context/LanguageContext";
 import { DEFAULT_DISCIPLINES, PROGRAM_ROLES, normalizeDisciplines } from "../config/programOptions";
+import RichTextEditor from "../components/RichTextEditor";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-athlete-application-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
@@ -103,13 +104,7 @@ function FormTextarea({
       <span className="mb-3 block text-sm font-black text-white">
         {label} {required && <span style={{ color: gold }}>*</span>}
       </span>
-      <textarea
-        required={required}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-h-32 w-full border border-zinc-700 bg-zinc-900/80 px-4 py-4 text-white outline-none transition focus:border-yellow-600"
-      />
+      <RichTextEditor required={required} value={value} placeholder={placeholder} onChange={onChange} dark />
     </label>
   );
 }

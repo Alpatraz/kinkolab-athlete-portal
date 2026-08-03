@@ -26,6 +26,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { useLanguage } from "../context/LanguageContext";
 import { hasLocalizedField, localizedField } from "../utils/localizedContent";
+import RichText, { plainRichText } from "../components/RichText";
 
 function SectionTitle({ icon: Icon, kicker, title, children }) {
   return (
@@ -770,8 +771,8 @@ export default function AthletePublicPage({
                 {primaryFamilyParticipation
                   ? "Cette page présente un fonds commun familial lié à une campagne précise."
                   : `Objectif : ${
-                      athleteFundingPurpose ||
-                      athleteBio ||
+                      plainRichText(athleteFundingPurpose) ||
+                      plainRichText(athleteBio) ||
                       "financer sa participation à la compétition"
                     }.`}
               </p>
@@ -799,9 +800,7 @@ export default function AthletePublicPage({
                   >
                     Présentation
                   </p>
-                  <p className="mt-3 text-base leading-7 text-zinc-300">
-                    {athleteBio}
-                  </p>
+                  <RichText value={athleteBio} className="mt-3 space-y-4 text-base text-zinc-300" paragraphClassName="leading-7" />
                 </div>
               )}
 

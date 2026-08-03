@@ -19,6 +19,7 @@ import ProgressBar from "../components/ProgressBar";
 import AthleteCard from "../components/AthleteCard";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
+import RichText from "../components/RichText";
 import {
   listFromField,
   safeExternalUrl,
@@ -354,11 +355,11 @@ const raisedManual = campaignParticipations.reduce(
               </p>
               <h2 className="mt-3 text-3xl font-black md:text-4xl">{campaignTitle}</h2>
               <div className="mt-6 space-y-5 text-lg leading-8 text-zinc-300">
-                <p>{overview || campaignDescription}</p>
+                <RichText value={overview || campaignDescription} className="space-y-5" paragraphClassName="leading-8" />
                 {audience && (
                   <div className="rounded-2xl border border-yellow-700/40 bg-yellow-950/20 p-5">
                     <h3 className="font-black text-white">{pageCopy.audience}</h3>
-                    <p className="mt-2 text-base leading-7 text-yellow-100">{audience}</p>
+                    <RichText value={audience} className="mt-2 space-y-3 text-base text-yellow-100" paragraphClassName="leading-7" />
                   </div>
                 )}
               </div>

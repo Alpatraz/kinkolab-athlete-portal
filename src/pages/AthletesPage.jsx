@@ -4,6 +4,7 @@ import { campaignTitle, gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
+import { plainRichText } from "../components/RichText";
 
 function isVisibleAthlete(athlete) {
   return (
@@ -183,7 +184,7 @@ export default function AthletesPage({
                   </div>
 
                   <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">
-                    {localizedField(athlete, "bio", language, ["presentation"]) || localizedField(athlete, "fundingPurpose", language, ["objective", "goalText"]) || "Cet athlète prépare sa campagne de financement avec KinkoLab."}
+                    {plainRichText(localizedField(athlete, "bio", language, ["presentation"]) || localizedField(athlete, "fundingPurpose", language, ["objective", "goalText"])) || "Cet athlète prépare sa campagne de financement avec KinkoLab."}
                   </p>
 
                   <div className="mt-5 rounded-2xl bg-black p-4">

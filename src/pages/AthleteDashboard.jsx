@@ -33,6 +33,7 @@ import { campaignTitle, gold, money } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import { contributionTotal } from "../services/fundTransactions";
 import { uploadAthleteMedia } from "../services/mediaUpload";
+import RichTextEditor from "../components/RichTextEditor";
 
 function minorFromBirthDate(value) {
   if (!value) return false;
@@ -1173,10 +1174,10 @@ export default function AthleteDashboard({
 
                       <p className="text-sm font-bold text-zinc-600">Écrivez dans une langue ou dans les deux. La version disponible servira automatiquement de repli.</p>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <textarea value={form.bioFr} onChange={(e) => setForm({ ...form, bioFr: e.target.value })} placeholder="Présentation — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={form.bioEn} onChange={(e) => setForm({ ...form, bioEn: e.target.value })} placeholder="Introduction — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={form.fundingPurposeFr} onChange={(e) => setForm({ ...form, fundingPurposeFr: e.target.value })} placeholder="Objectif de financement — Français" lang="fr" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={form.fundingPurposeEn} onChange={(e) => setForm({ ...form, fundingPurposeEn: e.target.value })} placeholder="Funding purpose — English" lang="en" className="min-h-32 rounded-2xl border border-zinc-200 p-3" />
+                        <RichTextEditor value={form.bioFr} onChange={(value) => setForm({ ...form, bioFr: value })} placeholder="Présentation — Français" lang="fr" />
+                        <RichTextEditor value={form.bioEn} onChange={(value) => setForm({ ...form, bioEn: value })} placeholder="Introduction — English" lang="en" />
+                        <RichTextEditor value={form.fundingPurposeFr} onChange={(value) => setForm({ ...form, fundingPurposeFr: value })} placeholder="Objectif de financement — Français" lang="fr" />
+                        <RichTextEditor value={form.fundingPurposeEn} onChange={(value) => setForm({ ...form, fundingPurposeEn: value })} placeholder="Funding purpose — English" lang="en" />
                       </div>
                       <input value={form.athleteSocials} onChange={(e) => setForm({ ...form, athleteSocials: e.target.value })} placeholder="Réseaux sociaux" className="rounded-2xl border border-zinc-200 p-3" />
                       <button type="button" onClick={saveAthleteProfile} disabled={saving || uploadingPhoto} className="flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-60">
@@ -1232,12 +1233,12 @@ export default function AthleteDashboard({
                     <div className="mt-5 grid gap-4">
                       <input type="number" value={participationForm.goal} onChange={(e) => setParticipationForm({ ...participationForm, goal: e.target.value })} placeholder="Objectif financier" className="rounded-2xl border border-zinc-200 p-3" />
                       <div className="grid gap-4 md:grid-cols-2">
-                        <textarea value={participationForm.fundingNeedsFr} onChange={(e) => setParticipationForm({ ...participationForm, fundingNeedsFr: e.target.value })} placeholder="Besoins de financement — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={participationForm.fundingNeedsEn} onChange={(e) => setParticipationForm({ ...participationForm, fundingNeedsEn: e.target.value })} placeholder="Funding needs — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={participationForm.campaignReasonFr} onChange={(e) => setParticipationForm({ ...participationForm, campaignReasonFr: e.target.value })} placeholder="Importance de la campagne — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={participationForm.campaignReasonEn} onChange={(e) => setParticipationForm({ ...participationForm, campaignReasonEn: e.target.value })} placeholder="Why this campaign matters — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={participationForm.publicMessageFr} onChange={(e) => setParticipationForm({ ...participationForm, publicMessageFr: e.target.value })} placeholder="Message public — Français" lang="fr" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
-                        <textarea value={participationForm.publicMessageEn} onChange={(e) => setParticipationForm({ ...participationForm, publicMessageEn: e.target.value })} placeholder="Public message — English" lang="en" className="min-h-28 rounded-2xl border border-zinc-200 p-3" />
+                        <RichTextEditor value={participationForm.fundingNeedsFr} onChange={(value) => setParticipationForm({ ...participationForm, fundingNeedsFr: value })} placeholder="Besoins de financement — Français" lang="fr" minHeight="min-h-28" />
+                        <RichTextEditor value={participationForm.fundingNeedsEn} onChange={(value) => setParticipationForm({ ...participationForm, fundingNeedsEn: value })} placeholder="Funding needs — English" lang="en" minHeight="min-h-28" />
+                        <RichTextEditor value={participationForm.campaignReasonFr} onChange={(value) => setParticipationForm({ ...participationForm, campaignReasonFr: value })} placeholder="Importance de la campagne — Français" lang="fr" minHeight="min-h-28" />
+                        <RichTextEditor value={participationForm.campaignReasonEn} onChange={(value) => setParticipationForm({ ...participationForm, campaignReasonEn: value })} placeholder="Why this campaign matters — English" lang="en" minHeight="min-h-28" />
+                        <RichTextEditor value={participationForm.publicMessageFr} onChange={(value) => setParticipationForm({ ...participationForm, publicMessageFr: value })} placeholder="Message public — Français" lang="fr" minHeight="min-h-28" />
+                        <RichTextEditor value={participationForm.publicMessageEn} onChange={(value) => setParticipationForm({ ...participationForm, publicMessageEn: value })} placeholder="Public message — English" lang="en" minHeight="min-h-28" />
                       </div>
                       <label className="flex items-center gap-3 rounded-2xl bg-zinc-100 p-4 text-sm font-black text-zinc-700">
                         <input type="checkbox" checked={participationForm.isPublic} onChange={(e) => setParticipationForm({ ...participationForm, isPublic: e.target.checked })} />

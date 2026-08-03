@@ -34,6 +34,8 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
+import RichTextEditor from "../components/RichTextEditor";
+import RichText from "../components/RichText";
 
 import {
   addDoc,
@@ -187,15 +189,15 @@ function TextInput({ label, value, onChange, placeholder = "", type = "text", hi
   );
 }
 
-function TextAreaInput({ label, value, onChange, placeholder = "", hint = "" }) {
+function TextAreaInput({ label, value, onChange, placeholder = "", hint = "", rich = false }) {
   return (
     <AdminField label={label} hint={hint}>
-      <textarea
+      {rich ? <RichTextEditor value={value || ""} onChange={onChange} placeholder={placeholder} minHeight="min-h-36" /> : <textarea
         value={value || ""}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="min-h-28 w-full rounded-2xl border border-zinc-200 p-3 text-zinc-950"
-      />
+      />}
     </AdminField>
   );
 }
@@ -1844,8 +1846,8 @@ export default function AdminView({
           <TextAreaInput label="Disciplines — anglais" value={campaignState.disciplinesEn} onChange={(value) => setCampaignState({ ...campaignState, disciplinesEn: value })} />
           <TextAreaInput label="Qui est concerné — français" value={campaignState.audienceFr} onChange={(value) => setCampaignState({ ...campaignState, audienceFr: value })} />
           <TextAreaInput label="Who it is for — English" value={campaignState.audienceEn} onChange={(value) => setCampaignState({ ...campaignState, audienceEn: value })} />
-          <TextAreaInput label="Présentation détaillée — français" value={campaignState.overviewFr} onChange={(value) => setCampaignState({ ...campaignState, overviewFr: value })} />
-          <TextAreaInput label="Detailed overview — English" value={campaignState.overviewEn} onChange={(value) => setCampaignState({ ...campaignState, overviewEn: value })} />
+          <TextAreaInput rich label="Présentation détaillée — français" value={campaignState.overviewFr} onChange={(value) => setCampaignState({ ...campaignState, overviewFr: value })} />
+          <TextAreaInput rich label="Detailed overview — English" value={campaignState.overviewEn} onChange={(value) => setCampaignState({ ...campaignState, overviewEn: value })} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -2203,7 +2205,7 @@ export default function AdminView({
                     {application.motivation && (
                       <div className="mt-4 rounded-2xl bg-zinc-100 p-4 text-sm text-zinc-700">
                         <b>Motivation :</b>
-                        <p className="mt-1">{application.motivation}</p>
+                        <RichText value={application.motivation} className="mt-1 space-y-3" paragraphClassName="leading-7" />
                       </div>
                     )}
                   </div>

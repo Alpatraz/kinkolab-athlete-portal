@@ -4,6 +4,7 @@ import { campaignTitle, gold, money, progressOf, totalRaised } from "../utils/fo
 import ProgressBar from "./ProgressBar";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
+import { plainRichText } from "./RichText";
 
 function contributionAmount(contribution) {
   return Number(contribution?.amountReserved || contribution?.reservedAmount || 0);
@@ -100,7 +101,7 @@ export default function AthleteCard({
           </p>
 
           <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-400">
-            {localizedField(athlete, "bio", language, ["presentation"]) || localizedField(athlete, "fundingPurpose", language, ["objective", "goalText"])}
+            {plainRichText(localizedField(athlete, "bio", language, ["presentation"]) || localizedField(athlete, "fundingPurpose", language, ["objective", "goalText"]))}
           </p>
 
           <div className="mt-4">
