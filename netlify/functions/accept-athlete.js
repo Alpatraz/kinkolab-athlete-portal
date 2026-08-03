@@ -175,7 +175,7 @@ exports.handler = async function (event) {
     }
 
     const body = JSON.parse(event.body || "{}");
-    const token = String(event.headers?.authorization || event.headers?.Authorization || "").replace(/^Bearer\s+/i, "");
+    const token = String(event.headers?.authorization || event.headers?.Authorization || body.idToken || "").replace(/^Bearer\s+/i, "");
     if (!token) return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
     const decoded = await admin.auth().verifyIdToken(token);
     const adminUser = await admin.firestore().collection("users").doc(decoded.uid).get();

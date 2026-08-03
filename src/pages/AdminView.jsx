@@ -490,6 +490,18 @@ export default function AdminView({
   goBack,
   onOpenAthlete,
 }) {
+  const [adminNotice, setAdminNotice] = useState(null);
+
+  useEffect(() => {
+    const nativeAlert = window.alert;
+    window.alert = (message) => setAdminNotice({
+      title: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden/i.test(String(message)) ? "Action impossible" : "Confirmation",
+      message: String(message || ""),
+      tone: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden/i.test(String(message)) ? "error" : "success",
+    });
+    return () => { window.alert = nativeAlert; };
+  }, []);
+
   async function sendProgramNotification(type, recordId) {
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error("Session administrateur expirée.");
@@ -1196,7 +1208,7 @@ export default function AdminView({
       const response = await fetch("/.netlify/functions/accept-athlete", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ applicationId: application.id }),
+        body: JSON.stringify({ applicationId: application.id, idToken: token }),
       });
 
       const data = await response.json();
@@ -3069,6 +3081,21 @@ export default function AdminView({
           </section>
         )}
       </div>
+      {adminNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="admin-notice-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setAdminNotice(null); }}>
+          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-zinc-700 bg-zinc-950 text-white shadow-2xl">
+            <div className={`h-2 ${adminNotice.tone === "error" ? "bg-red-500" : "bg-[#d7b85b]"}`} />
+            <div className="p-7 md:p-8">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${adminNotice.tone === "error" ? "bg-red-500/15 text-red-400" : "bg-yellow-500/15 text-[#d7b85b]"}`}>
+                {adminNotice.tone === "error" ? <XCircle size={26} /> : <CheckCircle2 size={26} />}
+              </div>
+              <h2 id="admin-notice-title" className="mt-5 text-2xl font-black">{adminNotice.title}</h2>
+              <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-300">{adminNotice.message}</p>
+              <button type="button" autoFocus onClick={() => setAdminNotice(null)} className={`mt-7 w-full rounded-2xl px-5 py-4 font-black ${adminNotice.tone === "error" ? "bg-red-500 text-white" : "bg-[#d7b85b] text-black"}`}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
