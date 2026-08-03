@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 function getAdminApp() {
   if (admin.apps.length) return admin.app();
@@ -34,6 +35,13 @@ function generateTemporaryPassword() {
   return `Kinko-${Math.random().toString(36).slice(2, 8)}-${Math.floor(
     1000 + Math.random() * 9000
   )}`;
+}
+
+function activationDetails() {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  return { token, tokenHash, expiresAt, url: `https://athletes.kinkolab.com/activate?token=${encodeURIComponent(token)}` };
 }
 
 function isMinor(birthDate) {
@@ -210,9 +218,10 @@ exports.handler = async function (event) {
 
     if (application.status === "accepté" && application.athleteId) {
       if (!email) return { statusCode: 400, body: JSON.stringify({ error: "No email found on application" }) };
-      const accountSetupUrl = await admin.auth().generatePasswordResetLink(email);
+      const activation = activationDetails();
       await appRef.update({
-        accountSetupUrl,
+        accountSetupUrl: activation.url,
+        activation: { tokenHash: activation.tokenHash, expiresAt: activation.expiresAt, usedAt: null, email, userId: application.userId },
         "emailNotifications.application_accepted": admin.firestore.FieldValue.delete(),
         accessLinkRenewedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -270,9 +279,8 @@ exports.handler = async function (event) {
     }
 
     const athlete = buildAthlete(application, userRecord.uid, familyId);
-    // Use Firebase's hosted action handler. A custom continue URL would require
-    // athletes.kinkolab.com to be allowlisted separately in Firebase Auth.
-    const accountSetupUrl = await admin.auth().generatePasswordResetLink(email);
+    const activation = activationDetails();
+    const accountSetupUrl = activation.url;
 
     await db.collection("athletes").doc(athlete.id).set(athlete, { merge: true });
 
@@ -303,6 +311,9 @@ exports.handler = async function (event) {
         athleteId: athlete.id,
         familyId,
         athleteIds: admin.firestore.FieldValue.arrayUnion(athlete.id),
+        mustChangePassword: true,
+        passwordChangedAt: null,
+        passwordExpiresAt: null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
@@ -315,6 +326,7 @@ exports.handler = async function (event) {
       userId: userRecord.uid,
       familyId,
       accountSetupUrl,
+      activation: { tokenHash: activation.tokenHash, expiresAt: activation.expiresAt, usedAt: null, email, userId: userRecord.uid },
       acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });

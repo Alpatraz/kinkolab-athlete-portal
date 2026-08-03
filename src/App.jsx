@@ -11,6 +11,8 @@ import CampaignDetailPage from "./pages/CampaignDetailPage";
 import AthletePublicPage from "./pages/AthletePublicPage";
 import SignupView from "./pages/SignupView";
 import LoginView from "./pages/LoginView";
+import ActivateAccountPage from "./pages/ActivateAccountPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
 import AdminView from "./pages/AdminView";
 import AthleteDashboard from "./pages/AthleteDashboard";
 import Footer from "./components/Footer";
@@ -105,6 +107,8 @@ function ProtectedAdminRoute({ currentUser, authLoading, children }) {
     return <Navigate to="/login" replace />;
   }
 
+  if (currentUser.mustChangePassword) return <Navigate to="/change-password" replace />;
+
   return children;
 }
 
@@ -119,6 +123,8 @@ function ProtectedDashboardRoute({ currentUser, authLoading, children }) {
 
   if (!currentUser) return <Navigate to="/login" replace />;
 
+  if (currentUser.mustChangePassword) return <Navigate to="/change-password" replace />;
+
   return children;
 }
 
@@ -128,6 +134,14 @@ function isPublicAthlete(athlete) {
     athlete?.status !== "suspendu" &&
     athlete?.status !== "archivé"
   );
+}
+
+function passwordMustChange(userData) {
+  if (userData?.mustChangePassword === true) return true;
+  const raw = userData?.passwordExpiresAt;
+  if (!raw) return false;
+  const date = typeof raw?.toDate === "function" ? raw.toDate() : new Date(raw);
+  return !Number.isNaN(date.getTime()) && date.getTime() <= Date.now();
 }
 
 export default function App() {
@@ -169,6 +183,7 @@ export default function App() {
           athleteId: userData.athleteId || null,
           athleteIds: userData.athleteIds || [],
           familyId: userData.familyId || null,
+          mustChangePassword: passwordMustChange(userData),
         });
       } catch (error) {
         console.error("Erreur récupération utilisateur:", error);
@@ -409,7 +424,23 @@ export default function App() {
               setCurrentUser={setCurrentUser}
               openAdmin={openAdmin}
               openDashboard={openDashboard}
+              openPasswordChange={() => navigate("/change-password")}
             />
+          }
+        />
+
+        <Route path="/activate" element={<ActivateAccountPage />} />
+
+        <Route
+          path="/change-password"
+          element={
+            authLoading ? (
+              <main className="min-h-screen bg-black p-8 text-white"><h1 className="text-3xl font-black">Chargement...</h1></main>
+            ) : currentUser ? (
+              <ChangePasswordPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
 

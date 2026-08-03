@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import {
   signInWithEmailAndPassword,
@@ -6,6 +6,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { useLocation } from "react-router-dom";
 
 import { gold } from "../utils/format";
 import { auth, db } from "../firebase";
@@ -15,12 +16,18 @@ export default function LoginView({
   setCurrentUser,
   openAdmin,
   openDashboard,
+  openPasswordChange,
 }) {
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (location.state?.passwordChanged) setInfoMessage("Mot de passe modifié. Reconnectez-vous avec votre nouveau mot de passe.");
+  }, [location.state]);
 
   async function login(event) {
     event.preventDefault();
@@ -41,6 +48,9 @@ export default function LoginView({
       }
 
       const userData = userSnap.data();
+      const rawExpiry = userData.passwordExpiresAt;
+      const expiry = typeof rawExpiry?.toDate === "function" ? rawExpiry.toDate() : (rawExpiry ? new Date(rawExpiry) : null);
+      const mustChangePassword = userData.mustChangePassword === true || (expiry && !Number.isNaN(expiry.getTime()) && expiry.getTime() <= Date.now());
 
       const connectedUser = {
         uid: firebaseUser.uid,
@@ -50,11 +60,14 @@ export default function LoginView({
         athleteId: userData.athleteId || null,
         familyId: userData.familyId || null,
         athleteIds: userData.athleteIds || [],
+        mustChangePassword,
       };
 
       setCurrentUser(connectedUser);
 
-      if (connectedUser.role === "admin") {
+      if (connectedUser.mustChangePassword) {
+        openPasswordChange();
+      } else if (connectedUser.role === "admin") {
         openAdmin();
       } else {
         openDashboard();
