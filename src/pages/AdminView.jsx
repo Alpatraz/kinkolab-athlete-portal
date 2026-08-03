@@ -1264,18 +1264,28 @@ export default function AdminView({
     }
   }
 
-  async function updateAthleteStatus(athlete, status) {
+  async function updateAthleteStatus(athlete, status, action = "update_status") {
+    const labels = { suspendu: "suspendre", actif: "réactiver", archivé: "archiver", supprimé: "supprimer" };
+    if (["archivé", "supprimé"].includes(status) && !window.confirm(
+      status === "supprimé"
+        ? `Supprimer ${athlete.name} ? Le profil public sera retiré, mais les données financières seront conservées pour les rapports.`
+        : `Archiver ${athlete.name} ? Le profil public sera retiré et pourra être réactivé plus tard.`
+    )) return;
+    setActionLoadingId(`athlete-${athlete.id}`);
     try {
       const token = await auth.currentUser?.getIdToken();
       const response = await fetch("/api/athlete-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: "update_status", athleteId: athlete.id, status }),
+        body: JSON.stringify({ action, athleteId: athlete.id, status }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Modification impossible");
-    } catch {
-      alert("Impossible de modifier cet athlète.");
+      alert(`${athlete.name} a bien été ${status === "actif" ? "réactivé" : status}.`);
+    } catch (error) {
+      alert(`Impossible de ${labels[status] || "modifier"} cet athlète : ${error.message || "erreur inconnue"}`);
+    } finally {
+      setActionLoadingId("");
     }
   }
 
@@ -2261,9 +2271,10 @@ export default function AdminView({
                     <div className="flex flex-wrap gap-2">
                       <AdminButton variant="light" onClick={() => onOpenAthlete(athlete.id)}><Eye size={16} /> Voir</AdminButton>
                       <AdminButton variant="light" disabled={actionLoadingId === athlete.sourceApplicationId} onClick={() => resendAthleteAccess(athlete)}><Mail size={16} /> Renvoyer l’accès</AdminButton>
-                      <AdminButton variant="amber" onClick={() => updateAthleteStatus(athlete, "suspendu")}><Ban size={16} /> Suspendre</AdminButton>
-                      <AdminButton variant="green" onClick={() => updateAthleteStatus(athlete, "actif")}><RotateCcw size={16} /> Réactiver</AdminButton>
-                      <AdminButton variant="light" onClick={() => updateAthleteStatus(athlete, "archivé")}><Archive size={16} /> Archiver</AdminButton>
+                      <AdminButton variant="amber" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "suspendu")}><Ban size={16} /> Suspendre</AdminButton>
+                      <AdminButton variant="green" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "actif")}><RotateCcw size={16} /> Réactiver</AdminButton>
+                      <AdminButton variant="light" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "archivé", "archive")}><Archive size={16} /> Archiver</AdminButton>
+                      <AdminButton variant="red" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "supprimé", "delete")}><Trash2 size={16} /> Supprimer</AdminButton>
                     </div>
                   </div>
 
