@@ -31,6 +31,7 @@ import {
   Upload,
   UserPlus2,
   Users,
+  Wallet,
   XCircle,
 } from "lucide-react";
 
@@ -508,6 +509,8 @@ export default function AdminView({
   const [participations, setParticipations] = useState([]);
   const [contributions, setContributions] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [wiseBatches, setWiseBatches] = useState([]);
+  const [wiseLoading, setWiseLoading] = useState(false);
   const [emailTemplates, setEmailTemplates] = useState([]);
   const [emailLogs, setEmailLogs] = useState([]);
   const [editingEmailTemplate, setEditingEmailTemplate] = useState(null);
@@ -603,6 +606,9 @@ export default function AdminView({
         setPayouts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
       }
     );
+    const unsubWiseBatches = onSnapshot(collection(db, "wisePayoutBatches"), (snapshot) => {
+      setWiseBatches(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
 
     return () => {
       unsubApps();
@@ -611,6 +617,7 @@ export default function AdminView({
       unsubParticipations();
       unsubContributions();
       unsubPayouts();
+      unsubWiseBatches();
     };
   }, []);
 
@@ -745,14 +752,16 @@ export default function AdminView({
     const rows = new Map();
 
     contributions.filter(isFinanciallyActive).forEach((contribution) => {
-      const key =
+      const beneficiaryKey =
         contribution.fundingMode === "family"
           ? `family-${contribution.fundingGroupId || contribution.familyId}`
           : `athlete-${contribution.athleteId || contribution.supportLabel}`;
+      const key = `${contribution.campaignId || "no-campaign"}-${beneficiaryKey}`;
 
       if (!rows.has(key)) {
         rows.set(key, {
           id: key,
+          targetKey: beneficiaryKey,
           label:
             contribution.fundingMode === "family"
               ? contribution.supportLabel ||
@@ -782,12 +791,14 @@ export default function AdminView({
     });
 
     payouts.forEach((payout) => {
-      const targetKey = payout.targetKey;
-      if (!targetKey) return;
+      const beneficiaryKey = payout.targetKey;
+      if (!beneficiaryKey) return;
+      const targetKey = `${payout.campaignId || "no-campaign"}-${beneficiaryKey}`;
 
       if (!rows.has(targetKey)) {
         rows.set(targetKey, {
           id: targetKey,
+          targetKey: beneficiaryKey,
           label: payout.beneficiaryLabel || "Bénéficiaire",
           type: payout.beneficiaryType || "—",
           athleteId: payout.athleteId || null,
@@ -810,7 +821,7 @@ export default function AdminView({
       ...row,
       balance: Math.max(row.reserved - row.paid, 0),
       payoutMethod: (row.athleteId ? athletes.find((item) => item.id === row.athleteId) : families.find((item) => item.id === row.familyId))?.payoutProfile?.method || "",
-      payoutEmail: (row.athleteId ? athletes.find((item) => item.id === row.athleteId) : families.find((item) => item.id === row.familyId))?.payoutProfile?.interacEmail || "",
+      payoutEmail: (row.athleteId ? athletes.find((item) => item.id === row.athleteId) : families.find((item) => item.id === row.familyId))?.payoutProfile?.wiseEmail || "",
     }));
   }, [contributions, payouts, allCampaigns, athletes, families]);
 
@@ -829,8 +840,20 @@ export default function AdminView({
   const transferColumns = [
     { label: "Bénéficiaire", value: "label" }, { label: "Type", value: "type" }, { label: "Campagne", value: "campaignTitle" },
     { label: "Réservé", value: "reserved", type: "Number" }, { label: "Déjà versé", value: "paid", type: "Number" }, { label: "À verser", value: "balance", type: "Number" },
-    { label: "Méthode", value: (item) => item.payoutMethod || "À confirmer" }, { label: "Courriel Interac", value: (item) => item.payoutEmail || "" },
+    { label: "Méthode", value: (item) => item.payoutMethod || "À confirmer" }, { label: "Courriel Wise", value: (item) => item.payoutEmail || "" },
   ];
+
+  async function wiseAction(action, campaignId = "") {
+    setWiseLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/wise-payouts", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action, campaignId }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Action Wise impossible");
+      alert(action === "sync" ? "Les statuts Wise ont été synchronisés." : action === "setup_webhook" ? "Le webhook Wise a été enregistré." : "Les campagnes admissibles ont été préparées. L’approbation finale demeure obligatoire dans Wise.");
+    } catch (error) { alert(error.message); }
+    finally { setWiseLoading(false); }
+  }
 
   function exportAdminFinancialReport() {
     exportExcelReport({ title: "Rapport financier — Programme Athlètes KinkoLab", columns: adminContributionColumns, rows: contributions, fileName: `rapport-financier-kinkolab-${new Date().toISOString().slice(0, 10)}.xls` });
@@ -1682,7 +1705,7 @@ export default function AdminView({
     }
 
     const payoutRef = await addDoc(collection(db, "payouts"), {
-      targetKey: row.id,
+      targetKey: row.targetKey || row.id,
       beneficiaryLabel: row.label,
       beneficiaryType: row.type,
       athleteId: row.athleteId || null,
@@ -2524,13 +2547,24 @@ export default function AdminView({
             </div>
 
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div><div className="flex items-center gap-3"><Wallet style={{ color: gold }} /><h2 className="text-2xl font-black text-zinc-950">Lots de versements Wise</h2></div><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Un lot est préparé automatiquement 15 jours après la fin de chaque campagne. Le portail ne finance jamais le lot : un autre membre autorisé doit obligatoirement le vérifier et l’approuver dans Wise Business à partir du solde CAD.</p></div>
+                <div className="flex flex-wrap gap-2"><AdminButton variant="amber" disabled={wiseLoading} onClick={() => wiseAction("prepare_eligible")}><Wallet size={16} /> Préparer les campagnes admissibles</AdminButton><AdminButton variant="light" disabled={wiseLoading} onClick={() => wiseAction("sync")}><RotateCcw size={16} /> Synchroniser Wise</AdminButton><AdminButton variant="light" disabled={wiseLoading} onClick={() => wiseAction("setup_webhook")}><Link2 size={16} /> Connecter les statuts</AdminButton></div>
+              </div>
+              <div className="mt-5 space-y-3">
+                {wiseBatches.length === 0 && <p className="rounded-2xl bg-zinc-100 p-5 text-sm text-zinc-500">Aucun lot Wise préparé.</p>}
+                {wiseBatches.sort((a, b) => String(b.eligibleAt || "").localeCompare(String(a.eligibleAt || ""))).map((batch) => <div key={batch.id} className="rounded-2xl border border-zinc-200 p-5"><div className="flex flex-wrap justify-between gap-4"><div><p className="text-xs font-black uppercase text-zinc-400">Admissible le {String(batch.eligibleAt || "").slice(0, 10) || "—"}</p><h3 className="mt-1 font-black text-zinc-950">{batch.campaignTitle || batch.campaignId}</h3><p className="mt-1 text-sm text-zinc-500">{batch.beneficiaryCount || 0} bénéficiaire(s) · Financement : solde CAD Wise · Approbation Wise obligatoire</p>{batch.error && <p className="mt-2 text-sm font-bold text-red-700">{batch.error}</p>}</div><div className="text-right"><p className="text-2xl font-black">{money(batch.total || 0)}</p><StatusPill status={batch.status || "préparation"} /></div></div>{batch.blockedBeneficiaries?.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{batch.blockedBeneficiaries.length} bénéficiaire(s) doivent compléter leurs renseignements Wise avant le prochain lot.</p>}</div>)}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
               <div className="flex items-center gap-3">
                 <CheckCircle2 style={{ color: gold }} />
-                <h2 className="text-2xl font-black text-zinc-950">Enregistrer un versement</h2>
+                <h2 className="text-2xl font-black text-zinc-950">Correction manuelle exceptionnelle</h2>
               </div>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Utilise ce formulaire lorsqu’un montant est réellement versé à un athlète ou à une famille.
+                À utiliser uniquement pour rapprocher un versement déjà effectué hors du flux Wise automatisé.
               </p>
 
               <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.7fr]">
@@ -2558,11 +2592,8 @@ export default function AdminView({
                   onChange={(event) => setNewPayout({ ...newPayout, method: event.target.value })}
                   className="rounded-2xl border border-zinc-200 p-3"
                 >
-                  <option value="virement">Virement</option>
-                  <option value="interac">Interac</option>
-                  <option value="cheque">Chèque</option>
-                  <option value="cash">Comptant</option>
-                  <option value="autre">Autre</option>
+                  <option value="wise">Wise</option>
+                  <option value="eft_exceptionnel">EFT exceptionnel</option>
                 </select>
               </div>
 

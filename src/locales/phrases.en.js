@@ -428,6 +428,23 @@ const phrases = {
   "Voir dans le calendrier des compétitions KinkoLab": "View in the KinkoLab competition calendar",
   "Inscription officielle à la compétition": "Official competition registration",
   "Le solde admissible est normalement versé 15 jours après la fin de la campagne, sous réserve des annulations, remboursements, vérifications et renseignements de versement complets.": "The eligible balance is normally paid 15 days after the campaign ends, subject to cancellations, refunds, verification and complete payout information.",
+  "Comment votre versement sera effectué": "How your payout will be made",
+  "Si votre candidature est acceptée, vous configurerez votre bénéficiaire dans votre espace avec votre nom légal et votre courriel seulement. À la fin de chaque campagne, tout votre solde admissible sera regroupé en un seul versement, normalement préparé 15 jours après la fermeture. KinkoLab prépare le lot dans Wise, puis une personne autorisée distincte doit l’approuver dans Wise avant son financement à partir du solde CAD de KinkoLab. Wise vous enverra ensuite un lien sécurisé, habituellement valide sept jours, afin que vous lui transmettiez directement vos coordonnées bancaires. KinkoLab ne reçoit ni ne conserve ces coordonnées. Pour un participant mineur, le bénéficiaire doit être son parent ou tuteur légal.": "If your application is accepted, you will set up your beneficiary in your dashboard using only your legal name and email address. At the end of each campaign, your entire eligible balance will be grouped into one payout, normally prepared 15 days after closing. KinkoLab prepares the batch in Wise, then a separate authorized person must approve it in Wise before it is funded from KinkoLab’s CAD balance. Wise will then email you a secure link, normally valid for seven days, so that you can provide your banking details directly to Wise. KinkoLab does not receive or store those details. For a minor participant, the beneficiary must be their parent or legal guardian.",
+  "Versement bancaire sécurisé par Wise": "Secure bank payout through Wise",
+  "KinkoLab prépare automatiquement un seul versement regroupant tout le solde admissible de votre campagne. Quinze jours après sa fin, Wise vous transmettra un lien sécurisé par courriel. Vous indiquerez vos coordonnées bancaires directement à Wise; KinkoLab ne les recevra jamais.": "KinkoLab automatically prepares one payout containing your campaign’s entire eligible balance. Fifteen days after it ends, Wise will email you a secure link. You will provide your banking details directly to Wise; KinkoLab will never receive them.",
+  "Nom légal du bénéficiaire": "Beneficiary’s legal name",
+  "Bénéficiaire": "Beneficiary",
+  "Athlète majeur": "Adult athlete",
+  "Parent ou tuteur légal": "Parent or legal guardian",
+  "Courriel du bénéficiaire pour Wise": "Beneficiary email for Wise",
+  "Le lien Wise expire après sept jours. Pour un mineur, utilisez le courriel du parent ou tuteur légal qui recevra les fonds.": "The Wise link expires after seven days. For a minor, use the email address of the parent or legal guardian who will receive the funds.",
+  "Je confirme que ces renseignements sont exacts et j’autorise KinkoLab à les utiliser uniquement pour effectuer et documenter les versements du Programme Athlètes.": "I confirm that this information is accurate and authorize KinkoLab to use it solely to make and document Athlete Program payouts.",
+  "Protection de vos renseignements": "Protecting your information",
+  "KinkoLab ne demande jamais votre mot de passe bancaire.": "KinkoLab never asks for your banking password.",
+  "Vos coordonnées bancaires sont fournies directement à Wise dans son environnement sécurisé.": "Your banking details are provided directly to Wise in its secure environment.",
+  "KinkoLab conserve uniquement votre nom légal, votre courriel de versement, le statut et la référence du transfert.": "KinkoLab retains only your legal name, payout email address, transfer status and reference.",
+  "Le versement ne peut être libéré que par une approbation distincte dans le compte Wise Business de KinkoLab.": "The payout can be released only through a separate approval in KinkoLab’s Wise Business account.",
+  "Vous pouvez demander la rectification de votre nom ou courriel avant la préparation du versement.": "You may request correction of your name or email before the payout is prepared.",
 };
 
 export default phrases;

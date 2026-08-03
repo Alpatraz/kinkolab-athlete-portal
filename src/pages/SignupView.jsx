@@ -776,6 +776,11 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
             <section className="border border-yellow-700/40 bg-zinc-950/50 p-6 md:p-8">
               <SectionTitle>Consentements obligatoires</SectionTitle>
 
+              <div className="mb-7 border-l-4 border-yellow-600 bg-black p-5 text-sm leading-7 text-zinc-300">
+                <strong className="block text-white">Comment votre versement sera effectué</strong>
+                Si votre candidature est acceptée, vous configurerez votre bénéficiaire dans votre espace avec votre nom légal et votre courriel seulement. À la fin de chaque campagne, tout votre solde admissible sera regroupé en un seul versement, normalement préparé 15 jours après la fermeture. KinkoLab prépare le lot dans Wise, puis une personne autorisée distincte doit l’approuver dans Wise avant son financement à partir du solde CAD de KinkoLab. Wise vous enverra ensuite un lien sécurisé, habituellement valide sept jours, afin que vous lui transmettiez directement vos coordonnées bancaires. KinkoLab ne reçoit ni ne conserve ces coordonnées. Pour un participant mineur, le bénéficiaire doit être son parent ou tuteur légal.
+              </div>
+
               <div className="space-y-5">
                 <ConsentCheckbox
                   checked={consents.rules}

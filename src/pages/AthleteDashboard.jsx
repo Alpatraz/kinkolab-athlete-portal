@@ -321,7 +321,7 @@ export default function AthleteDashboard({
     photoUrl: "",
     athleteSocials: "",
   });
-  const [payoutProfile, setPayoutProfile] = useState({ method: "interac", legalName: "", interacEmail: "", beneficiaryType: "athlete", consent: false });
+  const [payoutProfile, setPayoutProfile] = useState({ method: "wise", legalName: "", wiseEmail: "", beneficiaryType: "athlete", consent: false });
   const [savingPayoutProfile, setSavingPayoutProfile] = useState(false);
 
   const [participationForm, setParticipationForm] = useState({
@@ -434,7 +434,7 @@ export default function AthleteDashboard({
       photoUrl: selectedAthlete.photoUrl || "",
       athleteSocials: selectedAthlete.athleteSocials || "",
     });
-    setPayoutProfile({ method: selectedAthlete.payoutProfile?.method || "interac", legalName: selectedAthlete.payoutProfile?.legalName || selectedAthlete.name || "", interacEmail: selectedAthlete.payoutProfile?.interacEmail || selectedAthlete.email || selectedAthlete.parentEmail || "", beneficiaryType: selectedAthlete.payoutProfile?.beneficiaryType || "athlete", consent: Boolean(selectedAthlete.payoutProfile?.consent) });
+    setPayoutProfile({ method: "wise", legalName: selectedAthlete.payoutProfile?.legalName || selectedAthlete.name || "", wiseEmail: selectedAthlete.payoutProfile?.wiseEmail || selectedAthlete.payoutProfile?.interacEmail || selectedAthlete.email || selectedAthlete.parentEmail || "", beneficiaryType: selectedAthlete.payoutProfile?.beneficiaryType || "athlete", consent: Boolean(selectedAthlete.payoutProfile?.consent) });
     setSaved(false);
   }, [selectedAthlete]);
 
@@ -681,16 +681,17 @@ export default function AthleteDashboard({
   async function savePayoutProfile() {
     if (!selectedAthlete?.id) return;
     if (!payoutProfile.legalName.trim() || !payoutProfile.consent) { alert("Indiquez le nom légal du bénéficiaire et confirmez le consentement."); return; }
-    if (payoutProfile.method === "interac" && !payoutProfile.interacEmail.trim()) { alert("Indiquez l’adresse courriel utilisée pour le virement Interac."); return; }
+    if (!payoutProfile.wiseEmail.trim()) { alert("Indiquez l’adresse courriel que Wise utilisera pour sécuriser le versement."); return; }
     setSavingPayoutProfile(true);
     try {
       const safeProfile = {
-        method: payoutProfile.method,
+        method: "wise",
         legalName: payoutProfile.legalName.trim(),
-        interacEmail: payoutProfile.method === "interac" ? payoutProfile.interacEmail.trim().toLowerCase() : "",
+        wiseEmail: payoutProfile.wiseEmail.trim().toLowerCase(),
+        interacEmail: "",
         beneficiaryType: payoutProfile.beneficiaryType,
         consent: true,
-        directDepositStatus: payoutProfile.method === "direct_deposit" ? "secure_provider_required" : "not_applicable",
+        wiseRecipientStatus: "awaiting_invitation",
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(doc(db, "athletes", selectedAthlete.id), { payoutProfile: safeProfile, updatedAt: serverTimestamp() });
@@ -1349,16 +1350,15 @@ export default function AthleteDashboard({
                   <p className="mt-2 text-sm leading-6 text-zinc-600">Les fonds sont normalement versés 15 jours après la fin de la campagne, sous réserve des annulations, remboursements et vérifications nécessaires.</p>
                   <div className="mt-5 grid gap-4">
                     <label className="grid gap-2 text-sm font-black text-zinc-700">Athlète concerné<select value={selectedAthleteId} onChange={(event) => setSelectedAthleteId(event.target.value)} className="rounded-2xl border border-zinc-200 p-3">{athletes.map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}</option>)}</select></label>
-                    <label className="grid gap-2 text-sm font-black text-zinc-700">Méthode souhaitée<select value={payoutProfile.method} onChange={(event) => setPayoutProfile({ ...payoutProfile, method: event.target.value })} className="rounded-2xl border border-zinc-200 p-3"><option value="interac">Virement Interac</option><option value="direct_deposit">Dépôt direct sécurisé</option><option value="cheque">Chèque</option></select></label>
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><strong>Versement bancaire sécurisé par Wise</strong><br />KinkoLab prépare automatiquement un seul versement regroupant tout le solde admissible de votre campagne. Quinze jours après sa fin, Wise vous transmettra un lien sécurisé par courriel. Vous indiquerez vos coordonnées bancaires directement à Wise; KinkoLab ne les recevra jamais.</div>
                     <label className="grid gap-2 text-sm font-black text-zinc-700">Nom légal du bénéficiaire<input value={payoutProfile.legalName} onChange={(event) => setPayoutProfile({ ...payoutProfile, legalName: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /></label>
                     <label className="grid gap-2 text-sm font-black text-zinc-700">Bénéficiaire<select value={payoutProfile.beneficiaryType} onChange={(event) => setPayoutProfile({ ...payoutProfile, beneficiaryType: event.target.value })} className="rounded-2xl border border-zinc-200 p-3"><option value="athlete">Athlète majeur</option><option value="parent_guardian">Parent ou tuteur légal</option></select></label>
-                    {payoutProfile.method === "interac" && <label className="grid gap-2 text-sm font-black text-zinc-700">Courriel pour le virement Interac<input type="email" value={payoutProfile.interacEmail} onChange={(event) => setPayoutProfile({ ...payoutProfile, interacEmail: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /></label>}
-                    {payoutProfile.method === "direct_deposit" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><strong>Aucune coordonnée bancaire ne doit être inscrite ici.</strong> KinkoLab vous transmettra un lien sécurisé provenant d’un fournisseur de paiement spécialisé. Firebase ne conservera que l’état de vérification et un identifiant chiffré du bénéficiaire.</div>}
+                    <label className="grid gap-2 text-sm font-black text-zinc-700">Courriel du bénéficiaire pour Wise<input type="email" value={payoutProfile.wiseEmail} onChange={(event) => setPayoutProfile({ ...payoutProfile, wiseEmail: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /><span className="font-normal text-zinc-500">Le lien Wise expire après sept jours. Pour un mineur, utilisez le courriel du parent ou tuteur légal qui recevra les fonds.</span></label>
                     <label className="flex items-start gap-3 rounded-2xl bg-zinc-100 p-4 text-sm leading-6 text-zinc-700"><input type="checkbox" checked={payoutProfile.consent} onChange={(event) => setPayoutProfile({ ...payoutProfile, consent: event.target.checked })} className="mt-1" /><span>Je confirme que ces renseignements sont exacts et j’autorise KinkoLab à les utiliser uniquement pour effectuer et documenter les versements du Programme Athlètes.</span></label>
                     <button type="button" onClick={savePayoutProfile} disabled={savingPayoutProfile} className="rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-50">{savingPayoutProfile ? "Enregistrement…" : "Enregistrer les préférences"}</button>
                   </div>
                 </div>
-                <div className="rounded-[2rem] bg-zinc-950 p-6 text-white shadow-xl"><h2 className="text-xl font-black">Protection de vos renseignements</h2><ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-6 text-zinc-300"><li>KinkoLab ne demande jamais votre mot de passe bancaire.</li><li>Pour Interac, seules l’adresse de réception et l’identité du bénéficiaire sont conservées.</li><li>Les numéros de transit, d’institution et de compte ne seront jamais enregistrés directement dans Firebase.</li><li>Vous pouvez demander la rectification ou la suppression des renseignements lorsqu’ils ne sont plus nécessaires.</li></ul></div>
+                <div className="rounded-[2rem] bg-zinc-950 p-6 text-white shadow-xl"><h2 className="text-xl font-black">Protection de vos renseignements</h2><ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-6 text-zinc-300"><li>KinkoLab ne demande jamais votre mot de passe bancaire.</li><li>Vos coordonnées bancaires sont fournies directement à Wise dans son environnement sécurisé.</li><li>KinkoLab conserve uniquement votre nom légal, votre courriel de versement, le statut et la référence du transfert.</li><li>Le versement ne peut être libéré que par une approbation distincte dans le compte Wise Business de KinkoLab.</li><li>Vous pouvez demander la rectification de votre nom ou courriel avant la préparation du versement.</li></ul></div>
               </section>
             )}
 
