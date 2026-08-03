@@ -205,20 +205,29 @@ exports.handler = async function (event) {
       ...appSnap.data(),
     };
 
+    const minor = isMinor(application.birthDate);
+    const email = minor ? application.parentEmail : application.email;
+
     if (application.status === "accepté" && application.athleteId) {
+      if (!email) return { statusCode: 400, body: JSON.stringify({ error: "No email found on application" }) };
+      const accountSetupUrl = await admin.auth().generatePasswordResetLink(email);
+      await appRef.update({
+        accountSetupUrl,
+        "emailNotifications.application_accepted": admin.firestore.FieldValue.delete(),
+        accessLinkRenewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
       return {
         statusCode: 200,
         body: JSON.stringify({
           athleteId: application.athleteId,
           userId: application.userId,
-          email: application.email || application.parentEmail,
+          email,
           alreadyAccepted: true,
+          accessLinkRenewed: true,
         }),
       };
     }
-
-    const minor = isMinor(application.birthDate);
-    const email = minor ? application.parentEmail : application.email;
 
     if (minor && (!application.parentName || !application.parentEmail || !application.consents?.legalParent)) {
       return { statusCode: 400, body: JSON.stringify({ error: "A minor requires a verified parent or legal guardian account and consent" }) };

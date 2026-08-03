@@ -1223,14 +1223,26 @@ export default function AdminView({
         athleteId: data.athleteId,
         email: data.email,
       });
-      sendProgramNotification("application_accepted", application.id).catch((error) =>
-        alert(`Candidature acceptée, mais le courriel n’a pas été envoyé : ${error.message}`)
-      );
+      try {
+        await sendProgramNotification("application_accepted", application.id);
+      } catch (error) {
+        alert(`Candidature acceptée, mais le courriel n’a pas été envoyé : ${error.message}`);
+        return false;
+      }
+      return true;
     } catch (error) {
       alert(error.message || "Erreur lors de l’acceptation.");
+      return false;
     } finally {
       setActionLoadingId("");
     }
+  }
+
+  async function resendAthleteAccess(athlete) {
+    const application = applications.find((item) => item.id === athlete.sourceApplicationId);
+    if (!application) { alert("La candidature d’origine est introuvable. Vérifiez le dossier de l’athlète."); return; }
+    const sent = await acceptApplication(application);
+    if (sent) alert(`Un nouveau lien à usage unique a été envoyé à ${application.parentEmail || application.email}.`);
   }
 
   async function refuseApplication(application) {
@@ -2248,6 +2260,7 @@ export default function AdminView({
 
                     <div className="flex flex-wrap gap-2">
                       <AdminButton variant="light" onClick={() => onOpenAthlete(athlete.id)}><Eye size={16} /> Voir</AdminButton>
+                      <AdminButton variant="light" disabled={actionLoadingId === athlete.sourceApplicationId} onClick={() => resendAthleteAccess(athlete)}><Mail size={16} /> Renvoyer l’accès</AdminButton>
                       <AdminButton variant="amber" onClick={() => updateAthleteStatus(athlete, "suspendu")}><Ban size={16} /> Suspendre</AdminButton>
                       <AdminButton variant="green" onClick={() => updateAthleteStatus(athlete, "actif")}><RotateCcw size={16} /> Réactiver</AdminButton>
                       <AdminButton variant="light" onClick={() => updateAthleteStatus(athlete, "archivé")}><Archive size={16} /> Archiver</AdminButton>
