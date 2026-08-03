@@ -151,6 +151,7 @@ async function buildCampaignRows(campaign: any) {
       : await db.collection("families").doc(row.familyId).get();
     const data = beneficiary.data() || {};
     const payout = data.payoutProfile || {};
+    const ageKnown = !row.athleteId || Boolean(data.birthDate);
     const minor = Boolean(row.athleteId) && isMinor(data.birthDate);
     const requiredEmail = minor ? String(data.parentEmail || "").trim().toLowerCase() : String(payout.wiseEmail || payout.interacEmail || data.email || "").trim().toLowerCase();
     const validAuthority = !minor || (payout.beneficiaryType === "parent_guardian" && requiredEmail && requiredEmail === String(payout.wiseEmail || "").trim().toLowerCase() && String(payout.legalName || "").trim().toLowerCase() === String(data.parentName || "").trim().toLowerCase());
@@ -161,8 +162,8 @@ async function buildCampaignRows(campaign: any) {
       language: data.preferredLanguage || "fr",
       minor,
       beneficiaryAuthority: minor ? "parent_or_legal_guardian" : "adult_athlete",
-      ready: payout.method === "wise" && Boolean(payout.consent) && Boolean(requiredEmail) && validAuthority,
-      blockedReason: minor && !validAuthority ? "minor_parent_guardian_required" : payout.method === "wise" && payout.consent ? "missing_email" : "wise_consent_required",
+      ready: ageKnown && payout.method === "wise" && Boolean(payout.consent) && Boolean(requiredEmail) && validAuthority,
+      blockedReason: !ageKnown ? "age_verification_required" : minor && !validAuthority ? "minor_parent_guardian_required" : payout.method === "wise" && payout.consent ? "missing_email" : "wise_consent_required",
     });
   }
   return result;
