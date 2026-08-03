@@ -427,6 +427,7 @@ const phrases = {
   "Voir les résultats officiels": "View official results",
   "Voir dans le calendrier des compétitions KinkoLab": "View in the KinkoLab competition calendar",
   "Inscription officielle à la compétition": "Official competition registration",
+  "Le solde admissible est normalement versé 15 jours après la fin de la campagne, sous réserve des annulations, remboursements, vérifications et renseignements de versement complets.": "The eligible balance is normally paid 15 days after the campaign ends, subject to cancellations, refunds, verification and complete payout information.",
 };
 
 export default phrases;

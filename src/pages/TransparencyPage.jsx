@@ -23,7 +23,7 @@ const copy = {
       {
         number: "01",
         title: "Validation de la vente",
-        text: "Une vente est confirmée après un délai de 14 jours afin de tenir compte des fraudes potentielles, annulations, remboursements et problèmes de produit.",
+        text: "Chaque hoodie admissible attribue provisoirement 20 $ à l’athlète dès la confirmation du paiement. Le montant demeure ajustable en cas de fraude, d’annulation, de remboursement ou de contestation.",
       },
       {
         number: "02",
@@ -32,8 +32,8 @@ const copy = {
       },
       {
         number: "03",
-        title: "Versement périodique",
-        text: "KinkoLab verse les sommes accumulées selon la fréquence et les modalités prévues dans l’entente conclue avec l’athlète ou sa famille.",
+        title: "Versement après la campagne",
+        text: "Le solde admissible est normalement remis 15 jours après la fin de la campagne, sous réserve des vérifications et de la réception de renseignements de versement complets.",
       },
       {
         number: "04",
@@ -68,7 +68,7 @@ const copy = {
       {
         number: "01",
         title: "Sale validation",
-        text: "A sale is confirmed after 14 days to account for potential fraud, cancellations, refunds and product issues.",
+        text: "Each eligible hoodie provisionally allocates $20 to the athlete when payment is confirmed. The amount remains adjustable in the event of fraud, cancellation, refund or dispute.",
       },
       {
         number: "02",
@@ -77,8 +77,8 @@ const copy = {
       },
       {
         number: "03",
-        title: "Periodic payment",
-        text: "KinkoLab pays accumulated funds according to the schedule and terms set out in the agreement with the athlete or their family.",
+        title: "Payment after the campaign",
+        text: "The eligible balance is normally paid 15 days after the campaign ends, subject to verification and receipt of complete payment information.",
       },
       {
         number: "04",

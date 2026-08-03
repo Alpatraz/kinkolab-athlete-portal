@@ -6,6 +6,7 @@ import {
   BarChart3,
   CheckCircle2,
   DollarSign,
+  Download,
   ExternalLink,
   Eye,
   FolderKanban,
@@ -19,6 +20,7 @@ import {
   Palette,
   PencilLine,
   Plus,
+  Printer,
   RotateCcw,
   Save,
   Send,
@@ -40,6 +42,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  increment,
   onSnapshot,
   orderBy,
   query,
@@ -61,6 +64,7 @@ import {
 
 import StatCard from "../components/StatCard";
 import { DEFAULT_DISCIPLINES, normalizeDisciplines } from "../config/programOptions";
+import { exportExcelReport, printFinancialReport } from "../utils/financialReports";
 
 function slugify(value) {
   return String(value || "")
@@ -805,8 +809,40 @@ export default function AdminView({
     return Array.from(rows.values()).map((row) => ({
       ...row,
       balance: Math.max(row.reserved - row.paid, 0),
+      payoutMethod: (row.athleteId ? athletes.find((item) => item.id === row.athleteId) : families.find((item) => item.id === row.familyId))?.payoutProfile?.method || "",
+      payoutEmail: (row.athleteId ? athletes.find((item) => item.id === row.athleteId) : families.find((item) => item.id === row.familyId))?.payoutProfile?.interacEmail || "",
     }));
-  }, [contributions, payouts, allCampaigns]);
+  }, [contributions, payouts, allCampaigns, athletes, families]);
+
+  const adminContributionColumns = [
+    { label: "Date", value: contributionDate },
+    { label: "Commande", value: (item) => item.orderName || item.orderId || "—" },
+    { label: "Campagne", value: (item) => item.campaignTitle || participationCampaignName(item.campaignId) },
+    { label: "Athlète / famille", value: (item) => item.supportLabel || item.athleteName || item.familyName || "—" },
+    { label: "Produit", value: (item) => `${item.productTitle || item.productName || "—"}${item.variantTitle ? ` — ${item.variantTitle}` : ""}` },
+    { label: "Quantité", value: (item) => Number(item.quantity || 1), type: "Number" },
+    { label: "Part athlète", value: contributionAmount, type: "Number" },
+    { label: "Statut", value: (item) => item.status || "reserved" },
+    { label: "Date admissible au versement", value: (item) => item.eligiblePayoutDate ? String(item.eligiblePayoutDate).slice(0, 10) : "—" },
+  ];
+
+  const transferColumns = [
+    { label: "Bénéficiaire", value: "label" }, { label: "Type", value: "type" }, { label: "Campagne", value: "campaignTitle" },
+    { label: "Réservé", value: "reserved", type: "Number" }, { label: "Déjà versé", value: "paid", type: "Number" }, { label: "À verser", value: "balance", type: "Number" },
+    { label: "Méthode", value: (item) => item.payoutMethod || "À confirmer" }, { label: "Courriel Interac", value: (item) => item.payoutEmail || "" },
+  ];
+
+  function exportAdminFinancialReport() {
+    exportExcelReport({ title: "Rapport financier — Programme Athlètes KinkoLab", columns: adminContributionColumns, rows: contributions, fileName: `rapport-financier-kinkolab-${new Date().toISOString().slice(0, 10)}.xls` });
+  }
+
+  function exportTransferList() {
+    exportExcelReport({ title: "Liste des virements à effectuer", columns: transferColumns, rows: financeRows.filter((item) => item.balance > 0), fileName: `virements-athletes-${new Date().toISOString().slice(0, 10)}.xls` });
+  }
+
+  function printAdminFinancialReport() {
+    printFinancialReport({ title: "Rapport financier — Programme Athlètes KinkoLab", subtitle: "Contributions Shopify, annulations, remboursements et versements", columns: adminContributionColumns, rows: contributions, summary: [{ label: "Contributions actives", value: money(financialSummary.reserved) }, { label: "Versé", value: money(financialSummary.paid) }, { label: "Solde", value: money(financialSummary.balance) }] });
+  }
 
   const statistics = useMemo(() => {
     const toDate = (value) => {
@@ -1556,6 +1592,11 @@ export default function AdminView({
     if (!confirmed) return;
 
     try {
+      const wasActive = isFinanciallyActive(contribution);
+      const willBeActive = !["cancelled", "refunded"].includes(status);
+      const balanceDelta = wasActive === willBeActive
+        ? 0
+        : (willBeActive ? 1 : -1) * contributionAmount(contribution);
       const payload = {
         status,
         statusUpdatedAt: serverTimestamp(),
@@ -1578,6 +1619,24 @@ export default function AdminView({
       }
 
       await updateDoc(doc(db, "contributions", contribution.id), payload);
+
+      if (balanceDelta !== 0) {
+        const linkedParticipation = participations.find((participation) => {
+          if (participation.campaignId !== contribution.campaignId) return false;
+          if (contribution.fundingMode === "family") {
+            return participation.familyId === contribution.familyId
+              || participation.fundingGroupId === contribution.fundingGroupId;
+          }
+          return participation.athleteId === contribution.athleteId;
+        });
+
+        if (linkedParticipation?.id) {
+          await updateDoc(doc(db, "campaignParticipations", linkedParticipation.id), {
+            raisedShop: increment(balanceDelta),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
 
       if (contribution.orderId && contribution.lineItemId) {
         const transactionsSnapshot = await getDocs(
@@ -2447,6 +2506,12 @@ export default function AdminView({
               <p className="mt-2 text-sm text-zinc-500">
                 Suivi des montants réservés automatiquement depuis Shopify et des versements réellement effectués aux athlètes ou familles.
               </p>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <AdminButton variant="light" onClick={exportAdminFinancialReport}><Download size={16} /> Exporter Excel</AdminButton>
+                <AdminButton variant="light" onClick={printAdminFinancialReport}><Printer size={16} /> Imprimer / PDF</AdminButton>
+                <AdminButton variant="amber" onClick={exportTransferList}><Download size={16} /> Liste des virements</AdminButton>
+              </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-6">
                 <StatCard light icon={DollarSign} label="Actif" value={money(financialSummary.reserved)} sub="Contributions actives" />

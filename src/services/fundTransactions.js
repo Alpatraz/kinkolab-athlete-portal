@@ -16,7 +16,9 @@ export function transactionTotal(transactions = []) {
 }
 
 export function contributionTotal(contributions = []) {
-  return contributions.reduce(
+  return contributions
+    .filter((contribution) => !["cancelled", "annulé", "annule", "refunded", "remboursé", "rembourse"].includes(String(contribution?.status || "reserved").toLowerCase()))
+    .reduce(
     (sum, contribution) =>
       sum + Number(contribution.amountReserved || contribution.reservedAmount || 0),
     0

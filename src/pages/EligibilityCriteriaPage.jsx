@@ -250,7 +250,7 @@ export default function EligibilityCriteriaPage({ goBack, openSignup }) {
                   KinkoLab administre les fonds recueillis dans le cadre du
                   programme.
                 </li>
-                <li>Les fonds peuvent être versés en un ou plusieurs paiements.</li>
+                <li>Le solde admissible est normalement versé 15 jours après la fin de la campagne, sous réserve des annulations, remboursements, vérifications et renseignements de versement complets.</li>
                 <li>
                   KinkoLab peut demander des justificatifs liés aux dépenses
                   sportives admissibles.

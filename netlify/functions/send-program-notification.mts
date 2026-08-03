@@ -31,6 +31,11 @@ const DEFAULT_TEMPLATES: Record<string, any> = {
     fr: { subject: "Vos fonds KinkoLab ont été versés", title: "Versement enregistré", body: "Bonjour {{name}},\n\nUn versement de {{amount}} a été enregistré pour {{campaign}}.\n\nCommuniquez avec nous pour toute question concernant ce versement.", buttonLabel: "", buttonUrl: "" },
     en: { subject: "Your KinkoLab funds have been paid", title: "Payment recorded", body: "Hello {{name}},\n\nA payment of {{amount}} has been recorded for {{campaign}}.\n\nContact us if you have any questions about this payment.", buttonLabel: "", buttonUrl: "" },
   },
+  supporter_funds_paid: {
+    key: "supporter_funds_paid", name: "Fonds remis — supporteur", trigger: "Quand un versement est enregistré pour l’athlète soutenu", enabled: true,
+    fr: { subject: "Les fonds de {{campaign}} ont été remis", title: "Votre soutien a été remis à l’athlète", body: "Bonjour {{name}},\n\nNous vous confirmons que les fonds associés à votre achat supporter pour {{campaign}} ont été remis à {{athlete}}.\n\nMerci d’avoir contribué concrètement à son projet sportif.", buttonLabel: "Voir le Programme Athlètes", buttonUrl: `${SITE_URL}/campaigns` },
+    en: { subject: "The funds for {{campaign}} have been paid", title: "Your support has been paid to the athlete", body: "Hello {{name}},\n\nWe confirm that the funds associated with your supporter purchase for {{campaign}} have been paid to {{athlete}}.\n\nThank you for making a tangible contribution to their athletic project.", buttonLabel: "View the Athlete Program", buttonUrl: `${SITE_URL}/campaigns` },
+  },
 };
 
 function getAdminApp() {
@@ -180,7 +185,33 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
   const resendId = await sendEmail(recipient, rendered);
   await recordRef.update({ [`emailNotifications.${type}`]: admin.firestore.FieldValue.serverTimestamp() });
   await logEmail({ type, recordId, recipient, language, resendId, status: "sent", test: false });
-  return Response.json({ sent: true, resendId });
+  let supporterNotifications = 0;
+  if (type === "payout_paid") {
+    const payout = (await recordRef.get()).data() || {};
+    const contributionDocs = payout.campaignId
+      ? (await db.collection("contributions").where("campaignId", "==", payout.campaignId).get()).docs
+      : [];
+    const relevant = contributionDocs
+      .map((item) => item.data())
+      .filter((item) => !["cancelled", "refunded"].includes(String(item.status || "reserved").toLowerCase()))
+      .filter((item) => payout.athleteId ? item.athleteId === payout.athleteId : payout.familyId ? item.familyId === payout.familyId : false);
+    const recipients = new Map<string, any>();
+    relevant.forEach((item) => {
+      if (item.customerEmail) recipients.set(String(item.customerEmail).toLowerCase(), item);
+    });
+    const supporterTemplate = await getTemplate("supporter_funds_paid");
+    if (supporterTemplate?.enabled !== false) {
+      for (const [supporterEmail, contribution] of recipients) {
+        const supporterLanguage = contribution.customerLanguage || "fr";
+        const supporterVariables = { name: contribution.customerName || "supporteur", campaign: payout.campaignTitle || contribution.campaignTitle || "campagne KinkoLab", athlete: payout.beneficiaryLabel || contribution.athleteName || contribution.familyName || "l’athlète", amount: "", loginUrl: `${SITE_URL}/login`, accountSetupUrl: `${SITE_URL}/login` };
+        const supporterRendered = renderTemplate(supporterTemplate, supporterLanguage, supporterVariables);
+        const supporterResendId = await sendEmail(supporterEmail, supporterRendered);
+        await logEmail({ type: "supporter_funds_paid", recordId, recipient: supporterEmail, language: supporterLanguage, resendId: supporterResendId, status: "sent", test: false });
+        supporterNotifications += 1;
+      }
+    }
+  }
+  return Response.json({ sent: true, resendId, supporterNotifications });
 }
 
 export default async (req: Request) => {
