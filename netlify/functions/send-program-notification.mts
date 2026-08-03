@@ -18,8 +18,8 @@ const DEFAULT_TEMPLATES: Record<string, any> = {
   },
   application_accepted: {
     key: "application_accepted", name: "Candidature acceptée", trigger: "Quand un administrateur accepte une candidature", enabled: true,
-    fr: { subject: "Votre candidature KinkoLab est acceptée", title: "Bienvenue dans le Programme Athlètes", body: "Bonjour {{name}},\n\nVotre candidature pour {{campaign}} a été acceptée. Votre accès athlète a été créé. Utilisez le bouton ci-dessous pour choisir votre mot de passe.", buttonLabel: "Créer mon mot de passe", buttonUrl: "{{accountSetupUrl}}" },
-    en: { subject: "Your KinkoLab application has been accepted", title: "Welcome to the Athlete Program", body: "Hello {{name}},\n\nYour application for {{campaign}} has been accepted. Your athlete access has been created. Use the button below to choose your password.", buttonLabel: "Create my password", buttonUrl: "{{accountSetupUrl}}" },
+    fr: { subject: "Votre candidature KinkoLab est acceptée", title: "Bienvenue dans le Programme Athlètes", body: "Bonjour {{name}},\n\nVotre candidature pour {{campaign}} a été acceptée. Votre accès athlète a été créé.\n\nVotre identifiant de connexion est l’adresse courriel suivante : {{email}}\n\nUtilisez le bouton ci-dessous pour créer votre mot de passe. Vous pourrez ensuite vous connecter sur athletes.kinkolab.com/login avec cette adresse courriel et votre nouveau mot de passe.", buttonLabel: "Créer mon mot de passe", buttonUrl: "{{accountSetupUrl}}" },
+    en: { subject: "Your KinkoLab application has been accepted", title: "Welcome to the Athlete Program", body: "Hello {{name}},\n\nYour application for {{campaign}} has been accepted. Your athlete access has been created.\n\nYour login ID is the following email address: {{email}}\n\nUse the button below to create your password. You can then sign in at athletes.kinkolab.com/login using this email address and your new password.", buttonLabel: "Create my password", buttonUrl: "{{accountSetupUrl}}" },
   },
   application_refused: {
     key: "application_refused", name: "Candidature refusée", trigger: "Quand un administrateur refuse une candidature", enabled: true,
@@ -155,7 +155,7 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
     const application = snapshot.data();
     recipient = application?.parentEmail || application?.email || "";
     language = application?.preferredLanguage || "fr";
-    variables = { name: application?.athleteName || `${application?.firstName || ""} ${application?.lastName || ""}`.trim(), campaign: application?.campaignTitle || "Programme Athlètes KinkoLab", amount: "", loginUrl: `${SITE_URL}/login`, accountSetupUrl: application?.accountSetupUrl || `${SITE_URL}/login` };
+    variables = { name: application?.athleteName || `${application?.firstName || ""} ${application?.lastName || ""}`.trim(), email: recipient, campaign: application?.campaignTitle || "Programme Athlètes KinkoLab", amount: "", loginUrl: `${SITE_URL}/login`, accountSetupUrl: application?.accountSetupUrl || `${SITE_URL}/login` };
     communicationConsent = application?.communicationConsent || null;
   } else if (type === "payout_paid") {
     recordRef = db.collection("payouts").doc(recordId);
@@ -186,6 +186,11 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
   if (type === "application_accepted" && variables.accountSetupUrl) {
     rendered.buttonUrl = variables.accountSetupUrl;
     rendered.buttonLabel = language === "en" ? "Create my password" : "Créer mon mot de passe";
+    if (!rendered.body.includes(recipient)) {
+      rendered.body += language === "en"
+        ? `\n\nYour login ID is your email address: ${recipient}\n\nAfter creating your password, sign in at ${SITE_URL}/login.`
+        : `\n\nVotre identifiant de connexion est votre adresse courriel : ${recipient}\n\nAprès avoir créé votre mot de passe, connectez-vous sur ${SITE_URL}/login.`;
+    }
   }
   const preferenceToken = optional ? communicationConsent?.emailPreferenceToken : "";
   if (optional && !preferenceToken) return Response.json({ sent: false, skipped: "email_preference_token_required" });
