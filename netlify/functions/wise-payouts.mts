@@ -24,6 +24,10 @@ function token() {
   return value;
 }
 
+function approvalRuleConfirmed() {
+  return Netlify.env.get("WISE_APPROVAL_RULE_CONFIRMED") === "true";
+}
+
 async function wise(path: string, options: RequestInit = {}) {
   const response = await fetch(`${baseUrl()}${path}`, {
     ...options,
@@ -41,6 +45,7 @@ async function wise(path: string, options: RequestInit = {}) {
     const error: any = new Error(data?.message || data?.error || `Wise API ${response.status}`);
     error.status = response.status;
     error.details = data;
+    error.wiseHeaders = Object.fromEntries(response.headers.entries());
     throw error;
   }
   return data;
@@ -172,9 +177,12 @@ async function createWiseBatch(campaign: any, rows: any[], actor = "scheduler") 
     return { ...base, status: "blocked" };
   }
   await batchRef.set({ ...base, status: "creating" }, { merge: true });
+  let draft: any = null;
   try {
     const profile = await profileId();
     const group = await wise(`/v3/profiles/${profile}/batch-groups`, { method: "POST", body: JSON.stringify({ sourceCurrency: "CAD", name: `KinkoLab — ${base.campaignTitle}` }) });
+    const batchGroupId = group.id || group.batchGroupId;
+    if (!batchGroupId) throw new Error("Wise did not return a batch group identifier");
     const transfers = [];
     for (const row of readyRows) {
       const quote = await wise(`/v3/profiles/${profile}/quotes`, { method: "POST", body: JSON.stringify({ sourceCurrency: "CAD", targetCurrency: "CAD", sourceAmount: row.amount, targetAmount: null, payOut: "BANK_TRANSFER", preferredPayIn: "BALANCE" }) });
@@ -182,15 +190,55 @@ async function createWiseBatch(campaign: any, rows: any[], actor = "scheduler") 
       const emailEnabled = Array.isArray(requirements) && requirements.some((item: any) => item.type === "email");
       if (!emailEnabled) throw new Error("Wise has not enabled email recipients for this CAD route. Contact Wise support before production use.");
       const recipient = await wise("/v1/accounts", { method: "POST", body: JSON.stringify({ currency: "CAD", type: "email", profile, ownedByCustomer: false, accountHolderName: row.legalName, details: { legalType: "PRIVATE", email: row.email } }) });
-      const transfer = await wise(`/v3/profiles/${profile}/batch-groups/${group.id}/transfers`, { method: "POST", body: JSON.stringify({ targetAccount: recipient.id || recipient.accountId, quoteUuid: quote.id, customerTransactionId: crypto.randomUUID(), details: { reference: `KINKO-${campaign.id}` } }) });
+      const transfer = await wise(`/v3/profiles/${profile}/batch-groups/${batchGroupId}/transfers`, { method: "POST", body: JSON.stringify({ targetAccount: recipient.id || recipient.accountId, quoteUuid: quote.id, customerTransactionId: crypto.randomUUID(), details: { reference: `KINKO-${campaign.id}` } }) });
       transfers.push({ ...row, quoteId: quote.id, wiseRecipientId: recipient.id || recipient.accountId, wiseTransferId: transfer.id, status: transfer.status || "incoming_payment_waiting" });
     }
-    await batchRef.set({ ...base, profileId: profile, wiseBatchGroupId: group.id, transfers, status: "awaiting_wise_approval", error: null, createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    return { ...base, wiseBatchGroupId: group.id, transfers, status: "awaiting_wise_approval" };
+    draft = { ...base, profileId: profile, wiseBatchGroupId: batchGroupId, wiseBatchVersion: group.version, transfers, status: "closing_batch", error: null, createdAt: admin.firestore.FieldValue.serverTimestamp() };
+    await batchRef.set(draft, { merge: true });
+    const completedGroup = await wise(`/v3/profiles/${profile}/batch-groups/${batchGroupId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "COMPLETED", version: group.version }),
+    });
+    await batchRef.set({ wiseBatchStatus: completedGroup.status || "COMPLETED", wiseBatchVersion: completedGroup.version || group.version, status: "submitting_for_approval", updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    if (!approvalRuleConfirmed()) {
+      const status = "funding_configuration_required";
+      const error = "Set WISE_APPROVAL_RULE_CONFIRMED=true only after every payment created by the API token owner requires approval by another Wise team member.";
+      await batchRef.set({ status, error, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return { ...draft, status, error };
+    }
+    const funding = await wise(`/v3/profiles/${profile}/batch-payments/${batchGroupId}/payments`, {
+      method: "POST",
+      body: JSON.stringify({ type: "BALANCE" }),
+    });
+    const fundingStatus = String(funding.status || "PENDING").toUpperCase();
+    const status = fundingStatus === "COMPLETED" ? "processing" : "awaiting_wise_approval";
+    await batchRef.set({ fundingResponse: funding, fundingStatus, fundingRequestedAt: admin.firestore.FieldValue.serverTimestamp(), status, error: null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    return { ...draft, fundingStatus, status };
   } catch (error: any) {
-    await batchRef.set({ ...base, status: "failed", error: error.message, wiseError: error.details || null }, { merge: true });
+    await batchRef.set({ ...base, ...(draft || {}), status: draft ? "funding_failed" : "failed", error: error.message, wiseError: error.details || null, wiseErrorStatus: error.status || null, wiseErrorHeaders: error.wiseHeaders || null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     throw error;
   }
+}
+
+async function retryBatchFunding(campaignId: string) {
+  const ref = admin.firestore().collection("wisePayoutBatches").doc(campaignId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new Error("Wise batch not found");
+  const batch = snapshot.data() || {};
+  if (!batch.profileId || !batch.wiseBatchGroupId) throw new Error("Wise batch is incomplete and cannot be funded");
+  if (!approvalRuleConfirmed()) throw new Error("WISE_APPROVAL_RULE_CONFIRMED must be true after the Wise approval rule has been verified");
+  let completedGroup: any = null;
+  if (batch.wiseBatchStatus !== "COMPLETED") {
+    completedGroup = await wise(`/v3/profiles/${batch.profileId}/batch-groups/${batch.wiseBatchGroupId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "COMPLETED", version: batch.wiseBatchVersion }),
+    });
+  }
+  const funding = await wise(`/v3/profiles/${batch.profileId}/batch-payments/${batch.wiseBatchGroupId}/payments`, { method: "POST", body: JSON.stringify({ type: "BALANCE" }) });
+  const fundingStatus = String(funding.status || "PENDING").toUpperCase();
+  const status = fundingStatus === "COMPLETED" ? "processing" : "awaiting_wise_approval";
+  await ref.set({ wiseBatchStatus: completedGroup?.status || batch.wiseBatchStatus || "COMPLETED", wiseBatchVersion: completedGroup?.version || batch.wiseBatchVersion, fundingResponse: funding, fundingStatus, fundingRequestedAt: admin.firestore.FieldValue.serverTimestamp(), status, error: null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  return { campaignId, fundingStatus, status };
 }
 
 async function prepareEligible(actor = "scheduler", onlyCampaignId = "") {
@@ -258,10 +306,11 @@ export default async (req: Request) => {
     const adminUser = await requireAdmin(req);
     if (req.method === "GET") {
       const batches = (await admin.firestore().collection("wisePayoutBatches").orderBy("updatedAt", "desc").get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      return Response.json({ configured: Boolean(Netlify.env.get("WISE_API_TOKEN")), environment: Netlify.env.get("WISE_ENVIRONMENT") || "production", batches });
+      return Response.json({ configured: Boolean(Netlify.env.get("WISE_API_TOKEN")), approvalRuleConfirmed: approvalRuleConfirmed(), environment: Netlify.env.get("WISE_ENVIRONMENT") || "production", batches });
     }
     const body = await req.json();
     if (body.action === "prepare_eligible") return Response.json({ results: await prepareEligible(adminUser.uid, body.campaignId || "") });
+    if (body.action === "retry_funding") return Response.json({ result: await retryBatchFunding(body.campaignId || "") });
     if (body.action === "sync") return Response.json({ results: await syncBatches() });
     if (body.action === "setup_webhook") return Response.json({ subscription: await setupWebhook() });
     return Response.json({ error: "Unsupported action" }, { status: 400 });
