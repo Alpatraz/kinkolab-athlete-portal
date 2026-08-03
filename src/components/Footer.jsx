@@ -35,6 +35,7 @@ export default function Footer({
               <li><button onClick={openAthletes} className="hover:text-white">Athlètes</button></li>
               <li><button onClick={openCampaigns} className="hover:text-white">Campagnes</button></li>
               <li><button onClick={openSignup} className="hover:text-white">Inscription</button></li>
+              <li><a href="https://kinkolab.com" className="hover:text-white">Site principal KinkoLab</a></li>
             </ul>
           </div>
 

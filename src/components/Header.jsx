@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogIn, Menu, X } from "lucide-react";
+import { ExternalLink, LogIn, Menu, X } from "lucide-react";
 import { gold } from "../utils/format";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -55,6 +55,10 @@ export default function Header({
           <button onClick={openCampaigns} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
             {t("nav.campaigns")}
           </button>
+
+          <a href="https://kinkolab.com" className="inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
+            KinkoLab.com <ExternalLink size={14} aria-hidden="true" />
+          </a>
 
           {currentUser && (
             <button onClick={openDashboard} className="rounded-2xl px-4 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900 hover:text-white">
@@ -150,6 +154,13 @@ export default function Header({
       >
         {t("nav.campaigns")}
       </button>
+
+      <a
+        href="https://kinkolab.com"
+        className="flex w-full items-center justify-between rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+      >
+        KinkoLab.com <ExternalLink size={20} aria-hidden="true" />
+      </a>
 
       {currentUser && (
         <button
