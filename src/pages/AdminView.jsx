@@ -497,9 +497,9 @@ export default function AdminView({
   useEffect(() => {
     const nativeAlert = window.alert;
     window.alert = (message) => setAdminNotice({
-      title: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden/i.test(String(message)) ? "Action impossible" : "Confirmation",
+      title: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden|not allowlisted|not allowed|refusé|failed/i.test(String(message)) ? "Action impossible" : "Confirmation",
       message: String(message || ""),
-      tone: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden/i.test(String(message)) ? "error" : "success",
+      tone: /erreur|impossible|expir|obligatoire|introuvable|unauthorized|forbidden|not allowlisted|not allowed|refusé|failed/i.test(String(message)) ? "error" : "success",
     });
     return () => { window.alert = nativeAlert; };
   }, []);

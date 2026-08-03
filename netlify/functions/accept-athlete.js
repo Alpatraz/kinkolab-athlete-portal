@@ -261,9 +261,9 @@ exports.handler = async function (event) {
     }
 
     const athlete = buildAthlete(application, userRecord.uid, familyId);
-    const accountSetupUrl = await admin.auth().generatePasswordResetLink(email, {
-      url: "https://athletes.kinkolab.com/login",
-    });
+    // Use Firebase's hosted action handler. A custom continue URL would require
+    // athletes.kinkolab.com to be allowlisted separately in Firebase Auth.
+    const accountSetupUrl = await admin.auth().generatePasswordResetLink(email);
 
     await db.collection("athletes").doc(athlete.id).set(athlete, { merge: true });
 
