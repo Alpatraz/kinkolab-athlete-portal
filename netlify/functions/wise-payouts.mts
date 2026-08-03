@@ -71,6 +71,15 @@ function activeContribution(item: any) {
   return !["cancelled", "refunded", "annulé", "remboursé"].includes(String(item.status || "reserved").toLowerCase());
 }
 
+function isMinor(birthDate: any) {
+  const date = dateValue(birthDate);
+  if (!date) return false;
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  if (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate())) age -= 1;
+  return age < 18;
+}
+
 async function profileId() {
   const configured = Netlify.env.get("WISE_PROFILE_ID");
   if (configured) return Number(configured);
@@ -90,6 +99,7 @@ async function sendPayoutEmails(batch: any, item: any, payoutId: string) {
     ? await db.collection("athletes").doc(item.athleteId).get()
     : await db.collection("families").doc(item.familyId).get();
   const data = beneficiary.data() || {};
+  const retentionUntil = new Date(Date.UTC(new Date().getUTCFullYear() + 7, 0, 1)).toISOString();
   const recipient = item.email || data.parentEmail || data.email;
   const english = (item.language || data.preferredLanguage) === "en";
   const amount = new Intl.NumberFormat(english ? "en-CA" : "fr-CA", { style: "currency", currency: "CAD" }).format(item.amount);
@@ -100,6 +110,7 @@ async function sendPayoutEmails(batch: any, item: any, payoutId: string) {
     await db.collection("emailLogs").add({ type: "payout_paid", recordId: payoutId, recipient: to, resendId: result.id, status: "sent", createdAt: admin.firestore.FieldValue.serverTimestamp() });
   };
   if (recipient) await send(recipient, english ? `Your KinkoLab funds have been paid — ${batch.campaignTitle}` : `Vos fonds KinkoLab ont été versés — ${batch.campaignTitle}`, english ? "Wise payment completed" : "Versement Wise effectué", english ? `Hello ${item.legalName},\n\nWise has completed your ${amount} payment for ${batch.campaignTitle}. The transfer reference is ${item.wiseTransferId}.` : `Bonjour ${item.legalName},\n\nWise a effectué votre versement de ${amount} pour ${batch.campaignTitle}. La référence du transfert est ${item.wiseTransferId}.`);
+  await beneficiary.ref.update({ "payoutProfile.payoutDataRetentionUntil": retentionUntil, "payoutProfile.lastPaidAt": new Date().toISOString(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
   const contributions = (await db.collection("contributions").where("campaignId", "==", batch.campaignId).get()).docs.map((doc) => doc.data()).filter((entry) => item.athleteId ? entry.athleteId === item.athleteId : entry.familyId === item.familyId).filter(activeContribution);
   const supporters = new Map<string, any>();
   contributions.forEach((entry) => { if (entry.customerEmail) supporters.set(String(entry.customerEmail).toLowerCase(), entry); });
@@ -140,13 +151,18 @@ async function buildCampaignRows(campaign: any) {
       : await db.collection("families").doc(row.familyId).get();
     const data = beneficiary.data() || {};
     const payout = data.payoutProfile || {};
+    const minor = Boolean(row.athleteId) && isMinor(data.birthDate);
+    const requiredEmail = minor ? String(data.parentEmail || "").trim().toLowerCase() : String(payout.wiseEmail || payout.interacEmail || data.email || "").trim().toLowerCase();
+    const validAuthority = !minor || (payout.beneficiaryType === "parent_guardian" && requiredEmail && requiredEmail === String(payout.wiseEmail || "").trim().toLowerCase() && String(payout.legalName || "").trim().toLowerCase() === String(data.parentName || "").trim().toLowerCase());
     result.push({
       ...row,
-      legalName: payout.legalName || row.beneficiaryLabel,
-      email: String(payout.wiseEmail || payout.interacEmail || data.parentEmail || data.email || "").trim().toLowerCase(),
+      legalName: minor ? data.parentName || "" : payout.legalName || row.beneficiaryLabel,
+      email: requiredEmail,
       language: data.preferredLanguage || "fr",
-      ready: payout.method === "wise" && Boolean(payout.consent) && Boolean(payout.wiseEmail || payout.interacEmail),
-      blockedReason: payout.method === "wise" && payout.consent ? "missing_email" : "wise_consent_required",
+      minor,
+      beneficiaryAuthority: minor ? "parent_or_legal_guardian" : "adult_athlete",
+      ready: payout.method === "wise" && Boolean(payout.consent) && Boolean(requiredEmail) && validAuthority,
+      blockedReason: minor && !validAuthority ? "minor_parent_guardian_required" : payout.method === "wise" && payout.consent ? "missing_email" : "wise_consent_required",
     });
   }
   return result;
@@ -270,12 +286,13 @@ async function syncBatches() {
       if (remote.status === "outgoing_payment_sent") {
         const payoutId = `wise-${item.wiseTransferId}`;
         const payoutRef = db.collection("payouts").doc(payoutId);
+        const retentionUntil = new Date(Date.UTC(new Date().getUTCFullYear() + 7, 0, 1)).toISOString();
         if (!(await payoutRef.get()).exists) await payoutRef.set({
           targetKey: item.targetKey, athleteId: item.athleteId || null, familyId: item.familyId || null,
-          beneficiaryLabel: item.beneficiaryLabel, beneficiaryType: item.familyId ? "Famille" : "Athlète",
+          beneficiaryLabel: item.beneficiaryLabel, beneficiaryType: item.minor ? "Parent ou tuteur légal" : item.familyId ? "Famille" : "Athlète majeur",
           campaignId: batch.campaignId, campaignTitle: batch.campaignTitle, amount: item.amount,
           method: "wise", status: "paid", wiseTransferId: item.wiseTransferId, wiseBatchGroupId: batch.wiseBatchGroupId,
-          date: new Date().toISOString().slice(0, 10), createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          date: new Date().toISOString().slice(0, 10), retentionUntil, createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         await sendPayoutEmails(batch, item, payoutId);
       }

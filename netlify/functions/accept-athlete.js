@@ -36,6 +36,16 @@ function generateTemporaryPassword() {
   )}`;
 }
 
+function isMinor(birthDate) {
+  if (!birthDate) return false;
+  const birth = new Date(`${String(birthDate).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(birth.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age -= 1;
+  return age < 18;
+}
+
 function buildFamilyId(application) {
   const familyName =
     application.familyName ||
@@ -63,6 +73,7 @@ function buildAthlete(application, uid, familyId) {
     firstName: application.firstName || "",
     lastName: application.lastName || "",
     gender: application.gender || "",
+    birthDate: application.birthDate || "",
     isParaAthlete: application.isParaAthlete || "non",
     paraClassification: application.paraClassification || "",
 
@@ -164,6 +175,11 @@ exports.handler = async function (event) {
     }
 
     const body = JSON.parse(event.body || "{}");
+    const token = String(event.headers?.authorization || event.headers?.Authorization || "").replace(/^Bearer\s+/i, "");
+    if (!token) return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
+    const decoded = await admin.auth().verifyIdToken(token);
+    const adminUser = await admin.firestore().collection("users").doc(decoded.uid).get();
+    if (!adminUser.exists || adminUser.data()?.role !== "admin") return { statusCode: 403, body: JSON.stringify({ error: "Forbidden" }) };
     const { applicationId } = body;
 
     if (!applicationId) {
@@ -201,7 +217,12 @@ exports.handler = async function (event) {
       };
     }
 
-    const email = application.parentEmail || application.email;
+    const minor = isMinor(application.birthDate);
+    const email = minor ? application.parentEmail : application.email;
+
+    if (minor && (!application.parentName || !application.parentEmail || !application.consents?.legalParent)) {
+      return { statusCode: 400, body: JSON.stringify({ error: "A minor requires a verified parent or legal guardian account and consent" }) };
+    }
 
     if (!email) {
       return {
@@ -267,6 +288,7 @@ exports.handler = async function (event) {
         uid: userRecord.uid,
         email,
         name: application.parentName || athlete.name,
+        accountHolderType: minor ? "parent_guardian" : "adult_athlete",
         role: "athlete",
         preferredLanguage: application.preferredLanguage || "fr",
         athleteId: athlete.id,

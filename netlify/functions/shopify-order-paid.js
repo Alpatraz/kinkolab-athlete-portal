@@ -88,6 +88,25 @@ async function processPaid(db, order) {
   const orderId = String(order.id || "");
   if (!orderId) throw new Error("Missing order id");
   if (!["paid", "partially_paid"].includes(order.financial_status || "")) return { ignored: true };
+  const customerEmail = String(order.email || order.contact_email || "").trim().toLowerCase();
+  if (customerEmail) {
+    const preferenceId = crypto.createHash("sha256").update(customerEmail).digest("hex");
+    const preferenceRef = db.collection("emailPreferences").doc(preferenceId);
+    const previous = await preferenceRef.get();
+    const marketing = order.buyer_accepts_marketing === true || order.email_marketing_consent?.state === "subscribed";
+    const token = previous.data()?.token || crypto.randomUUID();
+    await preferenceRef.set({
+      emailHash: preferenceId,
+      email: marketing ? customerEmail : admin.firestore.FieldValue.delete(),
+      marketing,
+      operational: true,
+      status: marketing ? "subscribed" : "not_subscribed",
+      source: "shopify_checkout",
+      token,
+      consentRecordedAt: marketing ? admin.firestore.FieldValue.serverTimestamp() : previous.data()?.consentRecordedAt || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
   const supportedLines = [];
 
   for (const item of order.line_items || []) {

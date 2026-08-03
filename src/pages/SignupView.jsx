@@ -297,6 +297,7 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
     setSubmitting(true);
 
     try {
+      const emailPreferenceToken = crypto.randomUUID();
       const applicationRef = await addDoc(collection(db, "applications"), {
         type,
         status: "en_attente",
@@ -312,7 +313,9 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
         communicationConsent: {
           operational: true,
           marketing: Boolean(consents.marketingCommunications),
-          policyVersion: "2026-08-01",
+          policyVersion: "2026-08-03",
+          source: "athlete_application",
+          emailPreferenceToken,
           recordedAt: new Date().toISOString(),
         },
         preferredLanguage: language,

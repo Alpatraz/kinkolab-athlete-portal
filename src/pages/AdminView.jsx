@@ -1191,9 +1191,11 @@ export default function AdminView({
     setAcceptedAccess(null);
 
     try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Session administrateur expirée.");
       const response = await fetch("/.netlify/functions/accept-athlete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ applicationId: application.id }),
       });
 

@@ -33,6 +33,17 @@ import { campaignTitle, gold, money } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import { contributionTotal } from "../services/fundTransactions";
 import { uploadAthleteMedia } from "../services/mediaUpload";
+
+function minorFromBirthDate(value) {
+  if (!value) return false;
+  const birthDate = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(birthDate.getTime()) || birthDate > new Date()) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const birthdayPassed = today.getMonth() > birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+  if (!birthdayPassed) age -= 1;
+  return age < 18;
+}
 import { bilingualPayload, localizedField } from "../utils/localizedContent";
 import { DEFAULT_DISCIPLINES, PROGRAM_ROLES, normalizeDisciplines } from "../config/programOptions";
 import { exportExcelReport, printFinancialReport } from "../utils/financialReports";
@@ -434,7 +445,8 @@ export default function AthleteDashboard({
       photoUrl: selectedAthlete.photoUrl || "",
       athleteSocials: selectedAthlete.athleteSocials || "",
     });
-    setPayoutProfile({ method: "wise", legalName: selectedAthlete.payoutProfile?.legalName || selectedAthlete.name || "", wiseEmail: selectedAthlete.payoutProfile?.wiseEmail || selectedAthlete.payoutProfile?.interacEmail || selectedAthlete.email || selectedAthlete.parentEmail || "", beneficiaryType: selectedAthlete.payoutProfile?.beneficiaryType || "athlete", consent: Boolean(selectedAthlete.payoutProfile?.consent) });
+    const minor = minorFromBirthDate(selectedAthlete.birthDate);
+    setPayoutProfile({ method: "wise", legalName: minor ? selectedAthlete.parentName || "" : selectedAthlete.payoutProfile?.legalName || selectedAthlete.name || "", wiseEmail: minor ? selectedAthlete.parentEmail || "" : selectedAthlete.payoutProfile?.wiseEmail || selectedAthlete.payoutProfile?.interacEmail || selectedAthlete.email || "", beneficiaryType: minor ? "parent_guardian" : selectedAthlete.payoutProfile?.beneficiaryType || "athlete", consent: Boolean(selectedAthlete.payoutProfile?.consent) });
     setSaved(false);
   }, [selectedAthlete]);
 
@@ -680,6 +692,10 @@ export default function AthleteDashboard({
 
   async function savePayoutProfile() {
     if (!selectedAthlete?.id) return;
+    const isMinor = minorFromBirthDate(selectedAthlete.birthDate || form.birthDate);
+    if (isMinor && payoutProfile.beneficiaryType !== "parent_guardian") { alert("Pour un athlète mineur, le bénéficiaire doit obligatoirement être son parent ou tuteur légal."); return; }
+    if (isMinor && payoutProfile.wiseEmail.trim().toLowerCase() !== String(selectedAthlete.parentEmail || "").trim().toLowerCase()) { alert("Pour un athlète mineur, utilisez le courriel vérifié du parent ou tuteur légal."); return; }
+    if (isMinor && payoutProfile.legalName.trim().toLowerCase() !== String(selectedAthlete.parentName || "").trim().toLowerCase()) { alert("Pour un athlète mineur, le nom légal du bénéficiaire doit correspondre au parent ou tuteur légal vérifié du dossier."); return; }
     if (!payoutProfile.legalName.trim() || !payoutProfile.consent) { alert("Indiquez le nom légal du bénéficiaire et confirmez le consentement."); return; }
     if (!payoutProfile.wiseEmail.trim()) { alert("Indiquez l’adresse courriel que Wise utilisera pour sécuriser le versement."); return; }
     setSavingPayoutProfile(true);
@@ -689,7 +705,8 @@ export default function AthleteDashboard({
         legalName: payoutProfile.legalName.trim(),
         wiseEmail: payoutProfile.wiseEmail.trim().toLowerCase(),
         interacEmail: "",
-        beneficiaryType: payoutProfile.beneficiaryType,
+        beneficiaryType: isMinor ? "parent_guardian" : payoutProfile.beneficiaryType,
+        beneficiaryAuthority: isMinor ? "parent_or_legal_guardian" : "adult_athlete",
         consent: true,
         wiseRecipientStatus: "awaiting_invitation",
         updatedAt: new Date().toISOString(),
@@ -1352,8 +1369,8 @@ export default function AthleteDashboard({
                     <label className="grid gap-2 text-sm font-black text-zinc-700">Athlète concerné<select value={selectedAthleteId} onChange={(event) => setSelectedAthleteId(event.target.value)} className="rounded-2xl border border-zinc-200 p-3">{athletes.map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}</option>)}</select></label>
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><strong>Versement bancaire sécurisé par Wise</strong><br />KinkoLab prépare automatiquement un seul versement regroupant tout le solde admissible de votre campagne. Quinze jours après sa fin, Wise vous transmettra un lien sécurisé par courriel. Vous indiquerez vos coordonnées bancaires directement à Wise; KinkoLab ne les recevra jamais.</div>
                     <label className="grid gap-2 text-sm font-black text-zinc-700">Nom légal du bénéficiaire<input value={payoutProfile.legalName} onChange={(event) => setPayoutProfile({ ...payoutProfile, legalName: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /></label>
-                    <label className="grid gap-2 text-sm font-black text-zinc-700">Bénéficiaire<select value={payoutProfile.beneficiaryType} onChange={(event) => setPayoutProfile({ ...payoutProfile, beneficiaryType: event.target.value })} className="rounded-2xl border border-zinc-200 p-3"><option value="athlete">Athlète majeur</option><option value="parent_guardian">Parent ou tuteur légal</option></select></label>
-                    <label className="grid gap-2 text-sm font-black text-zinc-700">Courriel du bénéficiaire pour Wise<input type="email" value={payoutProfile.wiseEmail} onChange={(event) => setPayoutProfile({ ...payoutProfile, wiseEmail: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /><span className="font-normal text-zinc-500">Le lien Wise expire après sept jours. Pour un mineur, utilisez le courriel du parent ou tuteur légal qui recevra les fonds.</span></label>
+                    <label className="grid gap-2 text-sm font-black text-zinc-700">Bénéficiaire<select value={minorFromBirthDate(selectedAthlete?.birthDate || form.birthDate) ? "parent_guardian" : payoutProfile.beneficiaryType} disabled={minorFromBirthDate(selectedAthlete?.birthDate || form.birthDate)} onChange={(event) => setPayoutProfile({ ...payoutProfile, beneficiaryType: event.target.value })} className="rounded-2xl border border-zinc-200 p-3 disabled:bg-zinc-100"><option value="athlete">Athlète majeur</option><option value="parent_guardian">Parent ou tuteur légal</option></select></label>
+                    <label className="grid gap-2 text-sm font-black text-zinc-700">Courriel du bénéficiaire pour Wise<input type="email" value={payoutProfile.wiseEmail} onChange={(event) => setPayoutProfile({ ...payoutProfile, wiseEmail: event.target.value })} className="rounded-2xl border border-zinc-200 p-3" /><span className="font-normal text-zinc-500">Le lien Wise expire après sept jours. Pour un mineur, le bénéficiaire et le titulaire du compte doivent être le parent ou tuteur légal; son courriel doit correspondre au courriel parental vérifié du dossier.</span></label>
                     <label className="flex items-start gap-3 rounded-2xl bg-zinc-100 p-4 text-sm leading-6 text-zinc-700"><input type="checkbox" checked={payoutProfile.consent} onChange={(event) => setPayoutProfile({ ...payoutProfile, consent: event.target.checked })} className="mt-1" /><span>Je confirme que ces renseignements sont exacts et j’autorise KinkoLab à les utiliser uniquement pour effectuer et documenter les versements du Programme Athlètes.</span></label>
                     <button type="button" onClick={savePayoutProfile} disabled={savingPayoutProfile} className="rounded-2xl bg-black px-5 py-4 font-black text-white disabled:opacity-50">{savingPayoutProfile ? "Enregistrement…" : "Enregistrer les préférences"}</button>
                   </div>

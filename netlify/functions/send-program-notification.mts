@@ -55,7 +55,7 @@ function interpolate(value = "", variables: Record<string, string> = {}) {
   return String(value).replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, key) => variables[key] ?? "");
 }
 
-function emailLayout(title: string, body: string, buttonLabel = "", buttonUrl = "", customDesign: any = {}) {
+function emailLayout(title: string, body: string, buttonLabel = "", buttonUrl = "", customDesign: any = {}, unsubscribeUrl = "", language = "fr") {
   const design = { ...DEFAULT_DESIGN, ...(customDesign || {}) };
   const paragraphs = body.split(/\n\s*\n/).filter(Boolean);
   const align = ["left", "center", "right"].includes(design.alignment) ? design.alignment : "left";
@@ -67,7 +67,8 @@ function emailLayout(title: string, body: string, buttonLabel = "", buttonUrl = 
     button: buttonLabel && buttonUrl ? `<p style="margin-top:28px;text-align:${align}"><a href="${escapeHtml(buttonUrl)}" style="display:inline-block;border-radius:12px;background:${design.accentColor};color:${design.buttonTextColor};padding:14px 20px;font-weight:700;text-decoration:none">${escapeHtml(buttonLabel)}</a></p>` : "",
   };
   const order = Array.isArray(design.blocks) ? design.blocks : DEFAULT_DESIGN.blocks;
-  return `<!doctype html><html><body style="margin:0;background:${design.backgroundColor};font-family:Arial,sans-serif"><div style="max-width:${Number(design.contentWidth) || 640}px;margin:auto;padding:32px 20px"><div style="border:1px solid ${design.accentColor}55;border-radius:${Number(design.borderRadius) || 0}px;background:${design.cardColor};padding:32px">${order.map((key: string) => blocks[key] || "").join("")}<p style="margin-top:30px;border-top:1px solid ${design.accentColor}55;padding-top:20px;color:${design.textColor};opacity:.65;font-size:12px;text-align:${align}">KinkoLab Inc. · Terrebonne, Québec · athletes@kinkolab.com</p></div></div></body></html>`;
+  const unsubscribe = unsubscribeUrl ? `<p style="margin-top:12px;color:${design.textColor};opacity:.75;font-size:12px;text-align:${align}"><a href="${escapeHtml(unsubscribeUrl)}" style="color:${design.accentColor}">${language === "en" ? "Unsubscribe from optional emails" : "Se désabonner des courriels facultatifs"}</a></p>` : "";
+  return `<!doctype html><html><body style="margin:0;background:${design.backgroundColor};font-family:Arial,sans-serif"><div style="max-width:${Number(design.contentWidth) || 640}px;margin:auto;padding:32px 20px"><div style="border:1px solid ${design.accentColor}55;border-radius:${Number(design.borderRadius) || 0}px;background:${design.cardColor};padding:32px">${order.map((key: string) => blocks[key] || "").join("")}<p style="margin-top:30px;border-top:1px solid ${design.accentColor}55;padding-top:20px;color:${design.textColor};opacity:.65;font-size:12px;text-align:${align}">KinkoLab Inc. · Terrebonne, Québec · athletes@kinkolab.com</p>${unsubscribe}</div></div></body></html>`;
 }
 
 async function requireAdmin(req: Request) {
@@ -92,12 +93,12 @@ function renderTemplate(template: any, language: string, variables: Record<strin
   };
 }
 
-async function sendEmail(to: string, rendered: any) {
+async function sendEmail(to: string, rendered: any, options: any = {}) {
   const apiKey = Netlify.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("RESEND_API_KEY is missing");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, reply_to: "athletes@kinkolab.com", to: [to], subject: rendered.subject, html: emailLayout(rendered.title, rendered.body, rendered.buttonLabel, rendered.buttonUrl, rendered.design) }),
+    body: JSON.stringify({ from: FROM, reply_to: "athletes@kinkolab.com", to: [to], subject: rendered.subject, html: emailLayout(rendered.title, rendered.body, rendered.buttonLabel, rendered.buttonUrl, rendered.design, options.unsubscribeUrl, options.language), headers: options.unsubscribeUrl ? { "List-Unsubscribe": `<${options.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : undefined }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Resend rejected the email");
@@ -145,6 +146,7 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
   let recipient = "";
   let language = "fr";
   let variables: Record<string, string> = {};
+  let communicationConsent: any = null;
 
   if (["application_received", "application_accepted", "application_refused"].includes(type)) {
     recordRef = db.collection("applications").doc(recordId);
@@ -154,6 +156,7 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
     recipient = application?.parentEmail || application?.email || "";
     language = application?.preferredLanguage || "fr";
     variables = { name: application?.athleteName || `${application?.firstName || ""} ${application?.lastName || ""}`.trim(), campaign: application?.campaignTitle || "Programme Athlètes KinkoLab", amount: "", loginUrl: `${SITE_URL}/login`, accountSetupUrl: application?.accountSetupUrl || `${SITE_URL}/login` };
+    communicationConsent = application?.communicationConsent || null;
   } else if (type === "payout_paid") {
     recordRef = db.collection("payouts").doc(recordId);
     const snapshot = await recordRef.get();
@@ -173,6 +176,8 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
   const template = await getTemplate(type);
   if (!template) return Response.json({ error: "Template not found" }, { status: 404 });
   if (template.enabled === false) return Response.json({ sent: false, disabled: true });
+  const optional = template.category === "marketing" || template.communicationType === "optional";
+  if (optional && communicationConsent?.marketing !== true) return Response.json({ sent: false, skipped: "marketing_consent_required" });
   const current = (await recordRef.get()).data()?.emailNotifications?.[type];
   if (current) return Response.json({ sent: false, alreadySent: true });
   if (type !== "application_received" && !isAdmin) throw new Error("Unauthorized");
@@ -182,7 +187,10 @@ async function handleNotification(type: string, recordId: string, isAdmin: boole
     rendered.buttonUrl = variables.accountSetupUrl;
     rendered.buttonLabel = language === "en" ? "Create my password" : "Créer mon mot de passe";
   }
-  const resendId = await sendEmail(recipient, rendered);
+  const preferenceToken = optional ? communicationConsent?.emailPreferenceToken : "";
+  if (optional && !preferenceToken) return Response.json({ sent: false, skipped: "email_preference_token_required" });
+  const unsubscribeUrl = optional ? `${SITE_URL}/unsubscribe?token=${encodeURIComponent(preferenceToken)}&lang=${language}` : "";
+  const resendId = await sendEmail(recipient, rendered, { unsubscribeUrl, language });
   await recordRef.update({ [`emailNotifications.${type}`]: admin.firestore.FieldValue.serverTimestamp() });
   await logEmail({ type, recordId, recipient, language, resendId, status: "sent", test: false });
   let supporterNotifications = 0;
