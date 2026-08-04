@@ -68,6 +68,7 @@ import {
 import StatCard from "../components/StatCard";
 import { DEFAULT_DISCIPLINES, normalizeDisciplines } from "../config/programOptions";
 import { exportExcelReport, printFinancialReport } from "../utils/financialReports";
+import { athleteIsActiveInCampaign, isActiveParticipation } from "../utils/campaignParticipation";
 
 function slugify(value) {
   return String(value || "")
@@ -668,7 +669,7 @@ export default function AdminView({
     if (athleteFilters.discipline !== "all" && athlete.discipline !== athleteFilters.discipline) return false;
     if (athleteFilters.gender !== "all" && (athlete.gender || athlete.sex) !== athleteFilters.gender) return false;
     if (athleteFilters.para !== "all" && String(athlete.isParaAthlete || "non") !== athleteFilters.para) return false;
-    if (athleteFilters.campaign !== "all" && !participations.some((item) => item.athleteId === athlete.id && item.campaignId === athleteFilters.campaign)) return false;
+    if (athleteFilters.campaign !== "all" && !athleteIsActiveInCampaign(athlete, athleteFilters.campaign, participations)) return false;
     return true;
   }), [athletes, athleteFilters, participations]);
 
@@ -891,13 +892,9 @@ export default function AdminView({
     const campaignIdsForYear = new Set(allCampaigns
       .filter((campaign) => statsFilters.year === "all" || String(campaign.year) === statsFilters.year)
       .map((campaign) => campaign.id));
-    const relevantParticipations = participations.filter((item) => {
-      if (statsFilters.campaign !== "all" && item.campaignId !== statsFilters.campaign) return false;
-      return statsFilters.year === "all" || campaignIdsForYear.has(item.campaignId);
-    });
-    const participantIds = new Set(relevantParticipations.map((item) => item.athleteId));
+    const relevantCampaignIds = statsFilters.campaign !== "all" ? [statsFilters.campaign] : Array.from(campaignIdsForYear);
     const filteredAthletes = athletes.filter((athlete) => {
-      if ((statsFilters.campaign !== "all" || statsFilters.year !== "all") && !participantIds.has(athlete.id)) return false;
+      if ((statsFilters.campaign !== "all" || statsFilters.year !== "all") && !relevantCampaignIds.some((campaignId) => athleteIsActiveInCampaign(athlete, campaignId, participations))) return false;
       if (statsFilters.city !== "all" && athlete.city !== statsFilters.city) return false;
       if (statsFilters.dojo !== "all" && athlete.dojo !== statsFilters.dojo) return false;
       if (statsFilters.discipline !== "all" && athlete.discipline !== statsFilters.discipline) return false;
@@ -942,11 +939,12 @@ export default function AdminView({
       .filter((campaign) => statsFilters.year === "all" || String(campaign.year) === statsFilters.year)
       .filter((campaign) => statsFilters.campaign === "all" || campaign.id === statsFilters.campaign)
       .map((campaign) => {
-        const campaignParticipations = participations.filter((item) => item.campaignId === campaign.id);
+        const campaignParticipations = participations.filter((item) => item.campaignId === campaign.id && isActiveParticipation(item));
+        const campaignAthletes = athletes.filter((athlete) => athleteIsActiveInCampaign(athlete, campaign.id, participations));
         const campaignContributions = filteredContributions.filter((item) => item.campaignId === campaign.id);
         const raised = campaignContributions.reduce((sum, item) => sum + contributionAmount(item), 0)
           + campaignParticipations.reduce((sum, item) => sum + Number(item.raisedOffline || 0) + Number(item.raisedSponsorship || 0), 0);
-        return { id: campaign.id, title: campaign.title, year: campaign.year, athletes: new Set(campaignParticipations.map((item) => item.athleteId)).size, raised, goal: Number(campaign.goal || 0) };
+        return { id: campaign.id, title: campaign.title, year: campaign.year, athletes: campaignAthletes.length, raised, goal: Number(campaign.goal || 0) };
       }).sort((a, b) => String(b.year).localeCompare(String(a.year)) || b.raised - a.raised);
     return {
       athletes: filteredAthletes,
@@ -963,7 +961,7 @@ export default function AdminView({
     ["athletes", "Athlètes"],
     ["families", "Familles"],
     ["campaigns", "Campagnes"],
-    ["participations", "Participations"],
+    ["participations", "Inscriptions aux campagnes"],
     ["finances", "Finances"],
     ["statistics", "Statistiques"],
     ["communications", "Communications"],
@@ -1796,6 +1794,27 @@ export default function AdminView({
     alert("Versement enregistré.");
   }
 
+  async function managePayout(payout, action) {
+    const permanent = action === "delete_test";
+    const confirmation = permanent
+      ? window.prompt("Ce versement sans référence Wise sera supprimé définitivement. Écrivez SUPPRIMER pour confirmer.")
+      : window.confirm("Annuler ce versement? Il ne sera plus comptabilisé dans les montants versés.");
+    if ((permanent && confirmation !== "SUPPRIMER") || (!permanent && !confirmation)) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/payout-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ payoutId: payout.id, action, confirmation: permanent ? confirmation : undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossible de modifier ce versement.");
+      alert(permanent ? "Le versement test a été supprimé définitivement." : "Le versement a été annulé.");
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
   function approveMessage(id) {
     setWallMessages(
       wallMessages.map((message) =>
@@ -2151,7 +2170,7 @@ export default function AdminView({
         <section className="mt-8 grid gap-4 md:grid-cols-4">
           <StatCard light icon={Users} label="Athlètes" value={athletes.length} sub="Profils" />
           <StatCard light icon={Megaphone} label="Campagnes" value={allCampaigns.length} sub="Total" />
-          <StatCard light icon={Link2} label="Participations" value={participations.length} sub="Campagnes liées" />
+          <StatCard light icon={Link2} label="Inscriptions" value={participations.filter(isActiveParticipation).length} sub="Athlètes liés aux campagnes" />
           <StatCard light icon={DollarSign} label="Fonds réservés" value={money(financialSummary.reserved)} sub="Shopify / contributions" />
         </section>
 
@@ -2528,10 +2547,14 @@ export default function AdminView({
 
         {activeTab === "participations" && (
           <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 lg:col-span-2">
+              <h2 className="text-xl font-black text-zinc-950">À quoi sert une inscription à une campagne?</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-700">Elle relie un athlète à une campagne précise. C’est ici que le système détermine si son profil apparaît dans cette campagne, si les fonds lui sont attribués individuellement ou à sa famille, ainsi que son objectif et son statut. Archiver ou suspendre l’inscription retire l’athlète des listes publiques de cette campagne sans supprimer son profil.</p>
+            </div>
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
               <div className="flex items-center gap-3">
                 <Link2 style={{ color: gold }} />
-                <h2 className="text-2xl font-black text-zinc-950">Créer une participation</h2>
+                <h2 className="text-2xl font-black text-zinc-950">Inscrire un athlète à une campagne</h2>
               </div>
 
               <div className="mt-5 grid gap-3">
@@ -2552,15 +2575,15 @@ export default function AdminView({
 
                 <TextInput label="Objectif de participation" type="number" value={newParticipation.goal} onChange={(value) => setNewParticipation({ ...newParticipation, goal: value })} />
 
-                <AdminButton onClick={createParticipation}><Save size={16} /> Créer la participation</AdminButton>
+                <AdminButton onClick={createParticipation}><Save size={16} /> Créer l’inscription</AdminButton>
               </div>
             </div>
 
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-              <h2 className="text-2xl font-black text-zinc-950">Participations existantes</h2>
+              <h2 className="text-2xl font-black text-zinc-950">Inscriptions existantes</h2>
 
               <div className="mt-5 space-y-3">
-                {participations.length === 0 && <p className="text-zinc-500">Aucune participation créée.</p>}
+                {participations.length === 0 && <p className="text-zinc-500">Aucune inscription à une campagne.</p>}
 
                 {participations.map((participation) => (
                   <div key={participation.id} className="rounded-2xl border border-zinc-200 p-5">
@@ -2709,6 +2732,7 @@ export default function AdminView({
 
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
               <h2 className="text-2xl font-black text-zinc-950">Historique des versements</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Les statuts suivent le parcours réel : préparation, attente d’approbation Wise, traitement, versé, annulé ou échec. Un versement Wise déjà exécuté ne peut jamais être effacé du registre; seuls les essais ou corrections manuelles sans référence Wise peuvent être supprimés.</p>
 
               <div className="mt-5 space-y-3">
                 {payouts.length === 0 && <p className="text-zinc-500">Aucun versement enregistré pour le moment.</p>}
@@ -2725,7 +2749,11 @@ export default function AdminView({
 
                       <div className="text-right">
                         <p className="text-2xl font-black text-zinc-950">{money(payoutAmount(payout))}</p>
-                        <StatusPill status="versé" />
+                        <StatusPill status={(payout.status || "paid") === "paid" ? "versé" : payout.status} />
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                          {(payout.status || "paid") === "paid" && !payout.wiseTransferId && <AdminButton variant="amber" onClick={() => managePayout(payout, "cancel")}><XCircle size={15} /> Annuler</AdminButton>}
+                          {!payout.wiseTransferId && <AdminButton variant="red" onClick={() => managePayout(payout, "delete_test")}><Trash2 size={15} /> Supprimer le test</AdminButton>}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2735,6 +2763,7 @@ export default function AdminView({
 
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
               <h2 className="text-2xl font-black text-zinc-950">Historique Shopify</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Les ventes payées réservent automatiquement la part de l’athlète. Une annulation ou un remboursement Shopify retire automatiquement cette part et conserve une trace séparée dans cet historique.</p>
 
               <div className="mt-5 space-y-3">
                 {contributions.length === 0 && <p className="text-zinc-500">Aucune contribution enregistrée.</p>}
