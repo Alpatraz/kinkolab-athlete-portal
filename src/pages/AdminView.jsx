@@ -1554,6 +1554,28 @@ export default function AdminView({
     }
   }
 
+  async function manageFamily(family, action) {
+    if (action === "archive" && !window.confirm(`Archiver la famille « ${family.name} » ? Elle restera en mémoire et pourra être réactivée.`)) return;
+    const confirmation = action === "hard_delete"
+      ? window.prompt(`Cette suppression est définitive. Tapez SUPPRIMER pour effacer la famille « ${family.name} ». Les athlètes seront conservés et détachés de la famille.`)
+      : undefined;
+    if (action === "hard_delete" && confirmation !== "SUPPRIMER") return;
+    setActionLoadingId(`family-${family.id}`);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/family-admin", {
+        method: action === "hard_delete" ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ familyId: family.id, action, confirmation }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Opération impossible");
+      alert(action === "hard_delete" ? `La famille « ${family.name} » a été supprimée définitivement.` : action === "archive" ? `La famille « ${family.name} » a été archivée.` : `La famille « ${family.name} » a été réactivée.`);
+    } catch (error) {
+      alert(`Impossible de modifier cette famille : ${error.message || "erreur inconnue"}`);
+    } finally { setActionLoadingId(""); }
+  }
+
   async function createParticipation() {
     if (!newParticipation.athleteId || !newParticipation.campaignId) {
       alert("Athlète et campagne obligatoires.");
@@ -2328,6 +2350,12 @@ export default function AdminView({
                           <p className="text-sm text-zinc-500">{family.contactEmail}</p>
                         </div>
                         <StatusPill status={family.status || "active"} />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <AdminButton variant="light" disabled={actionLoadingId === `family-${family.id}`} onClick={() => manageFamily(family, "archive")}><Archive size={16} /> Archiver</AdminButton>
+                        <AdminButton variant="green" disabled={actionLoadingId === `family-${family.id}`} onClick={() => manageFamily(family, "reactivate")}><RotateCcw size={16} /> Réactiver</AdminButton>
+                        <AdminButton variant="red" disabled={actionLoadingId === `family-${family.id}`} onClick={() => manageFamily(family, "hard_delete")}><Trash2 size={16} /> Supprimer définitivement</AdminButton>
                       </div>
 
                       <div className="mt-5 space-y-2">
