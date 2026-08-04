@@ -1,5 +1,6 @@
 import type { Config } from "@netlify/functions";
 import admin from "firebase-admin";
+import crypto from "node:crypto";
 
 function getAdminApp() {
   if (admin.apps.length) return admin.app();
@@ -40,13 +41,22 @@ function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character] || character));
 }
 
+function activationDetails() {
+  const token = crypto.randomBytes(32).toString("base64url");
+  return {
+    tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    url: `https://athletes.kinkolab.com/activate?token=${encodeURIComponent(token)}`,
+  };
+}
+
 async function sendInvitation(email: string, name: string, setupUrl: string, language: string) {
   const apiKey = Netlify.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("RESEND_API_KEY is missing");
   const english = language === "en";
   const subject = english ? "Your KinkoLab administrator access" : "Votre accès administrateur KinkoLab";
   const title = english ? "Administrator invitation" : "Invitation administrateur";
-  const message = english ? `Hello ${name}, your KinkoLab administrator account is ready. Choose your password securely.` : `Bonjour ${name}, votre compte administrateur KinkoLab est prêt. Choisissez votre mot de passe de façon sécurisée.`;
+  const message = english ? `Hello ${name}, your KinkoLab administrator account is ready. Your login ID is ${email}. Use the secure button below to create your password.` : `Bonjour ${name}, votre compte administrateur KinkoLab est prêt. Votre identifiant de connexion est ${email}. Utilisez le bouton sécurisé ci-dessous pour créer votre mot de passe.`;
   const button = english ? "Create my password" : "Créer mon mot de passe";
   const loginMessage = english ? "After choosing your password, sign in to the Athlete Portal." : "Après avoir choisi votre mot de passe, connectez-vous au Portail Athlètes.";
   const loginLabel = english ? "Open the Athlete Portal" : "Ouvrir le Portail Athlètes";
@@ -114,12 +124,10 @@ export default async (req: Request) => {
       user = await admin.auth().createUser({ email: String(email).trim().toLowerCase(), displayName: name, password: `Kinko-${crypto.randomUUID()}-Aa1!` });
     }
     const userRef = db.collection("users").doc(user.uid);
-    await userRef.set({ uid: user.uid, email: user.email, name, role: "admin", preferredLanguage: language, invitedBy: currentAdmin.uid, invitationStatus: "pending", invitationError: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    const activation = activationDetails();
+    await userRef.set({ uid: user.uid, email: user.email, name, role: "admin", preferredLanguage: language, invitedBy: currentAdmin.uid, invitationStatus: "pending", mustChangePassword: true, adminActivation: { tokenHash: activation.tokenHash, expiresAt: activation.expiresAt, usedAt: null, email: user.email, userId: user.uid }, invitationError: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     try {
-      // Firebase's hosted password page does not require a custom continue URL. This
-      // keeps invitations working even before the portal domain is allowlisted.
-      const setupUrl = await admin.auth().generatePasswordResetLink(user.email!);
-      const invitation = await sendInvitation(user.email!, name, setupUrl, language);
+      const invitation = await sendInvitation(user.email!, name, activation.url, language);
       await Promise.all([
         userRef.set({ invitationStatus: "sent", invitationSentAt: admin.firestore.FieldValue.serverTimestamp(), invitationResendId: invitation.id, invitationError: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
         db.collection("emailLogs").add({ type: "admin_invitation", recipient: user.email, language, resendId: invitation.id, subject: invitation.subject, status: "sent", test: false, userId: user.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() }),
