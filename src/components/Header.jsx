@@ -37,7 +37,7 @@ export default function Header({
   }
 
   return (
-    <header data-i18n-managed className="sticky top-0 z-50 border-b border-zinc-800 bg-black/95 px-4 py-3 text-white backdrop-blur md:px-8">
+    <header data-i18n-managed className="sticky top-0 z-50 border-b border-zinc-800 bg-black px-4 py-3 text-white md:px-8">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
         <button onClick={() => closeAndRun(goHome)} className="flex items-center gap-3 text-left">
           <div>
@@ -116,7 +116,7 @@ export default function Header({
       </div>
 
       {mobileOpen && (
-  <div className="fixed inset-0 z-[999] h-dvh overflow-hidden bg-black/95 backdrop-blur-xl lg:hidden">
+  <div className="fixed inset-0 z-[999] h-[100dvh] overflow-hidden bg-black lg:hidden">
     <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
       <div className="flex items-center gap-3">
         <div>
@@ -137,8 +137,20 @@ export default function Header({
       </button>
     </div>
 
-    <nav className="h-[calc(100dvh-76px)] space-y-2 overflow-y-auto p-4 pb-28 overscroll-contain">
+    <nav className="absolute inset-x-0 bottom-0 top-[76px] space-y-2 overflow-y-auto p-4 pb-[max(2rem,env(safe-area-inset-bottom))] overscroll-contain" style={{ WebkitOverflowScrolling: "touch" }}>
       <LanguageSelector mobile />
+      {currentUser && (
+        <button
+          onClick={() => {
+            setMobileOpen(false);
+            setCurrentUser(null);
+          }}
+          className="w-full rounded-2xl px-5 py-4 text-left text-lg font-black text-black"
+          style={{ background: gold }}
+        >
+          {t("nav.logout")}
+        </button>
+      )}
       <button
         onClick={() => closeAndRun(goHome)}
         className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
@@ -192,18 +204,8 @@ export default function Header({
         KinkoLab.com <ExternalLink size={20} aria-hidden="true" />
       </a>
 
-      <div className="pt-4">
-        {currentUser ? (
-          <button
-            onClick={() => {
-              setMobileOpen(false);
-              setCurrentUser(null);
-            }}
-            className="w-full rounded-2xl bg-zinc-900 px-5 py-4 text-lg font-black text-white"
-          >
-            {t("nav.logout")}
-          </button>
-        ) : (
+      {!currentUser && (
+        <div className="pt-2">
           <button
             onClick={() => closeAndRun(openLogin)}
             className="flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-black text-black shadow-xl"
@@ -212,8 +214,8 @@ export default function Header({
             <LogIn size={22} />
             {t("nav.login")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </nav>
   </div>
 )}
