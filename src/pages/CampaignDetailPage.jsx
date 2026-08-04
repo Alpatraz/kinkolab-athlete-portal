@@ -587,6 +587,7 @@ const raisedManual = campaignParticipations.reduce(
   key={athlete.id}
   athlete={athlete}
   campaigns={[campaign]}
+  participation={campaignParticipations.find((item) => item.athleteId === athlete.id) || (athlete.campaignId === campaign.id ? { campaignId: campaign.id, goal: athlete.goal } : null)}
   contributions={contributions}
   onOpen={onOpenAthlete}
   onOpenCampaign={() => {}}
