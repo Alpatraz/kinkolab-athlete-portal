@@ -1266,11 +1266,8 @@ export default function AdminView({
 
   async function updateAthleteStatus(athlete, status, action = "update_status") {
     const labels = { suspendu: "suspendre", actif: "réactiver", archivé: "archiver", supprimé: "supprimer" };
-    if (["archivé", "supprimé"].includes(status) && !window.confirm(
-      status === "supprimé"
-        ? `Supprimer ${athlete.name} ? Le profil public sera retiré, mais les données financières seront conservées pour les rapports.`
-        : `Archiver ${athlete.name} ? Le profil public sera retiré et pourra être réactivé plus tard.`
-    )) return;
+    if (status === "archivé" && !window.confirm(`Archiver ${athlete.name} ? Le profil public sera retiré et pourra être réactivé plus tard.`)) return;
+    if (action === "hard_delete" && window.prompt(`Cette suppression est définitive. Tapez SUPPRIMER pour effacer ${athlete.name}. Les écritures comptables obligatoires seront conservées.`) !== "SUPPRIMER") return;
     setActionLoadingId(`athlete-${athlete.id}`);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -1281,7 +1278,7 @@ export default function AdminView({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Modification impossible");
-      alert(`${athlete.name} a bien été ${status === "actif" ? "réactivé" : status}.`);
+      alert(action === "hard_delete" ? `${athlete.name} a été supprimé définitivement.` : `${athlete.name} a bien été ${status === "actif" ? "réactivé" : status}.`);
     } catch (error) {
       alert(`Impossible de ${labels[status] || "modifier"} cet athlète : ${error.message || "erreur inconnue"}`);
     } finally {
@@ -1423,9 +1420,19 @@ export default function AdminView({
     }
   }
 
-  async function deleteCampaign(campaign) {
-    if (!window.confirm(`Supprimer la campagne « ${campaign.title} » ? Elle restera récupérable dans le filtre Supprimées.`)) return;
-    await updateCampaignStatus(campaign, "deleted");
+  async function deleteCampaignPermanently(campaign) {
+    const confirmation = window.prompt(`Cette suppression est définitive. Tapez SUPPRIMER pour effacer la campagne « ${campaign.title} ». Les écritures comptables obligatoires seront conservées.`);
+    if (confirmation !== "SUPPRIMER") return;
+    setActionLoadingId(`campaign-${campaign.id}`);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("/api/campaign-admin", { method: "DELETE", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ campaignId: campaign.id, confirmation }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Suppression impossible");
+      alert(`La campagne « ${campaign.title} » a été supprimée définitivement.`);
+    } catch (error) {
+      alert(`Impossible de supprimer définitivement cette campagne : ${error.message || "erreur inconnue"}`);
+    } finally { setActionLoadingId(""); }
   }
 
   async function duplicateCampaignEdition(campaign) {
@@ -2274,7 +2281,7 @@ export default function AdminView({
                       <AdminButton variant="amber" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "suspendu")}><Ban size={16} /> Suspendre</AdminButton>
                       <AdminButton variant="green" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "actif")}><RotateCcw size={16} /> Réactiver</AdminButton>
                       <AdminButton variant="light" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "archivé", "archive")}><Archive size={16} /> Archiver</AdminButton>
-                      <AdminButton variant="red" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "supprimé", "delete")}><Trash2 size={16} /> Supprimer</AdminButton>
+                      <AdminButton variant="red" disabled={actionLoadingId === `athlete-${athlete.id}`} onClick={() => updateAthleteStatus(athlete, "supprimé", "hard_delete")}><Trash2 size={16} /> Supprimer définitivement</AdminButton>
                     </div>
                   </div>
 
@@ -2438,7 +2445,7 @@ export default function AdminView({
                           <AdminButton variant="amber" onClick={() => updateCampaignStatus(campaign, "paused")}>Mettre en pause</AdminButton>
                           <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "completed")}>Terminer</AdminButton>
                           <AdminButton variant="light" onClick={() => updateCampaignStatus(campaign, "archived")}>Archiver</AdminButton>
-                          <AdminButton variant="red" onClick={() => deleteCampaign(campaign)}><Trash2 size={15} /> Supprimer</AdminButton>
+                          <AdminButton variant="red" disabled={actionLoadingId === `campaign-${campaign.id}`} onClick={() => deleteCampaignPermanently(campaign)}><Trash2 size={15} /> Supprimer définitivement</AdminButton>
                         </div>
                       </>
                     )}
