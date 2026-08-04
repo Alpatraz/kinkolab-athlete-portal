@@ -19,6 +19,7 @@ import Footer from "./components/Footer";
 
 import { auth, db } from "./firebase";
 import { campaignsSeed } from "./data/demoData";
+import { activeCampaignIdForAthlete } from "./utils/campaignParticipation";
 
 import EligibilityCriteriaPage from "./pages/EligibilityCriteriaPage";
 
@@ -279,13 +280,13 @@ export default function App() {
   }));
 }, [firebaseCampaigns]);
 
-  const publicAthletes = useMemo(() => {
-    return athletes.filter(isPublicAthlete);
-  }, [athletes]);
-
   const publicCampaigns = useMemo(() => {
     return campaigns.filter((campaign) => ["active", "actif", "active"].includes(String(campaign.status || "active").toLowerCase()));
   }, [campaigns]);
+
+  const publicAthletes = useMemo(() => {
+    return athletes.filter(isPublicAthlete).filter((athlete) => activeCampaignIdForAthlete(athlete, participations, publicCampaigns));
+  }, [athletes, participations, publicCampaigns]);
 
   const viewableCampaigns = useMemo(() => campaigns.filter((campaign) => {
     const status = String(campaign.status || "active").toLowerCase();

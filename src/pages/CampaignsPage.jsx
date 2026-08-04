@@ -4,6 +4,8 @@ import { gold, money } from "../utils/format";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
 import { withCampaignDefaults } from "../utils/campaignDetails";
+import CampaignCountdown from "../components/CampaignCountdown";
+import { athleteIsActiveInCampaign, isActiveParticipation as participationIsActive } from "../utils/campaignParticipation";
 
 function isVisibleCampaign(campaign) {
   return (
@@ -36,14 +38,7 @@ function participationRaised(participation) {
 }
 
 function isActiveParticipation(participation) {
-  return (
-    participation &&
-    participation.status !== "suspendue" &&
-    participation.status !== "suspendu" &&
-    participation.status !== "archivée" &&
-    participation.status !== "archivé" &&
-    participation.status !== "archive"
-  );
+  return participationIsActive(participation);
 }
 
 function contributionAmount(contribution) {
@@ -105,14 +100,9 @@ export default function CampaignsPage({
   }
 
   function campaignAthletes(campaignId) {
-    const activeParticipations = campaignParticipations(campaignId);
-    const athleteIds = new Set(
-      activeParticipations.map((participation) => participation.athleteId)
-    );
-
     return (athletes || []).filter(
       (athlete) =>
-        athleteIds.has(athlete.id) &&
+        athleteIsActiveInCampaign(athlete, campaignId, participations) &&
         athlete.status !== "suspendu" &&
         athlete.status !== "archivé" &&
         athlete.isPublic !== false
@@ -207,6 +197,7 @@ export default function CampaignsPage({
                       <h2 className="mt-3 text-3xl font-black text-white">
                         {localizedField(campaign, "title", language) || "Campagne KinkoLab"}
                       </h2>
+                      <div className="mt-4"><CampaignCountdown endDate={campaign.endDate} /></div>
                     </div>
 
                     <div

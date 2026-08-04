@@ -251,6 +251,12 @@ exports.handler = async function (event) {
       };
     }
 
+    if (!application.campaignId) return { statusCode: 400, body: JSON.stringify({ error: "A campaign is required" }) };
+    const campaignSnapshot = await db.collection("campaigns").doc(application.campaignId).get();
+    if (!campaignSnapshot.exists) return { statusCode: 400, body: JSON.stringify({ error: "The selected campaign no longer exists. Choose an active campaign before accepting." }) };
+    const campaignData = campaignSnapshot.data() || {};
+    if (!["active", "actif"].includes(String(campaignData.status || "active").toLowerCase())) return { statusCode: 400, body: JSON.stringify({ error: "The selected campaign is not active. Choose an active campaign before accepting." }) };
+
     const temporaryPassword = generateTemporaryPassword();
     const familyId = buildFamilyId(application);
 
@@ -283,6 +289,25 @@ exports.handler = async function (event) {
     const accountSetupUrl = activation.url;
 
     await db.collection("athletes").doc(athlete.id).set(athlete, { merge: true });
+
+    const participationId = slugify(`${athlete.id}-${application.campaignId}-individual`);
+    await db.collection("campaignParticipations").doc(participationId).set({
+      athleteId: athlete.id,
+      athleteName: athlete.name,
+      familyId: familyId || null,
+      familyName: athlete.familyName || null,
+      campaignId: application.campaignId,
+      campaignTitle: campaignData.title || application.campaignTitle || application.campaignId,
+      fundingMode: "individual",
+      fundingGroupId: `${athlete.id}-${application.campaignId}`,
+      goal: Number(application.desiredGoal || 0),
+      raisedShop: 0,
+      raisedOffline: 0,
+      raisedSponsorship: 0,
+      status: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
 
     await db.collection("families").doc(familyId).set(
       {

@@ -285,6 +285,11 @@ export default function SignupView({ goBack, openEligibility, campaigns = campai
 
   async function submitApplication(event) {
     event.preventDefault();
+    const selectedCampaign = campaigns.find((campaign) => campaign.id === form.campaignId);
+    if (!selectedCampaign) {
+      alert("Choisissez une campagne active avant d’envoyer votre candidature.");
+      return;
+    }
     if (!(form.motivationFr.trim() || form.motivationEn.trim()) || !(form.campaignReasonFr.trim() || form.campaignReasonEn.trim())) {
       alert("Présentez-vous et expliquez votre campagne dans au moins une langue.");
       return;

@@ -5,6 +5,7 @@ import ProgressBar from "../components/ProgressBar";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
 import { plainRichText } from "../components/RichText";
+import { activeCampaignIdForAthlete } from "../utils/campaignParticipation";
 
 function isVisibleAthlete(athlete) {
   return (
@@ -36,6 +37,7 @@ export default function AthletesPage({
   athletes = [],
   campaigns = [],
   contributions = [],
+  participations = [],
   onOpenAthlete,
   onOpenCampaign,
 }) {
@@ -85,7 +87,7 @@ export default function AthletesPage({
           athlete.province,
           athlete.discipline,
           athlete.belt,
-          campaignTitle(campaigns || [], athlete.campaignId),
+          campaignTitle(campaigns || [], activeCampaignIdForAthlete(athlete, participations, campaigns)),
         ]
           .filter(Boolean)
           .join(" ")
@@ -93,7 +95,7 @@ export default function AthletesPage({
 
         return text.includes(search.toLowerCase());
       });
-  }, [athletes, campaigns, search]);
+  }, [athletes, campaigns, participations, search]);
 
   return (
     <main className="min-h-screen bg-black p-4 text-white md:p-8">
@@ -132,7 +134,8 @@ export default function AthletesPage({
           {visibleAthletes.map((athlete) => {
             const raised = raisedForAthlete(athlete);
             const progress = progressForAthlete(athlete, raised);
-            const campaignName = campaignTitle(campaigns || [], athlete.campaignId);
+            const activeCampaignId = activeCampaignIdForAthlete(athlete, participations, campaigns);
+            const campaignName = activeCampaignId ? campaignTitle(campaigns || [], activeCampaignId) : "";
 
             return (
               <article key={athlete.id} className="overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 shadow-xl">
@@ -175,7 +178,7 @@ export default function AthletesPage({
 
                     {campaignName && (
                       <button
-                        onClick={() => onOpenCampaign?.(athlete.campaignId)}
+                        onClick={() => onOpenCampaign?.(activeCampaignId)}
                         className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-bold text-zinc-300 hover:bg-zinc-800"
                       >
                         {campaignName}

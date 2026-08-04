@@ -18,6 +18,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
+import CampaignCountdown from "../components/CampaignCountdown";
+import { athleteIsActiveInCampaign, isActiveParticipation } from "../utils/campaignParticipation";
 
 const DEFAULT_HERO_IMAGE_URL = "/images/kinkolab-programme-athletes-hero.png";
 const HOODIE_SUPPORT_AMOUNT = 20;
@@ -59,14 +61,7 @@ function isActiveContribution(contribution) {
 }
 
 function campaignStats(campaign, athletes = [], participations = [], contributions = []) {
-  const campaignParticipations = (participations || []).filter(
-    (participation) =>
-      participation.campaignId === campaign.id &&
-      participation.status !== "suspendue" &&
-      participation.status !== "suspendu" &&
-      participation.status !== "archivée" &&
-      participation.status !== "archivé"
-  );
+  const campaignParticipations = (participations || []).filter((participation) => participation.campaignId === campaign.id && isActiveParticipation(participation));
 
   const activeContributions = (contributions || []).filter(
     (contribution) =>
@@ -79,30 +74,17 @@ function campaignStats(campaign, athletes = [], participations = [], contributio
     0
   );
 
-  if (campaignParticipations.length > 0) {
-    const athleteIds = new Set(
-      campaignParticipations.map((item) => item.athleteId)
-    );
-
-    return {
-      athletesCount: Array.from(athleteIds).filter(Boolean).length,
-      raised: contributionRaised,
-      goal: campaignParticipations.reduce(
-        (sum, item) => sum + Number(item.goal || 0),
-        0
-      ),
-    };
-  }
-
   const linkedAthletes = (athletes || []).filter(
-    (athlete) => athlete.campaignId === campaign.id && isVisibleAthlete(athlete)
+    (athlete) => athleteIsActiveInCampaign(athlete, campaign.id, participations) && isVisibleAthlete(athlete)
   );
+
+  const participationByAthlete = new Map(campaignParticipations.map((item) => [item.athleteId, item]));
 
   return {
     athletesCount: linkedAthletes.length,
     raised: contributionRaised,
     goal: linkedAthletes.reduce(
-      (sum, athlete) => sum + Number(athlete.goal || 0),
+      (sum, athlete) => sum + Number(participationByAthlete.get(athlete.id)?.goal || athlete.goal || 0),
       0
     ),
   };
@@ -169,6 +151,8 @@ function CampaignCard({ campaign, athletes, participations, contributions, onOpe
             <h3 className="mt-3 text-3xl font-black uppercase leading-tight">
               {campaign.title || "Campagne KinkoLab"}
             </h3>
+
+            <div className="mt-4"><CampaignCountdown endDate={campaign.endDate} /></div>
 
             <p className="mt-5 text-sm leading-7 text-zinc-300">
               {campaign.description ||

@@ -17,6 +17,7 @@ import {
 import { gold, money, totalRaised } from "../utils/format";
 import ProgressBar from "../components/ProgressBar";
 import AthleteCard from "../components/AthleteCard";
+import CampaignCountdown from "../components/CampaignCountdown";
 import { useLanguage } from "../context/LanguageContext";
 import { localizedField } from "../utils/localizedContent";
 import RichText from "../components/RichText";
@@ -367,6 +368,7 @@ const raisedManual = campaignParticipations.reduce(
 
             <aside className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 md:p-8">
               <h2 className="text-2xl font-black">{pageCopy.details}</h2>
+              <div className="mt-4"><CampaignCountdown endDate={campaign.endDate} /></div>
               <dl className="mt-6 space-y-5">
                 <CampaignFact icon={CalendarDays} label={pageCopy.dates} value={dates} />
                 {campaignPeriod && <CampaignFact icon={CalendarDays} label={pageCopy.campaignPeriod} value={campaignPeriod} />}

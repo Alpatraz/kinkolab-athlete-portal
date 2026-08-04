@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ExternalLink, LogIn, Menu, X } from "lucide-react";
 import { gold } from "../utils/format";
 import { useLanguage } from "../context/LanguageContext";
@@ -18,8 +18,13 @@ export default function Header({
   const isAdmin = currentUser?.role === "admin";
   const { language, setLanguage, t } = useLanguage();
 
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
   const LanguageSelector = ({ mobile = false }) => (
-    <div className={`${mobile ? "w-full justify-center rounded-3xl px-6 py-4 text-lg" : "rounded-2xl px-3 py-2 text-sm"} flex items-center gap-2 border border-zinc-700 bg-zinc-950 font-black`} aria-label={t("language.selector")}>
+    <div className={`${mobile ? "flex w-full justify-center rounded-2xl px-5 py-3 text-base" : "hidden rounded-2xl px-3 py-2 text-sm sm:flex"} items-center gap-2 border border-zinc-700 bg-zinc-950 font-black`} aria-label={t("language.selector")}>
       <button type="button" onClick={() => setLanguage("fr")} className={language === "fr" ? "text-yellow-400" : "text-zinc-400 hover:text-white"} aria-pressed={language === "fr"}>FR</button>
       <span className="text-zinc-600" aria-hidden="true">/</span>
       <button type="button" onClick={() => setLanguage("en")} className={language === "en" ? "text-yellow-400" : "text-zinc-400 hover:text-white"} aria-pressed={language === "en"}>EN</button>
@@ -111,7 +116,7 @@ export default function Header({
       </div>
 
       {mobileOpen && (
-  <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-xl lg:hidden">
+  <div className="fixed inset-0 z-[999] h-dvh overflow-hidden bg-black/95 backdrop-blur-xl lg:hidden">
     <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
       <div className="flex items-center gap-3">
         <div>
@@ -132,25 +137,25 @@ export default function Header({
       </button>
     </div>
 
-    <nav className="p-5 space-y-4">
+    <nav className="h-[calc(100dvh-76px)] space-y-2 overflow-y-auto p-4 pb-28 overscroll-contain">
       <LanguageSelector mobile />
       <button
         onClick={() => closeAndRun(goHome)}
-        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
       >
         {t("nav.home")}
       </button>
 
       <button
         onClick={() => closeAndRun(openAthletes)}
-        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
       >
         {t("nav.athletes")}
       </button>
 
       <button
         onClick={() => closeAndRun(openCampaigns)}
-        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
       >
         {t("nav.campaigns")}
       </button>
@@ -158,7 +163,7 @@ export default function Header({
       {currentUser && (
         <button
           onClick={() => closeAndRun(openDashboard)}
-          className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+          className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
         >
           {t("nav.dashboard")}
         </button>
@@ -166,7 +171,7 @@ export default function Header({
 
       <button
         onClick={() => closeAndRun(openSignup)}
-        className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
       >
         {t("nav.signup")}
       </button>
@@ -174,7 +179,7 @@ export default function Header({
       {isAdmin && (
         <button
           onClick={() => closeAndRun(openAdmin)}
-          className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+          className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
         >
           Admin
         </button>
@@ -182,7 +187,7 @@ export default function Header({
 
       <a
         href="https://kinkolab.com"
-        className="flex w-full items-center justify-between rounded-3xl border border-zinc-800 bg-zinc-950 px-6 py-5 text-left text-xl font-black text-white shadow-xl"
+        className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 px-5 py-4 text-left text-lg font-black text-white shadow-xl"
       >
         KinkoLab.com <ExternalLink size={20} aria-hidden="true" />
       </a>
@@ -194,14 +199,14 @@ export default function Header({
               setMobileOpen(false);
               setCurrentUser(null);
             }}
-            className="w-full rounded-3xl bg-zinc-900 px-6 py-5 text-xl font-black text-white"
+            className="w-full rounded-2xl bg-zinc-900 px-5 py-4 text-lg font-black text-white"
           >
             {t("nav.logout")}
           </button>
         ) : (
           <button
             onClick={() => closeAndRun(openLogin)}
-            className="flex w-full items-center justify-center gap-3 rounded-3xl px-6 py-5 text-xl font-black text-black shadow-xl"
+            className="flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-black text-black shadow-xl"
             style={{ background: gold }}
           >
             <LogIn size={22} />
